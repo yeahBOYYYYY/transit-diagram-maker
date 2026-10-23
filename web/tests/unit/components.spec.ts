@@ -13,6 +13,7 @@ import NumberField from '../../src/components/ui/NumberField.vue'
 import ColorField from '../../src/components/ui/ColorField.vue'
 import ShortcutsDialog from '../../src/components/dialogs/ShortcutsDialog.vue'
 import DocumentSettingsDialog from '../../src/components/dialogs/DocumentSettingsDialog.vue'
+import AboutDialog from '../../src/components/dialogs/AboutDialog.vue'
 import { prefs } from '../../src/stores/prefs'
 
 let wrappers: VueWrapper[] = []
@@ -196,6 +197,18 @@ describe('ToolsPanel', () => {
     await w.find('[data-testid=tool-flyout] [data-tool=eraser]').trigger('pointerup')
     expect(store.state.tool).toBe('eraser')
     expect(w.find('[data-testid=tool-flyout]').exists()).toBe(false)
+  })
+})
+
+describe('AboutDialog', () => {
+  it('describes the program, its author and repository rather than the frameworks', () => {
+    freshStore()
+    const w = mountIt(AboutDialog)
+    const text = w.find('[data-testid=about]').text()
+    expect(text).toContain('yeahBOYYYYY')
+    expect(text).toContain('github.com/yeahBOYYYYY/transit-diagram-maker')
+    expect(text).toMatch(/Version \d+\.\d+\.\d+/)
+    expect(text).not.toMatch(/Rust|WebAssembly|Vue/)
   })
 })
 
