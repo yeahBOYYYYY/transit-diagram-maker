@@ -115,10 +115,10 @@ impl TransitEditor {
     #[wasm_bindgen(js_name = previewPill)]
     pub fn preview_pill(&self, cells_json: &str, outer: &str, inner: &str) -> Result<String, JsError> {
         let cells: Vec<Cell> = parse(cells_json)?;
-        let st = transit_core::Station {
-            line_ids: vec![],
-            shape: transit_core::StationShape::Pill { cells, outer_color: outer.into(), inner_color: inner.into() },
-        };
+        let st = transit_core::Station::new(
+            vec![],
+            transit_core::StationShape::Pill { cells, outer_color: outer.into(), inner_color: inner.into() },
+        );
         Ok(render::station_svg(&st, self.inner.settings()))
     }
 
@@ -285,8 +285,9 @@ impl TransitEditor {
         Ok(json(&self.inner.duplicate(&ids(ids_json)?).map_err(err)?))
     }
 
-    pub fn translate(&mut self, ids_json: &str, dx: f64, dy: f64) -> Result<(), JsError> {
-        self.inner.translate(&ids(ids_json)?, dx, dy).map_err(err)
+    /// `free` moves stations off their line (Alt-drag) instead of re-snapping them.
+    pub fn translate(&mut self, ids_json: &str, dx: f64, dy: f64, free: bool) -> Result<(), JsError> {
+        self.inner.translate(&ids(ids_json)?, dx, dy, free).map_err(err)
     }
 
     pub fn rotate(&mut self, ids_json: &str, deg: f64, px: f64, py: f64) -> Result<f64, JsError> {

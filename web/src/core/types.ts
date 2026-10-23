@@ -68,7 +68,8 @@ export type StationShape =
   | { shape: 'tick'; cell: Cell; dir: number; side: number; width: number; length: number; color: string }
   | { shape: 'pill'; cells: Cell[]; outer_color: string; inner_color: string }
 
-export type StationContent = { kind: 'station'; line_ids: Id[] } & StationShape
+/** `offset` is the free displacement from the line cell (Alt-drag), in cells. */
+export type StationContent = { kind: 'station'; line_ids: Id[]; offset: Vec2 } & StationShape
 
 export interface TextBox {
   pos: Vec2

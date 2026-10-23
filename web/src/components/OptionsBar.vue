@@ -48,7 +48,7 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
       <button class="icon-btn" title="Rotate 45° clockwise" :disabled="!s.selection.length" @click="rotateSelection(store, 45)">
         <UiIcon name="rotate-cw" :size="16" />
       </button>
-      <span class="hint dim">Click a selected object to toggle rotate handles · Shift: add to selection · Alt: free move</span>
+      <span class="hint dim">Click a selected object to toggle rotate handles · Shift: add to selection · Alt+drag: free move (stations leave their line)</span>
     </template>
 
     <template v-else-if="tool === 'hand'">

@@ -219,6 +219,21 @@ pub struct Station {
     pub line_ids: Vec<Id>,
     #[serde(flatten)]
     pub shape: StationShape,
+    /// Free displacement from the line cell in cells (0.1 precision), set by
+    /// moving the station with Alt held. Zero means it sits on its line.
+    #[serde(default)]
+    pub offset: Vec2,
+}
+
+impl Station {
+    pub fn new(line_ids: Vec<Id>, shape: StationShape) -> Self {
+        Station { line_ids, shape, offset: Vec2::default() }
+    }
+
+    /// Visual center: the shape anchor plus the free offset.
+    pub fn anchor(&self) -> Vec2 {
+        self.shape.anchor().add(self.offset)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]

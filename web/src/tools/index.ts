@@ -151,7 +151,7 @@ function selectTool(store: EditorStore, boundsOf: BoundsProvider): Tool {
         store.run(
           (e) => {
             e.rebase()
-            e.translate(s.selection, dx, dy)
+            e.translate(s.selection, dx, dy, p.alt)
           },
           { quiet: true },
         )
