@@ -17,7 +17,6 @@ import { prefs } from './stores/prefs'
 
 const store = useEditor()
 const s = store.state
-const zoom = computed(() => Math.round(s.view.zoom * 100))
 const showDock = computed(() => prefs.panels.properties || prefs.panels.layers)
 
 function beforeUnload(e: BeforeUnloadEvent): void {
@@ -34,11 +33,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     <div class="workspace">
       <ToolsPanel v-if="prefs.panels.tools" />
       <main class="center">
-        <div class="doc-tabs">
-          <div class="doc-tab active" data-testid="doc-tab">
-            {{ s.docName }}.transit @ {{ zoom }}%{{ s.dirty ? '*' : '' }}
-          </div>
-        </div>
         <CanvasView />
       </main>
       <aside v-if="showDock" class="dock">
@@ -72,25 +66,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   flex-direction: column;
   min-width: 0;
   background: var(--c-pasteboard);
-}
-.doc-tabs {
-  display: flex;
-  height: 26px;
-  background: var(--c-panel-header);
-  border-bottom: 1px solid var(--c-border);
-}
-.doc-tab {
-  display: flex;
-  align-items: center;
-  padding: 0 14px;
-  font-size: var(--fs-small);
-  color: var(--c-text-dim);
-  border-right: 1px solid var(--c-border);
-}
-.doc-tab.active {
-  background: var(--c-panel);
-  color: var(--c-text-bright);
-  box-shadow: inset 0 2px 0 var(--c-accent);
 }
 .dock {
   width: 300px;

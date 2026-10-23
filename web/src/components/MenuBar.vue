@@ -180,7 +180,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocDown))
       </div>
     </div>
     <div class="spacer" />
-    <div class="doc-title dim">{{ store.state.docName }}{{ store.state.dirty ? ' •' : '' }} — Transit Diagram Maker</div>
+    <div class="doc-title dim" data-testid="doc-title">{{ store.state.docName }}.transit{{ store.state.dirty ? ' •' : '' }} — Transit Diagram Maker</div>
   </nav>
 </template>
 
