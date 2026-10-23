@@ -2,7 +2,7 @@
 import type { ActionId } from '../core/actions'
 import { matches } from '../core/shortcuts'
 import { findItem, isEffectivelyLocked } from '../core/tree'
-import { downloadText, pickTextFile } from '../core/files'
+import { canSaveInPlace, downloadText, pickSaveHandle, pickTransitFile, writeHandle } from '../core/files'
 import type { EditorStore, ToolId } from './editor'
 import { prefs } from './prefs'
 
@@ -71,11 +71,31 @@ const TOOL_ACTIONS: Partial<Record<ActionId, ToolId>> = {
   'tool.icon': 'icon',
 }
 
-export async function saveTransit(store: EditorStore): Promise<void> {
+/**
+ * Save the document. Where the browser supports it, the first save asks for a
+ * location and later saves write back to the same file (`saveAs` always asks);
+ * otherwise the file is downloaded.
+ */
+export async function saveTransit(store: EditorStore, saveAs = false): Promise<void> {
+  const s = store.state
   const text = store.engine.value.saveTransit()
-  downloadText(`${store.state.docName}.transit`, text, 'application/json')
-  store.state.dirty = false
-  store.notify(`Saved ${store.state.docName}.transit`)
+  if (!canSaveInPlace()) {
+    downloadText(`${s.docName}.transit`, text, 'application/json')
+    s.dirty = false
+    store.notify(`Saved ${s.docName}.transit`)
+    return
+  }
+  try {
+    const handle = (!saveAs && store.getFileHandle()) || (await pickSaveHandle(`${s.docName}.transit`))
+    if (!handle) return
+    await writeHandle(handle, text)
+    store.setFileHandle(handle)
+    s.docName = handle.name.replace(/\.transit$/i, '')
+    s.dirty = false
+    store.notify(`Saved ${handle.name}`)
+  } catch (err) {
+    store.notify(`Could not save: ${err instanceof Error ? err.message : String(err)}`, 'error')
+  }
 }
 
 export function exportSvg(store: EditorStore): void {
@@ -85,8 +105,12 @@ export function exportSvg(store: EditorStore): void {
 }
 
 export async function openTransit(store: EditorStore): Promise<void> {
-  const file = await pickTextFile('.transit,application/json')
-  if (file) store.openTransit(file.text, file.name)
+  try {
+    const file = await pickTransitFile()
+    if (file) store.openTransit(file.text, file.name, file.handle)
+  } catch (err) {
+    store.notify(`Could not open: ${err instanceof Error ? err.message : String(err)}`, 'error')
+  }
 }
 
 export function runAction(store: EditorStore, id: ActionId): void {
@@ -105,6 +129,9 @@ export function runAction(store: EditorStore, id: ActionId): void {
       return
     case 'file.save':
       void saveTransit(store)
+      return
+    case 'file.saveAs':
+      void saveTransit(store, true)
       return
     case 'file.exportSvg':
       exportSvg(store)

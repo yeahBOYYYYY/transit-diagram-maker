@@ -6,6 +6,8 @@ import { displayCombo } from '../core/shortcuts'
 import { useEditor } from '../stores/editor'
 import { isEnabled, runAction } from '../stores/commands'
 import { prefs } from '../stores/prefs'
+import { APP } from '../core/about'
+import UiIcon from './ui/UiIcon.vue'
 
 type Item =
   | { action: ActionId; label?: string }
@@ -19,7 +21,7 @@ const bar = ref<HTMLElement | null>(null)
 const menus = computed<{ name: string; items: Item[] }[]>(() => [
   {
     name: 'File',
-    items: [{ action: 'file.new' }, { action: 'file.open' }, { sep: true }, { action: 'file.save' }, { action: 'file.exportSvg' }],
+    items: [{ action: 'file.new' }, { action: 'file.open' }, { sep: true }, { action: 'file.save' }, { action: 'file.saveAs' }, { action: 'file.exportSvg' }],
   },
   {
     name: 'Edit',
@@ -181,6 +183,18 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocDown))
     </div>
     <div class="spacer" />
     <div class="doc-title dim" data-testid="doc-title">{{ store.state.docName }}.transit{{ store.state.dirty ? ' •' : '' }} — Transit Diagram Maker</div>
+    <button
+      type="button"
+      class="bar-btn"
+      :title="`Save (${displayCombo(prefs.shortcuts['file.save'] ?? '')})`"
+      data-testid="quick-save"
+      @click="runAction(store, 'file.save')"
+    >
+      <UiIcon name="save" :size="16" />
+    </button>
+    <a class="bar-btn" :href="APP.repoUrl" target="_blank" rel="noopener" title="Transit Diagram Maker on GitHub" data-testid="github-link">
+      <UiIcon name="github" :size="16" />
+    </a>
   </nav>
 </template>
 
@@ -272,7 +286,21 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocDown))
 .doc-title {
   display: flex;
   align-items: center;
-  padding: 0 14px;
+  padding: 0 10px;
   font-size: var(--fs-small);
+}
+.bar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  border: 0;
+  background: transparent;
+  color: var(--c-text);
+  cursor: pointer;
+}
+.bar-btn:hover {
+  background: #454545;
+  color: #fff;
 }
 </style>
