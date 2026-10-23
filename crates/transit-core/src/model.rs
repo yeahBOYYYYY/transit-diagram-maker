@@ -9,13 +9,18 @@ use serde::{Deserialize, Serialize};
 
 pub type Id = u64;
 
+/// Pixels per cell on the canvas (at 100% zoom) and the default SVG export scale.
+pub const CELL_PX: f64 = 24.0;
+
 /// Document-wide constants that affect rendering. All lengths are in cell units
 /// unless the name says otherwise.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct DocSettings {
-    /// Size of one grid cell in pixels (the SVG user unit).
-    pub grid_size: f64,
+    /// Pixels per cell used when rendering. Not part of the document: the
+    /// canvas always uses `CELL_PX` and an SVG export may pick its own scale.
+    #[serde(skip, default = "cell_px")]
+    pub cell_px: f64,
     /// Width of a transit line, as a fraction of a cell.
     pub line_width: f64,
     /// Radius of the curve used where a line turns.
@@ -45,7 +50,7 @@ pub struct DocSettings {
 impl Default for DocSettings {
     fn default() -> Self {
         DocSettings {
-            grid_size: 24.0,
+            cell_px: CELL_PX,
             line_width: 1.0,
             corner_radius: 1.5,
             cap_roundness: 1.0,
@@ -73,7 +78,7 @@ impl DocSettings {
     pub fn sanitized(mut self) -> Self {
         let fix = |v: f64, lo: f64, hi: f64, def: f64| if v.is_finite() { v.clamp(lo, hi) } else { def };
         let d = DocSettings::default();
-        self.grid_size = fix(self.grid_size, 2.0, 512.0, d.grid_size);
+        self.cell_px = fix(self.cell_px, 1.0, 512.0, d.cell_px);
         self.line_width = fix(self.line_width, 0.05, 4.0, d.line_width);
         self.corner_radius = fix(self.corner_radius, 0.0, 50.0, d.corner_radius);
         self.cap_roundness = fix(self.cap_roundness, 0.0, 1.0, d.cap_roundness);
@@ -372,6 +377,10 @@ pub struct Group {
     pub kind: GroupKind,
     /// Bottom-to-top.
     pub children: Vec<Node>,
+}
+
+fn cell_px() -> f64 {
+    CELL_PX
 }
 
 fn yes() -> bool {

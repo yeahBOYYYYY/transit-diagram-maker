@@ -1,6 +1,6 @@
 //! SVG generation. The same markup is used for the live canvas and for export,
 //! so what you see is exactly what gets exported. Output units are pixels
-//! (cell units × `grid_size`).
+//! (cell units × `DocSettings::cell_px`).
 
 use crate::geom::{fit_dashes, fmt_num, rounded_polyline, rounded_polyline_len, Cell, Rect, Vec2};
 use crate::icons;
@@ -63,7 +63,7 @@ fn cap_roundness(cap: Cap, settings: &DocSettings) -> f64 {
 
 /// Markup for a line built from the given vertices and style.
 pub fn line_svg(points: &[Cell], style: &LineStyle, settings: &DocSettings) -> String {
-    let g = settings.grid_size;
+    let g = settings.cell_px;
     if points.len() < 2 {
         return String::new();
     }
@@ -173,7 +173,7 @@ pub fn blob_skeleton(cells: &[Cell], g: f64) -> String {
 }
 
 fn blob_svg(cells: &[Cell], outer: &str, inner: &str, settings: &DocSettings) -> String {
-    let g = settings.grid_size;
+    let g = settings.cell_px;
     let d = blob_skeleton(cells, g);
     let ro = settings.station_outer_radius * g;
     let ri = settings.station_inner_radius.min(settings.station_outer_radius) * g;
@@ -193,7 +193,7 @@ fn blob_svg(cells: &[Cell], outer: &str, inner: &str, settings: &DocSettings) ->
 }
 
 fn tick_corners(cell: Cell, dir: crate::geom::Dir8, side: i8, along: i8, width: f64, length: f64, settings: &DocSettings) -> [Vec2; 4] {
-    let g = settings.grid_size;
+    let g = settings.cell_px;
     let c = crate::geom::tick_center(cell, dir, along, width).scale(g);
     let d = dir.unit();
     let nrm = d.perp().scale(if side < 0 { -1.0 } else { 1.0 });
@@ -209,7 +209,7 @@ pub fn station_svg(st: &Station, settings: &DocSettings) -> String {
     if st.offset == Vec2::default() {
         return body;
     }
-    let o = st.offset.scale(settings.grid_size);
+    let o = st.offset.scale(settings.cell_px);
     format!(r#"<g transform="translate({} {})">{body}</g>"#, n(o.x), n(o.y))
 }
 
@@ -245,7 +245,7 @@ fn text_metrics(t: &TextBox, g: f64) -> (Vec<&str>, f64, f64) {
 }
 
 pub fn text_svg(t: &TextBox, settings: &DocSettings) -> String {
-    let g = settings.grid_size;
+    let g = settings.cell_px;
     let p = t.pos.scale(g);
     let fs = t.size * g;
     let (lines, _, _) = text_metrics(t, g);
@@ -282,7 +282,7 @@ pub fn text_svg(t: &TextBox, settings: &DocSettings) -> String {
 }
 
 pub fn icon_svg(i: &Icon, settings: &DocSettings) -> String {
-    let g = settings.grid_size;
+    let g = settings.cell_px;
     let p = i.pos.scale(g);
     let size = i.size * g;
     format!(
@@ -316,7 +316,7 @@ fn rotated_rect_bounds(center: Vec2, rect: Rect, deg: f64) -> Rect {
 
 /// Bounding box of content in pixels (approximate for text).
 pub fn content_bounds(c: &Content, settings: &DocSettings) -> Option<Rect> {
-    let g = settings.grid_size;
+    let g = settings.cell_px;
     match c {
         Content::Line(seg) => {
             Rect::from_points(seg.points.iter().map(|p| p.center().scale(g))).map(|r| r.inflate(settings.line_width * g / 2.0))
@@ -415,8 +415,15 @@ fn export_nodes(nodes: &[Node], settings: &DocSettings, out: &mut String, depth:
 
 /// Standalone SVG document of everything visible, cropped to the content.
 pub fn export_svg(doc: &Document) -> String {
-    let s = &doc.settings;
-    let g = s.grid_size;
+    export_svg_with(doc, &doc.settings)
+}
+
+/// Like `export_svg`, but rendered with one-off settings (including the
+/// pixels-per-cell scale) instead of the document's own.
+pub fn export_svg_with(doc: &Document, settings: &DocSettings) -> String {
+    let s = &settings.clone().sanitized();
+    let doc = &Document { settings: s.clone(), ..doc.clone() };
+    let g = s.cell_px;
     let b = document_bounds(doc).unwrap_or(Rect { x: 0.0, y: 0.0, w: g, h: g }).inflate(s.export_margin * g);
     let mut out = String::new();
     let _ = writeln!(out, r#"<?xml version="1.0" encoding="UTF-8"?>"#);

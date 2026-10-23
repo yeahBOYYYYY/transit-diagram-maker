@@ -146,7 +146,6 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
       <template v-if="s.selection.length === 0">
         <div class="section-title">Document</div>
         <div class="grid2">
-          <NumberField :model-value="s.settings.grid_size" label="Grid" :min="2" :max="512" unit="px" @update:model-value="(v) => setSetting('grid_size', v)" @commit="done" />
           <NumberField :model-value="s.settings.line_width" label="Line W" :min="0.05" :max="4" :step="0.05" unit="cells" @update:model-value="(v) => setSetting('line_width', v)" @commit="done" />
           <NumberField :model-value="s.settings.corner_radius" label="Curve" :min="0" :max="50" :step="0.25" unit="cells" @update:model-value="(v) => setSetting('corner_radius', v)" @commit="done" />
           <NumberField :model-value="s.settings.cap_roundness" label="Cap round" :min="0" :max="1" :step="0.05" @update:model-value="(v) => setSetting('cap_roundness', v)" @commit="done" />

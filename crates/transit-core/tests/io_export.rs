@@ -77,7 +77,7 @@ fn repairs_id_counter_settings_and_bad_lines() {
     }"#;
     let doc = io::from_transit(text).unwrap();
     assert_eq!(doc.next_id, 44);
-    assert_eq!(doc.settings.grid_size, 2.0);
+    assert_eq!(doc.settings.cell_px, CELL_PX, "a stored cell size from older files is ignored");
     assert_eq!(doc.settings.line_width, 0.8);
     assert_eq!(doc.root.len(), 1, "single-point line dropped");
     let Node::Layer(l) = &doc.root[0] else { panic!() };
@@ -145,13 +145,25 @@ fn export_of_empty_document_is_valid() {
 }
 
 #[test]
-fn grid_size_scales_rendering() {
+fn export_with_one_off_settings_scales_and_restyles() {
     let mut ed = Editor::new();
     ed.create_line(&[c(0, 0), c(4, 0)], LineStyle::default()).unwrap();
-    let before = render::document_bounds(ed.document()).unwrap();
-    ed.set_settings(DocSettings { grid_size: 48.0, ..DocSettings::default() }).unwrap();
-    let after = render::document_bounds(ed.document()).unwrap();
-    assert_eq!(after, before.scale(2.0));
+    let normal = render::export_svg(ed.document());
+    assert!(normal.contains(r#"width="168" height="72""#), "{normal}");
+    let custom = DocSettings { cell_px: 48.0, export_background: String::new(), ..ed.settings().clone() };
+    let big = render::export_svg_with(ed.document(), &custom);
+    assert!(big.contains(r#"width="336" height="144""#), "twice the pixels per cell: {big}");
+    assert!(!big.contains("<rect"), "transparent background");
+    let thin = render::export_svg_with(ed.document(), &DocSettings { line_width: 0.5, ..custom });
+    assert!(thin.contains(r#"stroke-width="24""#), "half-cell line at 48px per cell: {thin}");
+    assert_eq!(render::export_svg(ed.document()), normal, "the document is unchanged");
+}
+
+#[test]
+fn cell_size_is_not_saved() {
+    let ed = Editor::new();
+    assert!(!io::to_transit(ed.document()).contains("cell_px"));
+    assert!(!io::to_transit(ed.document()).contains("grid_size"));
 }
 
 #[test]

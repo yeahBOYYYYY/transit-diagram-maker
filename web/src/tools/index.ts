@@ -1,7 +1,7 @@
 // Pointer and keyboard behavior of each canvas tool.
 import type { Cell, Id, Rect, Vec2 } from '../core/types'
 import { ancestorsOf, findItem, leafIds } from '../core/tree'
-import { brush, cellsBetween, rectFromPoints, rectsIntersect, snap } from '../core/viewport'
+import { CELL_PX, brush, cellsBetween, rectFromPoints, rectsIntersect, snap } from '../core/viewport'
 import type { EditorStore, ToolId } from '../stores/editor'
 import { prefs } from '../stores/prefs'
 import { nudgeSelection } from '../stores/commands'
@@ -130,7 +130,7 @@ function selectTool(store: EditorStore, boundsOf: BoundsProvider): Tool {
     },
     move(p, pressed) {
       if (!pressed || !start) return
-      const g = s.settings.grid_size
+      const g = CELL_PX
       if (mode === 'pending') {
         const d = Math.hypot(p.screen.x - start.screen.x, p.screen.y - start.screen.y)
         if (d < prefs.dragThreshold || s.selection.length === 0) return
@@ -471,7 +471,7 @@ function iconTool(store: EditorStore): Tool {
   return {
     cursor: () => 'copy',
     move(p) {
-      const g = s.settings.grid_size
+      const g = CELL_PX
       const size = (prefs.icon.size ?? s.settings.icon_size ?? s.settings.station_outer_radius * 2) * g
       const c = place(p)
       const x = c.x * g - size / 2

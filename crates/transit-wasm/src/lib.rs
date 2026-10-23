@@ -64,6 +64,14 @@ impl TransitEditor {
         render::export_svg(self.inner.document())
     }
 
+    /// Export with one-off settings and `cell_px` pixels per cell; the document is not changed.
+    #[wasm_bindgen(js_name = exportSvgWith)]
+    pub fn export_svg_with(&self, settings_json: &str, cell_px: f64) -> Result<String, JsError> {
+        let mut settings: transit_core::DocSettings = parse(settings_json)?;
+        settings.cell_px = cell_px;
+        Ok(render::export_svg_with(self.inner.document(), &settings))
+    }
+
     // ---------------------------------------------------------- queries
 
     pub fn fragments(&self) -> String {

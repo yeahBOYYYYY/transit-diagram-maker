@@ -20,7 +20,7 @@ export async function cellPos(page: Page, x: number, y: number): Promise<{ x: nu
     ([x, y]) => {
       const s = (window as any).__transit.state
       const host = document.querySelector('[data-testid=canvas]')!.getBoundingClientRect()
-      const g = s.settings.grid_size
+      const g = 24 // CELL_PX
       return {
         x: host.left + s.view.x + (x + 0.5) * g * s.view.zoom,
         y: host.top + s.view.y + (y + 0.5) * g * s.view.zoom,
