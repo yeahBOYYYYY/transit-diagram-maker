@@ -104,8 +104,12 @@ pub enum Cap {
 pub enum StrokeKind {
     #[default]
     Plain,
+    /// A line with an inner channel of `inner_color`.
     Hollow,
+    /// A broken line: full-width dashes of the line color with empty gaps.
     Dashed,
+    /// A hollow line with dashes of the line color running down its channel.
+    HollowDashed,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -113,18 +117,17 @@ pub enum StrokeKind {
 pub struct LineStyle {
     pub color: String,
     pub kind: StrokeKind,
-    /// Inner channel color for hollow and dashed lines.
+    /// Inner channel color for hollow lines.
     pub inner_color: String,
     /// Inner channel width as a percentage of the line width.
     pub inner_width_pct: f64,
-    /// Dash length in cells.
+    /// Requested dash length in cells. Dashes and gaps are stretched slightly
+    /// so a line always starts and ends with a full dash.
     pub dash_length: f64,
-    /// Spacing between dashes in cells.
+    /// Requested gap between dashes in cells.
     pub dash_gap: f64,
-    /// Dash width as a percentage of the line width.
+    /// Width of the dashes inside a hollow dashed line, as a percentage of the line width.
     pub dash_width_pct: f64,
-    /// Offset of the first dash from the start of the line, in cells.
-    pub dash_offset: f64,
     pub start_cap: Cap,
     pub end_cap: Cap,
 }
@@ -136,10 +139,9 @@ impl Default for LineStyle {
             kind: StrokeKind::Plain,
             inner_color: "#ffffff".into(),
             inner_width_pct: 55.0,
-            dash_length: 0.6,
-            dash_gap: 0.4,
+            dash_length: 1.0,
+            dash_gap: 0.5,
             dash_width_pct: 30.0,
-            dash_offset: 0.0,
             start_cap: Cap::Round,
             end_cap: Cap::Round,
         }

@@ -21,7 +21,7 @@ export interface Rect {
 
 export type RouteMode = 'straight_first' | 'diagonal_first'
 export type Cap = 'butt' | 'round'
-export type StrokeKind = 'plain' | 'hollow' | 'dashed'
+export type StrokeKind = 'plain' | 'hollow' | 'dashed' | 'hollow_dashed'
 export type StationKind = 'dot' | 'tick' | 'pill'
 export type TextAlign = 'start' | 'middle' | 'end'
 
@@ -51,7 +51,6 @@ export interface LineStyle {
   dash_length: number
   dash_gap: number
   dash_width_pct: number
-  dash_offset: number
   start_cap: Cap
   end_cap: Cap
 }
