@@ -1,6 +1,7 @@
 <script setup lang="ts">
-// Vertical tool strip. The pen and the eraser share a slot: a long press (or
-// right click) on the slot opens a flyout to choose between them.
+// Vertical tool strip. The pen and the eraser share a slot: a long press, a
+// double click or a right click on the slot opens a flyout to choose between
+// them. After a long press the tool can be picked by releasing over it.
 import { computed, onBeforeUnmount, ref } from 'vue'
 import UiIcon from './ui/UiIcon.vue'
 import { ACTIONS } from '../core/actions'
@@ -92,6 +93,7 @@ const activeColor = computed(() => prefs.line.color)
         @pointerdown.stop="onDown(i, slot)"
         @pointerup="onUp(slot)"
         @pointerleave="cancelPress"
+        @dblclick="slot.tools.length > 1 && (flyout = i)"
         @contextmenu.prevent="slot.tools.length > 1 && (flyout = i)"
       >
         <UiIcon :name="shown(slot)" :size="20" />
@@ -105,6 +107,7 @@ const activeColor = computed(() => prefs.line.color)
           class="fly-item"
           :class="{ on: store.state.tool === t }"
           :data-tool="t"
+          @pointerup="choose(t)"
           @click="choose(t)"
         >
           <span class="mark">{{ store.state.tool === t ? '■' : '' }}</span>

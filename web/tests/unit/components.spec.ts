@@ -186,6 +186,17 @@ describe('ToolsPanel', () => {
     expect(w.find('.tools > .slot .tool[data-tool=eraser]').exists()).toBe(true)
     vi.useRealTimers()
   })
+
+  it('opens the flyout on double click and picks a tool on release', async () => {
+    const store = freshStore()
+    const w = mountIt(ToolsPanel)
+    await w.find('[data-tool=pen]').trigger('dblclick')
+    expect(w.find('[data-testid=tool-flyout]').exists()).toBe(true)
+    // Releasing over an item (press-and-drag from the slot) picks it.
+    await w.find('[data-testid=tool-flyout] [data-tool=eraser]').trigger('pointerup')
+    expect(store.state.tool).toBe('eraser')
+    expect(w.find('[data-testid=tool-flyout]').exists()).toBe(false)
+  })
 })
 
 describe('MenuBar', () => {
