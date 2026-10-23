@@ -37,6 +37,8 @@ export function createEditor(engine = new Engine()) {
     selection: [] as Id[],
     tool: 'select' as ToolId,
     penSlot: 'pen' as 'pen' | 'eraser',
+    /** Line the pen adds segments to (its line id), or null to start a new line. */
+    penTarget: null as Id | null,
     transformMode: 'move' as 'move' | 'rotate',
     view: { x: 0, y: 0, zoom: 1 } as View,
     viewport: { width: 800, height: 600 },
@@ -67,6 +69,7 @@ export function createEditor(engine = new Engine()) {
     state.canUndo = engine.canUndo()
     state.canRedo = engine.canRedo()
     state.selection = state.selection.filter((id) => findItem(state.tree, id) !== null)
+    if (state.penTarget !== null && !lines().some((l) => l.lineId === state.penTarget)) state.penTarget = null
     state.revision++
   }
 
@@ -169,8 +172,35 @@ export function createEditor(engine = new Engine()) {
 
   // ---------------------------------------------------------------- tools
 
+  /** Line id of a line group or segment, if `id` is one. */
+  function lineIdOf(id: Id): Id | null {
+    const n = engine.node(id)
+    if (n?.type === 'group' && n.kind.role === 'line') return n.kind.line_id
+    if (n?.type === 'layer' && n.content.kind === 'line') return n.content.line_id
+    return null
+  }
+
+  /** Every line in the document, top of the stack first. */
+  function lines(): { lineId: Id; name: string }[] {
+    const out: { lineId: Id; name: string }[] = []
+    const walk = (items: TreeItem[]) =>
+      items.forEach((it) => {
+        if (it.kind === 'group' && it.role === 'line') {
+          const lineId = lineIdOf(it.id)
+          if (lineId !== null) out.push({ lineId, name: it.name })
+        }
+        walk(it.children)
+      })
+    walk(state.tree)
+    return out
+  }
+
   function setTool(tool: ToolId): void {
     if (state.textEdit) finishTextEdit(true)
+    // Picking the pen with a line selected continues that line.
+    if (tool === 'pen' && state.tool !== 'pen') {
+      state.penTarget = state.selection.length === 1 ? lineIdOf(state.selection[0]) : null
+    }
     state.tool = tool
     if (tool === 'pen' || tool === 'eraser') state.penSlot = tool
     state.overlay = { preview: '', marquee: null, cells: [], cellsColor: prefs.selectionColor }
@@ -272,6 +302,8 @@ export function createEditor(engine = new Engine()) {
     fitToScreen,
     actualSize,
     setTool,
+    lineIdOf,
+    lines,
     undo,
     redo,
     startTextEdit,

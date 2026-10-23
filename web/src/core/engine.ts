@@ -116,6 +116,10 @@ export class Engine {
   createLine(points: Cell[], style: Partial<LineStyle>): CreatedLine {
     return JSON.parse(this.ed.createLine(j(points), j(style)))
   }
+  /** Add a disconnected segment to an existing line (it takes the line's style). */
+  addSegment(lineId: Id, points: Cell[]): CreatedLine {
+    return JSON.parse(this.ed.addSegment(lineId, j(points)))
+  }
   erase(cells: Cell[]): number {
     return this.ed.erase(j(cells))
   }
