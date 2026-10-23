@@ -171,6 +171,19 @@ impl Dir8 {
     }
 }
 
+/// Center of a tick station's base on its line cell. On straight lines the tick
+/// sits in a corner of the cell (`along` = -1 at the edge it enters through,
+/// +1 at the edge it leaves through) so one side is flush with a grid line;
+/// on diagonals, or with `along` = 0, it is centered.
+pub fn tick_center(cell: Cell, dir: Dir8, along: i8, width: f64) -> Vec2 {
+    let c = cell.center();
+    if dir.is_diagonal() || along == 0 {
+        return c;
+    }
+    let shift = (0.5 - width / 2.0).max(0.0) * along.signum() as f64;
+    c.add(dir.unit().scale(shift))
+}
+
 /// How the pen routes between two cells that are not on a common 8-way direction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -482,6 +495,15 @@ mod tests {
     fn rotate_quarter_turn_is_exact() {
         let p = Vec2::new(3.5, 0.5).rotate_around(Vec2::new(0.5, 0.5), 90.0);
         assert_eq!(p, Vec2::new(0.5, 3.5));
+    }
+
+    #[test]
+    fn tick_center_sits_in_a_corner() {
+        assert_eq!(tick_center(c(2, 0), Dir8::E, -1, 0.4), Vec2::new(2.2, 0.5));
+        assert_eq!(tick_center(c(2, 0), Dir8::E, 1, 0.4), Vec2::new(2.8, 0.5));
+        assert_eq!(tick_center(c(2, 0), Dir8::S, 1, 0.4), Vec2::new(2.5, 0.8));
+        assert_eq!(tick_center(c(2, 0), Dir8::SE, 1, 0.4), Vec2::new(2.5, 0.5));
+        assert_eq!(tick_center(c(2, 0), Dir8::E, 0, 0.4), Vec2::new(2.5, 0.5));
     }
 
     #[test]

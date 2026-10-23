@@ -265,6 +265,53 @@ fn pill_is_painted_above_all_touched_lines() {
     assert_eq!(order.iter().position(|i| *i == s.station_id), Some(order.len() - 2), "only its label is above it");
 }
 
+fn tick_slot(ed: &Editor, id: Id) -> (Cell, Dir8, i8) {
+    match &station(ed, id).shape {
+        StationShape::Tick { cell, dir, along, .. } => (*cell, *dir, *along),
+        other => panic!("not a tick: {other:?}"),
+    }
+}
+
+#[test]
+fn tick_snaps_into_the_nearest_cell_corner() {
+    let mut ed = Editor::new();
+    line(&mut ed, &[c(0, 0), c(9, 0)]);
+    let a = ed.add_station_at(StationKind::Tick, c(3, 0), Vec2::new(3.9, 0.4), &StationOptions::default()).unwrap();
+    assert_eq!(tick_slot(&ed, a.station_id), (c(3, 0), Dir8::E, 1));
+    let b = ed.add_station_at(StationKind::Tick, c(5, 0), Vec2::new(5.1, 0.6), &StationOptions::default()).unwrap();
+    assert_eq!(tick_slot(&ed, b.station_id), (c(5, 0), Dir8::E, -1));
+    // The label sits above the tick, not above the cell center.
+    let label = text(&ed, b.text_id.unwrap()).pos;
+    let w = ed.settings().tick_width;
+    assert!((label.x - geom::snap_tenth(5.0 + w / 2.0)).abs() < 1e-9, "{label:?}");
+}
+
+#[test]
+fn ticks_on_diagonals_stay_centered() {
+    let mut ed = Editor::new();
+    line(&mut ed, &[c(0, 0), c(5, 5)]);
+    let s = ed.add_station_at(StationKind::Tick, c(2, 2), Vec2::new(2.9, 2.9), &StationOptions::default()).unwrap();
+    assert_eq!(tick_slot(&ed, s.station_id), (c(2, 2), Dir8::SE, 0));
+}
+
+#[test]
+fn dragging_a_tick_hops_between_corners() {
+    let mut ed = Editor::new();
+    line(&mut ed, &[c(0, 0), c(9, 0)]);
+    let s = ed.add_station_at(StationKind::Tick, c(3, 0), Vec2::new(3.1, 0.5), &StationOptions::default()).unwrap();
+    // Half a cell to the right: same cell, other corner.
+    ed.translate(&[s.station_id], 0.5, 0.0, false).unwrap();
+    assert_eq!(tick_slot(&ed, s.station_id), (c(3, 0), Dir8::E, 1));
+    // Another half cell: the start corner of the next cell.
+    ed.translate(&[s.station_id], 0.5, 0.0, false).unwrap();
+    assert_eq!(tick_slot(&ed, s.station_id), (c(4, 0), Dir8::E, -1));
+    // Dragging off the line still lands on it.
+    ed.translate(&[s.station_id], 0.0, 3.0, false).unwrap();
+    assert_eq!(tick_slot(&ed, s.station_id), (c(4, 0), Dir8::E, -1));
+    ed.move_station_to(s.station_id, Vec2::new(7.8, 0.5)).unwrap();
+    assert_eq!(tick_slot(&ed, s.station_id), (c(7, 0), Dir8::E, 1));
+}
+
 #[test]
 fn station_kind_can_change() {
     let mut ed = Editor::new();

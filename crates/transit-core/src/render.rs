@@ -178,9 +178,9 @@ fn blob_svg(cells: &[Cell], outer: &str, inner: &str, settings: &DocSettings) ->
     s
 }
 
-fn tick_corners(cell: Cell, dir: crate::geom::Dir8, side: i8, width: f64, length: f64, settings: &DocSettings) -> [Vec2; 4] {
+fn tick_corners(cell: Cell, dir: crate::geom::Dir8, side: i8, along: i8, width: f64, length: f64, settings: &DocSettings) -> [Vec2; 4] {
     let g = settings.grid_size;
-    let c = cell.center().scale(g);
+    let c = crate::geom::tick_center(cell, dir, along, width).scale(g);
     let d = dir.unit();
     let nrm = d.perp().scale(if side < 0 { -1.0 } else { 1.0 });
     let h = settings.line_width * g / 2.0;
@@ -203,8 +203,8 @@ fn station_shape_svg(st: &Station, settings: &DocSettings) -> String {
     match &st.shape {
         StationShape::Dot { cell, outer_color, inner_color } => blob_svg(&[*cell], outer_color, inner_color, settings),
         StationShape::Pill { cells, outer_color, inner_color } => blob_svg(cells, outer_color, inner_color, settings),
-        StationShape::Tick { cell, dir, side, width, length, color } => {
-            let p = tick_corners(*cell, *dir, *side, *width, *length, settings);
+        StationShape::Tick { cell, dir, side, along, width, length, color } => {
+            let p = tick_corners(*cell, *dir, *side, *along, *width, *length, settings);
             format!(
                 r#"<path d="M{} {}L{} {}L{} {}L{} {}Z" fill="{}"/>"#,
                 n(p[0].x),
@@ -309,8 +309,8 @@ pub fn content_bounds(c: &Content, settings: &DocSettings) -> Option<Rect> {
         }
         Content::Station(st) => {
             let r = match &st.shape {
-                StationShape::Tick { cell, dir, side, width, length, .. } => {
-                    Rect::from_points(tick_corners(*cell, *dir, *side, *width, *length, settings))
+                StationShape::Tick { cell, dir, side, along, width, length, .. } => {
+                    Rect::from_points(tick_corners(*cell, *dir, *side, *along, *width, *length, settings))
                 }
                 shape => Rect::from_points(shape.cells().iter().map(|p| p.center().scale(g)))
                     .map(|r| r.inflate(settings.station_outer_radius * g)),
@@ -538,7 +538,15 @@ mod tests {
         assert!(m.contains(r#"stroke-width="29.76""#), "outer diameter 2*0.62*24: {m}");
         let tick = Station::new(
             vec![1],
-            StationShape::Tick { cell: Cell::new(0, 0), dir: Dir8::E, side: 1, width: 0.5, length: 1.0, color: "#f00".into() },
+            StationShape::Tick {
+                cell: Cell::new(0, 0),
+                dir: Dir8::E,
+                side: 1,
+                along: 0,
+                width: 0.5,
+                length: 1.0,
+                color: "#f00".into(),
+            },
         );
         let m = station_svg(&tick, &s);
         parse(&m);
@@ -546,6 +554,22 @@ mod tests {
         // Horizontal line, tick pokes up (left of east) from the border at y=0.
         assert!((b.y - (12.0 - 12.0 - 24.0)).abs() < 1e-9, "{b:?}");
         assert!((b.w - 12.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn tick_in_corner_is_flush_with_grid_line() {
+        let s = settings();
+        let tick = |along| {
+            Content::Station(Station::new(
+                vec![1],
+                StationShape::Tick { cell: Cell::new(1, 0), dir: Dir8::E, side: 1, along, width: 0.35, length: 0.55, color: "#000".into() },
+            ))
+        };
+        // Cell 1 spans x = 24..48 px; the tick touches its left or right edge.
+        let start = content_bounds(&tick(-1), &s).unwrap();
+        assert!((start.x - 24.0).abs() < 1e-9, "{start:?}");
+        let end = content_bounds(&tick(1), &s).unwrap();
+        assert!((end.x + end.w - 48.0).abs() < 1e-9, "{end:?}");
     }
 
     #[test]

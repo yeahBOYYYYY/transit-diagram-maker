@@ -111,6 +111,18 @@ describe('station tool', () => {
     expect(store.state.overlay.cellsColor).toBe('#ff4d4f')
   })
 
+  it('places a tick in the cell corner nearest to the pointer and previews it', () => {
+    const { store, tools } = setup()
+    store.run((e) => e.createLine([{ x: 0, y: 0 }, { x: 10, y: 0 }], {}))
+    prefs.station.kind = 'tick'
+    tools.station.move?.(at(store, 4.8, 0.5), false)
+    expect(store.state.overlay.preview).toContain('<path')
+    click(store, tools.station, 4.8, 0.5)
+    const st = store.state.fragments.find((f) => f.kind === 'station')!
+    const n = store.node(st.id)
+    expect(n?.type === 'layer' && n.content.kind === 'station' && n.content.shape === 'tick' && n.content.along).toBe(1)
+  })
+
   it('paints pill stations by dragging', () => {
     const { store, tools } = setup()
     store.run((e) => e.createLine([{ x: 0, y: 0 }, { x: 10, y: 0 }], {}))

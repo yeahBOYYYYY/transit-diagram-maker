@@ -381,10 +381,7 @@ function stationTool(store: EditorStore): Tool {
       s.overlay = { ...s.overlay, preview: '', cells: [p.cell], cellsColor: '#ff4d4f' }
       return
     }
-    const preview =
-      prefs.station.kind === 'tick'
-        ? ''
-        : e.previewPill([hit.cell], prefs.station.outer_color, prefs.station.inner_color)
+    const preview = e.previewStation(prefs.station.kind, p.cell, p.cells, opts())
     s.overlay = { ...s.overlay, preview, cells: [hit.cell], cellsColor: prefs.selectionColor }
   }
   return {
@@ -397,7 +394,7 @@ function stationTool(store: EditorStore): Tool {
         hover(p)
         return
       }
-      const created = store.run((e) => e.addStation(prefs.station.kind, p.cell, opts()))
+      const created = store.run((e) => e.addStation(prefs.station.kind, p.cell, opts(), p.cells))
       if (created) store.select([created.station_id])
       hover(p)
     },
