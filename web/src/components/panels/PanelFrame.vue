@@ -1,8 +1,8 @@
 <script setup lang="ts">
-// Docked panel with a tab strip header and a collapse toggle.
+// Docked panel with a title header and a collapse toggle.
 import { ref } from 'vue'
 
-defineProps<{ title: string; tabs?: string[]; grow?: boolean }>()
+defineProps<{ title: string; grow?: boolean }>()
 const collapsed = ref(false)
 </script>
 
@@ -10,7 +10,6 @@ const collapsed = ref(false)
   <section class="panel" :class="{ collapsed, grow }" :data-panel="title">
     <header class="head" @dblclick="collapsed = !collapsed">
       <div class="tab active">{{ title }}</div>
-      <div v-for="t in tabs ?? []" :key="t" class="tab">{{ t }}</div>
       <div class="spacer" />
       <button class="collapse" :title="collapsed ? 'Expand' : 'Collapse'" @click="collapsed = !collapsed">
         {{ collapsed ? '▸' : '▾' }}
