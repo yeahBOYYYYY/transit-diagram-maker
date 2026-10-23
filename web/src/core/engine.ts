@@ -65,6 +65,10 @@ export class Engine {
   bounds(ids: Id[]): Rect | null {
     return JSON.parse(this.ed.bounds(j(ids)))
   }
+  /** X / Y of the given nodes in cells: an object's anchor, or the top-left-most anchor of several. */
+  position(ids: Id[]): Vec2 | null {
+    return JSON.parse(this.ed.position(j(ids)))
+  }
   lineHitAt(cell: Cell): LineHit | null {
     return JSON.parse(this.ed.lineHitAt(cell.x, cell.y))
   }

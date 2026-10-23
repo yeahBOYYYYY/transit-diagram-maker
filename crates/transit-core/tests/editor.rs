@@ -748,6 +748,21 @@ fn rotation_below_half_step_is_noop() {
 }
 
 #[test]
+fn position_is_the_anchor_of_each_object() {
+    let mut ed = Editor::new();
+    let l = line(&mut ed, &[c(2, 3), c(6, 3), c(8, 1)]);
+    assert_eq!(ed.position(&[l.layer_id]), Some(Vec2::new(2.5, 1.5)), "top-left of the cell centers");
+    let s = ed.add_station(StationKind::Dot, c(4, 3), &StationOptions { label: false, ..StationOptions::default() }).unwrap();
+    assert_eq!(ed.position(&[s.station_id]), Some(Vec2::new(4.5, 3.5)));
+    ed.translate(&[s.station_id], 0.2, -0.3, true).unwrap();
+    assert_eq!(ed.position(&[s.station_id]), Some(Vec2::new(4.7, 3.2)), "includes the free offset");
+    let t = ed.add_text(TextBox { pos: Vec2::new(-1.0, 7.5), ..TextBox::default() }).unwrap();
+    assert_eq!(ed.position(&[t]), Some(Vec2::new(-1.0, 7.5)));
+    assert_eq!(ed.position(&[l.group_id, t]), Some(Vec2::new(-1.0, 1.5)), "top-left-most anchor");
+    assert_eq!(ed.position(&[]), None);
+}
+
+#[test]
 fn bounds_cover_selection() {
     let mut ed = Editor::new();
     let l = line(&mut ed, &[c(0, 0), c(4, 0)]);

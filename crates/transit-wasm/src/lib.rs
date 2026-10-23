@@ -94,6 +94,11 @@ impl TransitEditor {
         Ok(json(&self.inner.bounds(&ids(ids_json)?)))
     }
 
+    /// X / Y of the given nodes in cells (see `Editor::position`), or null.
+    pub fn position(&self, ids_json: &str) -> Result<String, JsError> {
+        Ok(json(&self.inner.position(&ids(ids_json)?)))
+    }
+
     #[wasm_bindgen(js_name = lineHitAt)]
     pub fn line_hit_at(&self, x: i32, y: i32) -> String {
         json(&self.inner.line_hit_at(Cell::new(x, y)))
