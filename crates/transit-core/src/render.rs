@@ -191,6 +191,15 @@ fn tick_corners(cell: Cell, dir: crate::geom::Dir8, side: i8, width: f64, length
 }
 
 pub fn station_svg(st: &Station, settings: &DocSettings) -> String {
+    let body = station_shape_svg(st, settings);
+    if st.offset == Vec2::default() {
+        return body;
+    }
+    let o = st.offset.scale(settings.grid_size);
+    format!(r#"<g transform="translate({} {})">{body}</g>"#, n(o.x), n(o.y))
+}
+
+fn station_shape_svg(st: &Station, settings: &DocSettings) -> String {
     match &st.shape {
         StationShape::Dot { cell, outer_color, inner_color } => blob_svg(&[*cell], outer_color, inner_color, settings),
         StationShape::Pill { cells, outer_color, inner_color } => blob_svg(cells, outer_color, inner_color, settings),
@@ -298,13 +307,16 @@ pub fn content_bounds(c: &Content, settings: &DocSettings) -> Option<Rect> {
         Content::Line(seg) => {
             Rect::from_points(seg.points.iter().map(|p| p.center().scale(g))).map(|r| r.inflate(settings.line_width * g / 2.0))
         }
-        Content::Station(st) => match &st.shape {
-            StationShape::Tick { cell, dir, side, width, length, .. } => {
-                Rect::from_points(tick_corners(*cell, *dir, *side, *width, *length, settings))
-            }
-            shape => Rect::from_points(shape.cells().iter().map(|p| p.center().scale(g)))
-                .map(|r| r.inflate(settings.station_outer_radius * g)),
-        },
+        Content::Station(st) => {
+            let r = match &st.shape {
+                StationShape::Tick { cell, dir, side, width, length, .. } => {
+                    Rect::from_points(tick_corners(*cell, *dir, *side, *width, *length, settings))
+                }
+                shape => Rect::from_points(shape.cells().iter().map(|p| p.center().scale(g)))
+                    .map(|r| r.inflate(settings.station_outer_radius * g)),
+            };
+            r.map(|r| Rect { x: r.x + st.offset.x * g, y: r.y + st.offset.y * g, ..r })
+        }
         Content::Text(t) => {
             let (_, w, h) = text_metrics(t, g);
             let p = t.pos.scale(g);
@@ -505,10 +517,10 @@ mod tests {
         assert!(d.contains("M5 5L15 5L15 15L5 15Z"), "{d}");
         assert!(!d.contains("M5 5L15 15"), "no diagonals inside a block");
         let m = station_svg(
-            &Station {
-                line_ids: vec![],
-                shape: StationShape::Pill { cells: cells.to_vec(), outer_color: "#000".into(), inner_color: "#fff".into() },
-            },
+            &Station::new(
+                vec![],
+                StationShape::Pill { cells: cells.to_vec(), outer_color: "#000".into(), inner_color: "#fff".into() },
+            ),
             &DocSettings::default(),
         );
         assert!(m.contains(r##"fill="#fff""##), "the block interior is filled with the inner color: {m}");
@@ -517,30 +529,39 @@ mod tests {
     #[test]
     fn station_shapes_render() {
         let s = settings();
-        let dot = Station {
-            line_ids: vec![1],
-            shape: StationShape::Dot { cell: Cell::new(2, 2), outer_color: "#000".into(), inner_color: "#fff".into() },
-        };
+        let dot = Station::new(
+            vec![1],
+            StationShape::Dot { cell: Cell::new(2, 2), outer_color: "#000".into(), inner_color: "#fff".into() },
+        );
         let m = station_svg(&dot, &s);
         parse(&m);
         assert!(m.contains(r#"stroke-width="29.76""#), "outer diameter 2*0.62*24: {m}");
-        let tick = Station {
-            line_ids: vec![1],
-            shape: StationShape::Tick {
-                cell: Cell::new(0, 0),
-                dir: Dir8::E,
-                side: 1,
-                width: 0.5,
-                length: 1.0,
-                color: "#f00".into(),
-            },
-        };
+        let tick = Station::new(
+            vec![1],
+            StationShape::Tick { cell: Cell::new(0, 0), dir: Dir8::E, side: 1, width: 0.5, length: 1.0, color: "#f00".into() },
+        );
         let m = station_svg(&tick, &s);
         parse(&m);
         let b = content_bounds(&Content::Station(tick), &s).unwrap();
         // Horizontal line, tick pokes up (left of east) from the border at y=0.
         assert!((b.y - (12.0 - 12.0 - 24.0)).abs() < 1e-9, "{b:?}");
         assert!((b.w - 12.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn station_offset_translates_markup_and_bounds() {
+        let s = settings();
+        let mut st = Station::new(
+            vec![1],
+            StationShape::Dot { cell: Cell::new(0, 0), outer_color: "#000".into(), inner_color: "#fff".into() },
+        );
+        let base = content_bounds(&Content::Station(st.clone()), &s).unwrap();
+        st.offset = Vec2::new(0.5, -0.2);
+        let m = station_svg(&st, &s);
+        parse(&m);
+        assert!(m.starts_with(r#"<g transform="translate(12 -4.8)">"#), "{m}");
+        let b = content_bounds(&Content::Station(st), &s).unwrap();
+        assert!((b.x - base.x - 12.0).abs() < 1e-9 && (b.y - base.y + 4.8).abs() < 1e-9);
     }
 
     #[test]

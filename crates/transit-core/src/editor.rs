@@ -814,7 +814,7 @@ impl Editor {
                 let new_id = copy.id();
                 tree::insert(&mut d.root, loc.parent, loc.index + 1, copy);
                 let leaves = tree::leaf_ids(&d.root, &[new_id]);
-                translate_layers(d, &leaves, 1.0, 1.0);
+                translate_layers(d, &leaves, 1.0, 1.0, false);
                 created.push(new_id);
             }
             Ok(created)
@@ -823,12 +823,14 @@ impl Editor {
 
     // -------------------------------------------------------- transforms
 
-    /// Move nodes by a delta in cell units. Lines and stations move in whole
-    /// cells (dot/tick stations re-snap to their line), text and icons move freely.
-    pub fn translate(&mut self, ids: &[Id], dx: f64, dy: f64) -> Result<()> {
+    /// Move nodes by a delta in cell units. Lines move in whole cells, text and
+    /// icons in tenths of a cell. Stations normally move in whole cells and
+    /// re-snap onto their line; with `free` they leave the line and move in
+    /// tenths (their coupling to the line is kept).
+    pub fn translate(&mut self, ids: &[Id], dx: f64, dy: f64, free: bool) -> Result<()> {
         self.apply(|d| {
             let leaves = editable_leaves(d, ids);
-            translate_layers(d, &leaves, dx, dy);
+            translate_layers(d, &leaves, dx, dy, free);
             Ok(())
         })
     }
@@ -862,23 +864,26 @@ impl Editor {
                             seg.points = norm;
                         }
                     }
-                    Content::Station(st) => match &mut st.shape {
-                        StationShape::Dot { cell, .. } => *cell = rot_cell(*cell),
-                        StationShape::Tick { cell, dir, .. } => {
-                            *cell = rot_cell(*cell);
-                            *dir = dir.rotated(steps);
-                        }
-                        StationShape::Pill { cells, .. } => {
-                            let mut out: Vec<Cell> = Vec::new();
-                            for c in cells.iter() {
-                                let r = rot_cell(*c);
-                                if !out.contains(&r) {
-                                    out.push(r);
-                                }
+                    Content::Station(st) => {
+                        st.offset = st.offset.rotate_around(Vec2::default(), angle).snapped();
+                        match &mut st.shape {
+                            StationShape::Dot { cell, .. } => *cell = rot_cell(*cell),
+                            StationShape::Tick { cell, dir, .. } => {
+                                *cell = rot_cell(*cell);
+                                *dir = dir.rotated(steps);
                             }
-                            *cells = out;
+                            StationShape::Pill { cells, .. } => {
+                                let mut out: Vec<Cell> = Vec::new();
+                                for c in cells.iter() {
+                                    let r = rot_cell(*c);
+                                    if !out.contains(&r) {
+                                        out.push(r);
+                                    }
+                                }
+                                *cells = out;
+                            }
                         }
-                    },
+                    }
                     Content::Text(t) => {
                         t.pos = t.pos.rotate_around(pivot, angle).snapped();
                         t.rotation = snap_rotation(t.rotation + angle);
@@ -906,6 +911,7 @@ impl Editor {
             };
             let (cell, dir) = snap_to_lines(&snapshot, &st.line_ids, pos)
                 .ok_or_else(|| EditError::Invalid("station is not coupled to an existing line".into()))?;
+            st.offset = Vec2::default();
             if let StationShape::Pill { cells, .. } = &st.shape {
                 let a = Cell::containing(st.shape.anchor());
                 let moved: Vec<Cell> = cells.iter().map(|c| c.offset(cell.x - a.x, cell.y - a.y)).collect();
@@ -1024,7 +1030,7 @@ fn insert_station(
         name: name.clone(),
         visible: true,
         locked: false,
-        content: Content::Station(Station { line_ids, shape }),
+        content: Content::Station(Station::new(line_ids, shape)),
     })];
     let mut text_id = None;
     if opts.label {
@@ -1102,7 +1108,7 @@ fn station_anchors(d: &Document) -> HashMap<Id, Vec2> {
     let mut out = HashMap::new();
     tree::walk_layers(&d.root, &mut |l, _, _| {
         if let Content::Station(st) = &l.content {
-            out.insert(l.id, st.shape.anchor());
+            out.insert(l.id, st.anchor());
         }
     });
     out
@@ -1158,9 +1164,18 @@ fn snap_stations(d: &mut Document, leaves: &[Id]) {
     });
 }
 
-fn translate_layers(d: &mut Document, leaves: &[Id], dx: f64, dy: f64) {
+fn translate_layers(d: &mut Document, leaves: &[Id], dx: f64, dy: f64, free: bool) {
     let (ix, iy) = (dx.round() as i32, dy.round() as i32);
+    let delta = Vec2::new(dx, dy);
     let old = station_anchors(d);
+    // Stations whose lines move along keep their place relative to them.
+    let mut moved_lines = HashSet::new();
+    for id in leaves {
+        if let Some(Content::Line(seg)) = tree::find_layer(&d.root, *id).map(|l| &l.content) {
+            moved_lines.insert(seg.line_id);
+        }
+    }
+    let mut snap = Vec::new();
     for id in leaves {
         let Some(layer) = tree::find_layer_mut(&mut d.root, *id) else { continue };
         match &mut layer.content {
@@ -1169,19 +1184,31 @@ fn translate_layers(d: &mut Document, leaves: &[Id], dx: f64, dy: f64) {
                     *p = p.offset(ix, iy);
                 }
             }
-            Content::Station(st) => match &mut st.shape {
-                StationShape::Dot { cell, .. } | StationShape::Tick { cell, .. } => *cell = cell.offset(ix, iy),
-                StationShape::Pill { cells, .. } => {
-                    for c in cells.iter_mut() {
-                        *c = c.offset(ix, iy);
+            Content::Station(st) => {
+                let with_line = !st.line_ids.is_empty() && st.line_ids.iter().all(|l| moved_lines.contains(l));
+                let (cx, cy) = if free && !with_line { (0, 0) } else { (ix, iy) };
+                match &mut st.shape {
+                    StationShape::Dot { cell, .. } | StationShape::Tick { cell, .. } => *cell = cell.offset(cx, cy),
+                    StationShape::Pill { cells, .. } => {
+                        for c in cells.iter_mut() {
+                            *c = c.offset(cx, cy);
+                        }
                     }
                 }
-            },
-            Content::Text(t) => t.pos = t.pos.add(Vec2::new(dx, dy)).snapped(),
-            Content::Icon(i) => i.pos = i.pos.add(Vec2::new(dx, dy)).snapped(),
+                if free {
+                    st.offset = st.offset.add(delta).sub(Vec2::new(cx as f64, cy as f64)).snapped();
+                } else {
+                    if !with_line {
+                        st.offset = Vec2::default();
+                    }
+                    snap.push(*id);
+                }
+            }
+            Content::Text(t) => t.pos = t.pos.add(delta).snapped(),
+            Content::Icon(i) => i.pos = i.pos.add(delta).snapped(),
         }
     }
-    snap_stations(d, leaves);
+    snap_stations(d, &snap);
     move_orphan_labels(d, leaves, &old);
 }
 

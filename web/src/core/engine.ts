@@ -173,8 +173,9 @@ export class Engine {
   duplicate(ids: Id[]): Id[] {
     return JSON.parse(this.ed.duplicate(j(ids)))
   }
-  translate(ids: Id[], dx: number, dy: number): void {
-    this.ed.translate(j(ids), dx, dy)
+  /** `free` lets stations leave their line (Alt-drag) instead of re-snapping. */
+  translate(ids: Id[], dx: number, dy: number, free = false): void {
+    this.ed.translate(j(ids), dx, dy, free)
   }
   rotate(ids: Id[], deg: number, pivot: { x: number; y: number }): number {
     return this.ed.rotate(j(ids), deg, pivot.x, pivot.y)

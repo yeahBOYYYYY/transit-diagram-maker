@@ -295,8 +295,45 @@ fn translating_station_alone_keeps_it_on_line() {
     let mut ed = Editor::new();
     line(&mut ed, &[c(0, 0), c(9, 0)]);
     let s = ed.add_station(StationKind::Dot, c(2, 0), &StationOptions::default()).unwrap();
-    ed.translate(&[s.station_id], 3.0, 4.0).unwrap();
+    ed.translate(&[s.station_id], 3.0, 4.0, false).unwrap();
     assert_eq!(station(&ed, s.station_id).shape.cells(), vec![c(5, 0)]);
+}
+
+#[test]
+fn free_move_takes_station_off_its_line() {
+    let mut ed = Editor::new();
+    let l = line(&mut ed, &[c(0, 0), c(9, 0)]);
+    let s = ed.add_station(StationKind::Dot, c(2, 0), &StationOptions::default()).unwrap();
+    let label = text(&ed, s.text_id.unwrap()).pos;
+    ed.translate(&[s.station_id], 0.34, 1.26, true).unwrap();
+    let st = station(&ed, s.station_id);
+    assert_eq!(st.shape.cells(), vec![c(2, 0)], "the line cell is kept");
+    assert_eq!(st.offset, Vec2::new(0.3, 1.3));
+    assert_eq!(st.line_ids, vec![l.line_id], "still coupled");
+    let moved = text(&ed, s.text_id.unwrap()).pos;
+    assert!((moved.x - label.x - 0.3).abs() < 1e-9 && (moved.y - label.y - 1.3).abs() < 1e-9, "label follows");
+    // A normal move snaps it back onto the line.
+    ed.translate(&[s.station_id], 1.0, 0.0, false).unwrap();
+    let st = station(&ed, s.station_id);
+    assert_eq!(st.offset, Vec2::default());
+    assert_eq!(st.shape.cells(), vec![c(3, 0)]);
+}
+
+#[test]
+fn freely_moved_station_keeps_offset_when_its_line_moves() {
+    let mut ed = Editor::new();
+    let l = line(&mut ed, &[c(0, 0), c(9, 0)]);
+    let s = ed.add_station(StationKind::Dot, c(2, 0), &StationOptions::default()).unwrap();
+    ed.translate(&[s.station_id], 0.5, 0.5, true).unwrap();
+    ed.translate(&[l.group_id], 0.0, 2.0, false).unwrap();
+    let st = station(&ed, s.station_id);
+    assert_eq!(st.shape.cells(), vec![c(2, 2)]);
+    assert_eq!(st.offset, Vec2::new(0.5, 0.5));
+    // Alt-dragging the whole line moves everything together in whole cells.
+    ed.translate(&[l.group_id], 1.0, 0.0, true).unwrap();
+    let st = station(&ed, s.station_id);
+    assert_eq!(st.shape.cells(), vec![c(3, 2)]);
+    assert_eq!(st.offset, Vec2::new(0.5, 0.5));
 }
 
 // ----------------------------------------------------------- text & icons
@@ -377,7 +414,7 @@ fn locked_layers_cannot_be_moved_or_deleted() {
     let mut ed = Editor::new();
     let l = line(&mut ed, &[c(0, 0), c(9, 0)]);
     ed.set_locked(l.layer_id, true).unwrap();
-    ed.translate(&[l.group_id], 2.0, 0.0).unwrap();
+    ed.translate(&[l.group_id], 2.0, 0.0, false).unwrap();
     assert_eq!(segment(&ed, l.layer_id).points[0], c(0, 0));
     assert_eq!(ed.delete(&[l.layer_id]).unwrap(), 0);
     assert!(ed.layer(l.layer_id).is_some());
@@ -499,7 +536,7 @@ fn translate_rounds_grid_content_but_not_text() {
     let mut ed = Editor::new();
     let l = line(&mut ed, &[c(0, 0), c(3, 0)]);
     let t = ed.add_text(TextBox { pos: Vec2::new(1.0, 1.0), ..TextBox::default() }).unwrap();
-    ed.translate(&[l.group_id, t], 1.6, -0.4).unwrap();
+    ed.translate(&[l.group_id, t], 1.6, -0.4, false).unwrap();
     assert_eq!(segment(&ed, l.layer_id).points, vec![c(2, 0), c(5, 0)]);
     let p = text(&ed, t).pos;
     assert!((p.x - 2.6).abs() < 1e-9 && (p.y - 0.6).abs() < 1e-9);
@@ -510,7 +547,7 @@ fn whole_line_group_moves_with_stations() {
     let mut ed = Editor::new();
     let l = line(&mut ed, &[c(0, 0), c(9, 0)]);
     let s = ed.add_station(StationKind::Dot, c(2, 0), &StationOptions::default()).unwrap();
-    ed.translate(&[l.group_id], 0.0, 5.0).unwrap();
+    ed.translate(&[l.group_id], 0.0, 5.0, false).unwrap();
     assert_eq!(station(&ed, s.station_id).shape.cells(), vec![c(2, 5)]);
 }
 
@@ -522,7 +559,7 @@ fn drag_with_rebase_does_not_accumulate() {
     ed.begin();
     for step in 1..=5 {
         ed.rebase();
-        ed.translate(&[l.group_id], step as f64, 0.0).unwrap();
+        ed.translate(&[l.group_id], step as f64, 0.0, false).unwrap();
     }
     ed.commit();
     assert_eq!(segment(&ed, l.layer_id).points, vec![c(5, 0), c(8, 0)]);
@@ -534,7 +571,7 @@ fn cancel_transaction_restores() {
     let mut ed = Editor::new();
     let l = line(&mut ed, &[c(0, 0), c(3, 0)]);
     ed.begin();
-    ed.translate(&[l.group_id], 4.0, 0.0).unwrap();
+    ed.translate(&[l.group_id], 4.0, 0.0, false).unwrap();
     ed.cancel();
     assert_eq!(segment(&ed, l.layer_id).points, vec![c(0, 0), c(3, 0)]);
 }
@@ -592,7 +629,7 @@ fn text_and_icon_positions_have_one_decimal() {
     let mut ed = Editor::new();
     let t = ed.add_text(TextBox { pos: Vec2::new(1.234, 5.678), ..TextBox::default() }).unwrap();
     assert_eq!(text(&ed, t).pos, Vec2::new(1.2, 5.7));
-    ed.translate(&[t], 0.33, -0.01).unwrap();
+    ed.translate(&[t], 0.33, -0.01, false).unwrap();
     assert_eq!(text(&ed, t).pos, Vec2::new(1.5, 5.7));
     ed.update_content(t, &json!({"pos": {"x": 0.05}})).unwrap();
     assert_eq!(text(&ed, t).pos.x, 0.1);
@@ -666,7 +703,7 @@ fn no_op_changes_are_not_recorded() {
     let l = line(&mut ed, &[c(0, 0), c(4, 0)]);
     let depth = ed.undo_depth();
     ed.set_visible(l.group_id, true).unwrap();
-    ed.translate(&[l.group_id], 0.2, 0.2).unwrap();
+    ed.translate(&[l.group_id], 0.2, 0.2, false).unwrap();
     assert_eq!(ed.undo_depth(), depth);
 }
 
@@ -699,7 +736,7 @@ fn undo_inside_transaction_commits_first() {
     let mut ed = Editor::new();
     let l = line(&mut ed, &[c(0, 0), c(4, 0)]);
     ed.begin();
-    ed.translate(&[l.group_id], 2.0, 0.0).unwrap();
+    ed.translate(&[l.group_id], 2.0, 0.0, false).unwrap();
     assert!(ed.can_undo());
     ed.undo();
     assert!(!ed.in_transaction());

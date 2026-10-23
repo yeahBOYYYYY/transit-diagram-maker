@@ -173,6 +173,24 @@ describe('selection tool', () => {
     expect(m?.type === 'layer' && m.content.kind === 'line' && m.content.points[0]).toEqual({ x: 0, y: 0 })
   })
 
+  it('alt-dragging a station moves it off its line', () => {
+    const { store, tools } = setup()
+    store.run((e) => e.createLine([{ x: 0, y: 0 }, { x: 8, y: 0 }], {}))
+    const st = store.run((e) => e.addStation('dot', { x: 3, y: 0 }, { label: false }))!
+    const sel = tools.select
+    sel.down?.(at(store, 3.5, 0.5, { hitId: st.station_id }))
+    sel.move?.(at(store, 4.2, 1.8, { hitId: st.station_id, alt: true }), true)
+    sel.up?.(at(store, 4.2, 1.8, { alt: true }))
+    const n = store.node(st.station_id)
+    expect(n?.type === 'layer' && n.content.kind === 'station' && n.content.offset).toEqual({ x: 0.7, y: 1.3 })
+    // Without Alt the same drag snaps back onto the line.
+    sel.down?.(at(store, 4.2, 1.8, { hitId: st.station_id }))
+    sel.move?.(at(store, 5.2, 1.8, { hitId: st.station_id }), true)
+    sel.up?.(at(store, 5.2, 1.8))
+    const m = store.node(st.station_id)
+    expect(m?.type === 'layer' && m.content.kind === 'station' && m.content.offset).toEqual({ x: 0, y: 0 })
+  })
+
   it('clicking a selected object toggles rotate mode', () => {
     const { store, tools } = setup()
     const t = store.run((e) => e.addText({ pos: { x: 1, y: 1 } }))!
