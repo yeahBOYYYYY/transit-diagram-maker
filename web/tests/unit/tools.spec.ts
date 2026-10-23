@@ -69,6 +69,36 @@ describe('line pen', () => {
   })
 })
 
+describe('drawing into an existing line', () => {
+  it('picking the pen with a line selected adds a disconnected segment to it', () => {
+    const { store, tools } = setup()
+    const a = store.run((e) => e.createLine([{ x: 0, y: 0 }, { x: 4, y: 0 }], { color: '#ff0000' }))!
+    store.select([a.group_id])
+    store.setTool('pen')
+    expect(store.state.penTarget).toBe(a.line_id)
+    click(store, tools.pen, 0.5, 5.5)
+    click(store, tools.pen, 4.5, 5.5)
+    tools.pen.key?.(key('Enter'))
+    expect(store.state.tree).toHaveLength(1)
+    const segs = store.state.tree[0].children.map((c) => store.node(c.id))
+    expect(segs).toHaveLength(2)
+    expect(segs.every((n) => n?.type === 'layer' && n.content.kind === 'line' && n.content.line_id === a.line_id)).toBe(true)
+    expect(segs.every((n) => n?.type === 'layer' && n.content.kind === 'line' && n.content.style.color === '#ff0000')).toBe(true)
+  })
+
+  it('starts a new line when nothing is selected and forgets deleted targets', () => {
+    const { store } = setup()
+    const a = store.run((e) => e.createLine([{ x: 0, y: 0 }, { x: 4, y: 0 }], {}))!
+    store.clearSelection()
+    store.setTool('pen')
+    expect(store.state.penTarget).toBeNull()
+    store.state.penTarget = a.line_id
+    expect(store.lines()).toEqual([{ lineId: a.line_id, name: 'Line 1' }])
+    store.run((e) => e.delete([a.group_id]))
+    expect(store.state.penTarget).toBeNull()
+  })
+})
+
 describe('eraser', () => {
   it('splits a line with one undo step per stroke', () => {
     const { store, tools } = setup()

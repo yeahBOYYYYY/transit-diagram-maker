@@ -244,11 +244,21 @@ function penTool(store: EditorStore): Tool {
   let hover: Cell | null = null
   const s = store.state
 
+  /** Style of the line the pen adds to, or the pen defaults for a new line. */
+  const style = () => {
+    if (s.penTarget === null) return prefs.line
+    for (const f of s.fragments) {
+      const n = f.kind === 'line' ? store.node(f.id) : null
+      if (n?.type === 'layer' && n.content.kind === 'line' && n.content.line_id === s.penTarget) return n.content.style
+    }
+    return prefs.line
+  }
+
   const update = () => {
     if (points.length && hover) {
       s.overlay = {
         ...s.overlay,
-        preview: store.engine.value.previewLine([...points, hover], prefs.line),
+        preview: store.engine.value.previewLine([...points, hover], style()),
         cells: points.slice(),
         cellsColor: prefs.selectionColor,
       }
@@ -262,10 +272,11 @@ function penTool(store: EditorStore): Tool {
     points = []
     const distinct = pts.filter((c, i) => i === 0 || !sameCell(pts[i - 1], c))
     if (distinct.length >= 2) {
-      const created = store.run((e) => e.createLine(distinct, prefs.line))
+      const target = s.penTarget
+      const created = store.run((e) => (target === null ? e.createLine(distinct, prefs.line) : e.addSegment(target, distinct)))
       if (created) {
         store.select([created.group_id])
-        store.notify('Line created')
+        store.notify(target === null ? 'Line created' : 'Segment added to the line')
       }
     }
     update()

@@ -522,6 +522,54 @@ fn move_node_between_groups_and_guard_cycles() {
 }
 
 #[test]
+fn add_segment_joins_an_existing_line() {
+    let mut ed = Editor::new();
+    let red = LineStyle { color: "#ff0000".into(), ..LineStyle::default() };
+    let a = ed.create_line(&[c(0, 0), c(4, 0)], red.clone()).unwrap();
+    let st = ed.add_station(StationKind::Dot, c(2, 0), &StationOptions::default()).unwrap();
+    let b = ed.add_segment(a.line_id, &[c(0, 5), c(4, 5)]).unwrap();
+    assert_eq!(b.group_id, a.group_id);
+    assert_eq!(b.line_id, a.line_id);
+    assert_eq!(segment(&ed, b.layer_id).style, red, "takes the line's style");
+    assert_eq!(segments_of(&ed, a.line_id), vec![a.layer_id, b.layer_id]);
+    // Stations stay painted above every segment of the line.
+    let root = &ed.document().root;
+    let Some(Node::Group(g)) = tree::find(root, a.group_id) else { panic!() };
+    assert_eq!(g.children.last().map(|n| n.id()), Some(st.group_id));
+    assert!(ed.add_segment(999, &[c(0, 0), c(1, 0)]).is_err());
+}
+
+#[test]
+fn dropping_a_segment_into_another_line_group_joins_that_line() {
+    let mut ed = Editor::new();
+    let a = ed.create_line(&[c(0, 0), c(4, 0)], LineStyle { color: "#ff0000".into(), ..LineStyle::default() }).unwrap();
+    let b = ed.create_line(&[c(0, 5), c(4, 5)], LineStyle { color: "#0000ff".into(), ..LineStyle::default() }).unwrap();
+    ed.move_node(b.layer_id, Some(a.group_id), 1).unwrap();
+    assert_eq!(segment(&ed, b.layer_id).line_id, a.line_id);
+    assert_eq!(segment(&ed, b.layer_id).style.color, "#ff0000");
+    assert!(ed.node(b.group_id).is_none(), "the emptied line group is pruned");
+    // A style change now reaches both segments.
+    ed.update_content(a.layer_id, &json!({"style": {"color": "#00ff00"}})).unwrap();
+    assert_eq!(segment(&ed, b.layer_id).style.color, "#00ff00");
+}
+
+#[test]
+fn dropping_a_line_group_into_another_merges_the_lines() {
+    let mut ed = Editor::new();
+    let a = line(&mut ed, &[c(0, 0), c(4, 0)]);
+    let b = line(&mut ed, &[c(0, 5), c(4, 5)]);
+    let st = ed.add_station(StationKind::Dot, c(2, 5), &StationOptions::default()).unwrap();
+    ed.move_node(b.group_id, Some(a.group_id), 1).unwrap();
+    assert!(ed.node(b.group_id).is_none());
+    assert_eq!(segments_of(&ed, a.line_id), vec![a.layer_id, b.layer_id]);
+    assert_eq!(station(&ed, st.station_id).line_ids, vec![a.line_id]);
+    assert_eq!(tree::ancestors(&ed.document().root, st.station_id).last(), Some(&a.group_id));
+    // Stations of the merged line still snap to it.
+    ed.translate(&[st.station_id], 1.0, 0.0, false).unwrap();
+    assert_eq!(station(&ed, st.station_id).shape.cells(), vec![c(3, 5)]);
+}
+
+#[test]
 fn move_node_within_same_parent_accounts_for_removal() {
     let mut ed = Editor::new();
     let a = ed.add_text(TextBox::default()).unwrap();

@@ -59,6 +59,19 @@ test.describe('layers panel', () => {
     await layerRow(page, 'Line 1')
   })
 
+  test('dragging a line onto another line group joins the two lines', async ({ page }) => {
+    await drawLine(page, [[0, 0], [6, 0]])
+    await drawLine(page, [[0, 4], [6, 4]])
+    const target = await layerRow(page, 'Line 1')
+    const source = await layerRow(page, 'Line 2')
+    const t = (await target.boundingBox())!
+    await source.dragTo(target, { targetPosition: { x: 80, y: t.height / 2 } })
+    const tree = await state(page, (s) => s.tree.map((g: any) => ({ name: g.name, children: g.children.length })))
+    expect(tree).toEqual([{ name: 'Line 1', children: 2 }])
+    const ids = await state(page, (s) => s.fragments.map((f: any) => (window as any).__transit.node(f.id).content.line_id))
+    expect(new Set(ids).size).toBe(1)
+  })
+
   test('new empty group and moving a layer into it', async ({ page }) => {
     await drawLine(page, [[0, 0], [6, 0]])
     await page.getByTestId('new-group-btn').click()

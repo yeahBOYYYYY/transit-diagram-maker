@@ -186,6 +186,12 @@ impl TransitEditor {
         Ok(json(&self.inner.create_line(&pts, style).map_err(err)?))
     }
 
+    #[wasm_bindgen(js_name = addSegment)]
+    pub fn add_segment(&mut self, line_id: f64, points_json: &str) -> Result<String, JsError> {
+        let pts: Vec<Cell> = parse(points_json)?;
+        Ok(json(&self.inner.add_segment(line_id as u64, &pts).map_err(err)?))
+    }
+
     pub fn erase(&mut self, cells_json: &str) -> Result<usize, JsError> {
         let cells: Vec<Cell> = parse(cells_json)?;
         self.inner.erase(&cells).map_err(err)

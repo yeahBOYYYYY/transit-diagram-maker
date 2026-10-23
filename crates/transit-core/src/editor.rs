@@ -376,6 +376,25 @@ impl Editor {
         })
     }
 
+    /// Add a disconnected segment to an existing line. It joins the line's
+    /// group (below its stations) and takes the line's style.
+    pub fn add_segment(&mut self, line_id: Id, points: &[Cell]) -> Result<CreatedLine> {
+        self.apply(|d| {
+            let pts = geom::normalize_path(points, d.settings.route_mode);
+            if pts.len() < 2 {
+                return Err(EditError::Invalid("a line needs at least two distinct cells".into()));
+            }
+            let group_id = line_group(&d.root, line_id).ok_or(EditError::NotFound(line_id))?;
+            let style = line_style(&d.root, line_id).unwrap_or_default();
+            let layer_id = d.alloc_id();
+            let name = format!("Segment {}", count_segments(&d.root, line_id) + 1);
+            let content = Content::Line(LineSegment { line_id, points: pts, style });
+            let index = segments_end(&d.root, group_id);
+            tree::insert(&mut d.root, Some(group_id), index, Node::Layer(Layer { id: layer_id, name, visible: true, locked: false, content }));
+            Ok(CreatedLine { group_id, layer_id, line_id })
+        })
+    }
+
     /// Erase the given cells from every editable line, splitting segments into
     /// separate layers where they become discontinuous. Returns the number of
     /// segments touched.
@@ -790,9 +809,38 @@ impl Editor {
                     return Err(EditError::Invalid("target is not a group".into()));
                 }
             }
-            let (node, loc) = tree::remove(&mut d.root, id).ok_or(EditError::NotFound(id))?;
+            let (mut node, loc) = tree::remove(&mut d.root, id).ok_or(EditError::NotFound(id))?;
             let index = if loc.parent == parent && loc.index < index { index - 1 } else { index };
-            tree::insert(&mut d.root, parent, index, node);
+            // Dropping segments into another line's group makes them part of that line.
+            let target_line = parent.and_then(|p| match tree::find(&d.root, p) {
+                Some(Node::Group(Group { kind: GroupKind::Line { line_id }, .. })) => Some(*line_id),
+                _ => None,
+            });
+            match (target_line, node) {
+                (Some(target), Node::Group(Group { kind: GroupKind::Line { line_id: source }, children, .. })) if source != target => {
+                    // A whole line dropped onto another: merge it, keeping its stations.
+                    let style = line_style(&d.root, target).unwrap_or_default();
+                    let mut children = children;
+                    join_line(&mut children, source, target, &style);
+                    tree::walk_layers_mut(&mut d.root, &mut |l| relink_station(l, source, target));
+                    for (i, child) in children.into_iter().enumerate() {
+                        tree::insert(&mut d.root, parent, index + i, child);
+                    }
+                }
+                (target, n) => {
+                    node = n;
+                    if let Some(target) = target {
+                        let style = line_style(&d.root, target).unwrap_or_default();
+                        let mut list = vec![node];
+                        let sources: HashSet<Id> = line_ids_in(&list).into_iter().filter(|l| *l != target).collect();
+                        for source in sources {
+                            join_line(&mut list, source, target, &style);
+                        }
+                        node = list.pop().unwrap();
+                    }
+                    tree::insert(&mut d.root, parent, index, node);
+                }
+            }
             tree::prune_empty_groups(&mut d.root);
             Ok(())
         })
@@ -1006,6 +1054,75 @@ fn count_segments(nodes: &[Node], line_id: Id) -> usize {
         }
     });
     n
+}
+
+/// The group holding the given line.
+fn line_group(nodes: &[Node], line_id: Id) -> Option<Id> {
+    let mut out = None;
+    tree::walk_nodes(nodes, &mut |n| {
+        if let Node::Group(g) = n {
+            if out.is_none() && g.kind == (GroupKind::Line { line_id }) {
+                out = Some(g.id);
+            }
+        }
+    });
+    out
+}
+
+fn line_style(nodes: &[Node], line_id: Id) -> Option<LineStyle> {
+    let mut out = None;
+    tree::walk_layers(nodes, &mut |l, _, _| {
+        if let Content::Line(s) = &l.content {
+            if out.is_none() && s.line_id == line_id {
+                out = Some(s.style.clone());
+            }
+        }
+    });
+    out
+}
+
+fn line_ids_in(nodes: &[Node]) -> Vec<Id> {
+    let mut out = Vec::new();
+    tree::walk_layers(nodes, &mut |l, _, _| {
+        if let Content::Line(s) = &l.content {
+            if !out.contains(&s.line_id) {
+                out.push(s.line_id);
+            }
+        }
+    });
+    out
+}
+
+/// Index right after the last segment in a line group, so new segments stay below its stations.
+fn segments_end(nodes: &[Node], group_id: Id) -> usize {
+    tree::children(nodes, Some(group_id))
+        .map(|c| c.iter().rposition(|n| matches!(n, Node::Layer(Layer { content: Content::Line(_), .. }))).map_or(0, |i| i + 1))
+        .unwrap_or(0)
+}
+
+/// Turn the segments of line `from` (within `nodes`) into segments of line `to`.
+fn join_line(nodes: &mut [Node], from: Id, to: Id, style: &LineStyle) {
+    tree::walk_layers_mut(nodes, &mut |l| {
+        if let Content::Line(s) = &mut l.content {
+            if s.line_id == from {
+                s.line_id = to;
+                s.style = style.clone();
+            }
+        }
+        relink_station(l, from, to);
+    });
+}
+
+fn relink_station(l: &mut Layer, from: Id, to: Id) {
+    if let Content::Station(st) = &mut l.content {
+        if st.line_ids.contains(&to) {
+            st.line_ids.retain(|id| *id != from);
+        } else {
+            for id in st.line_ids.iter_mut().filter(|id| **id == from) {
+                *id = to;
+            }
+        }
+    }
 }
 
 fn count_stations(nodes: &[Node]) -> usize {

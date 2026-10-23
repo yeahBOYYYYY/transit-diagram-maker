@@ -58,40 +58,51 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
     </template>
 
     <template v-else-if="tool === 'pen'">
-      <ColorField v-model="prefs.line.color" label="Color" />
-      <label class="opt">
-        <span class="dim">Style:</span>
-        <select v-model="prefs.line.kind" data-testid="line-style">
-          <option value="plain">Plain</option>
-          <option value="hollow">Hollow</option>
-          <option value="dashed">Dashed</option>
+      <label class="opt" title="Add the next segment to an existing line, or start a new one">
+        <span class="dim">Draw into:</span>
+        <select v-model="s.penTarget" data-testid="pen-target">
+          <option :value="null">New line</option>
+          <option v-for="l in store.lines()" :key="l.lineId" :value="l.lineId">{{ l.name }}</option>
         </select>
       </label>
-      <template v-if="prefs.line.kind !== 'plain'">
-        <ColorField v-model="prefs.line.inner_color" label="Inner" />
-        <NumberField v-model="prefs.line.inner_width_pct" label="Inner W" :min="0" :max="100" unit="%" :width="40" />
-      </template>
-      <template v-if="prefs.line.kind === 'dashed'">
-        <NumberField v-model="prefs.line.dash_length" label="Dash" :min="0.05" :step="0.05" :width="40" title="Dash length (cells)" />
-        <NumberField v-model="prefs.line.dash_gap" label="Gap" :min="0" :step="0.05" :width="40" title="Spacing between dashes (cells)" />
-        <NumberField v-model="prefs.line.dash_width_pct" label="W" :min="0" :max="100" unit="%" :width="36" title="Dash width" />
-        <NumberField v-model="prefs.line.dash_offset" label="Offset" :step="0.05" :width="40" title="Offset from the start (cells)" />
-      </template>
       <div class="sep-v" />
-      <label class="opt">
-        <span class="dim">Start:</span>
-        <select v-model="prefs.line.start_cap">
-          <option value="round">Round</option>
-          <option value="butt">Butt</option>
-        </select>
-      </label>
-      <label class="opt">
-        <span class="dim">End:</span>
-        <select v-model="prefs.line.end_cap">
-          <option value="round">Round</option>
-          <option value="butt">Butt</option>
-        </select>
-      </label>
+      <template v-if="s.penTarget === null">
+        <ColorField v-model="prefs.line.color" label="Color" />
+        <label class="opt">
+          <span class="dim">Style:</span>
+          <select v-model="prefs.line.kind" data-testid="line-style">
+            <option value="plain">Plain</option>
+            <option value="hollow">Hollow</option>
+            <option value="dashed">Dashed</option>
+          </select>
+        </label>
+        <template v-if="prefs.line.kind !== 'plain'">
+          <ColorField v-model="prefs.line.inner_color" label="Inner" />
+          <NumberField v-model="prefs.line.inner_width_pct" label="Inner W" :min="0" :max="100" unit="%" :width="40" />
+        </template>
+        <template v-if="prefs.line.kind === 'dashed'">
+          <NumberField v-model="prefs.line.dash_length" label="Dash" :min="0.05" :step="0.05" :width="40" title="Dash length (cells)" />
+          <NumberField v-model="prefs.line.dash_gap" label="Gap" :min="0" :step="0.05" :width="40" title="Spacing between dashes (cells)" />
+          <NumberField v-model="prefs.line.dash_width_pct" label="W" :min="0" :max="100" unit="%" :width="36" title="Dash width" />
+          <NumberField v-model="prefs.line.dash_offset" label="Offset" :step="0.05" :width="40" title="Offset from the start (cells)" />
+        </template>
+        <div class="sep-v" />
+        <label class="opt">
+          <span class="dim">Start:</span>
+          <select v-model="prefs.line.start_cap">
+            <option value="round">Round</option>
+            <option value="butt">Butt</option>
+          </select>
+        </label>
+        <label class="opt">
+          <span class="dim">End:</span>
+          <select v-model="prefs.line.end_cap">
+            <option value="round">Round</option>
+            <option value="butt">Butt</option>
+          </select>
+        </label>
+      </template>
+      <span v-else class="dim">Uses the line's style</span>
       <span class="hint dim">Click to add points · click last point / Enter to finish · Backspace removes</span>
     </template>
 
