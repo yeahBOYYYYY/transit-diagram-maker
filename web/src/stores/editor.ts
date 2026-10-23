@@ -1,0 +1,296 @@
+// Central application state. The Rust engine owns the document; this store
+// mirrors what the UI needs (render fragments, layer tree, settings) and keeps
+// purely visual state (selection, view, active tool, overlays).
+import { reactive, shallowRef } from 'vue'
+import { Engine } from '../core/engine'
+import type { Cell, DocNode, DocSettings, Fragment, Id, Rect, TreeItem } from '../core/types'
+import { leafIds, findItem, topLevelOf } from '../core/tree'
+import { fitRect, unionRects, zoomAt, type View } from '../core/viewport'
+import { prefs } from './prefs'
+
+export type ToolId = 'select' | 'hand' | 'pen' | 'eraser' | 'station' | 'text' | 'icon'
+
+export interface Overlay {
+  /** Markup drawn in world space above the document (pen / pill previews). */
+  preview: string
+  /** Marquee in world px. */
+  marquee: Rect | null
+  /** Cells highlighted in world space (eraser brush, hover target). */
+  cells: Cell[]
+  cellsColor: string
+}
+
+export interface TextEditState {
+  id: Id
+  /** Created by this edit session (cancel removes it). */
+  isNew: boolean
+  value: string
+}
+
+export function createEditor(engine = new Engine()) {
+  const state = reactive({
+    revision: 0,
+    fragments: [] as Fragment[],
+    tree: [] as TreeItem[],
+    settings: engine.settings() as DocSettings,
+    selection: [] as Id[],
+    tool: 'select' as ToolId,
+    penSlot: 'pen' as 'pen' | 'eraser',
+    transformMode: 'move' as 'move' | 'rotate',
+    view: { x: 0, y: 0, zoom: 1 } as View,
+    viewport: { width: 800, height: 600 },
+    canUndo: false,
+    canRedo: false,
+    docName: 'Untitled-1',
+    dirty: false,
+    overlay: { preview: '', marquee: null, cells: [], cellsColor: '#31a8ff' } as Overlay,
+    cursor: null as { x: number; y: number } | null,
+    message: '',
+    messageKind: 'info' as 'info' | 'error',
+    textEdit: null as TextEditState | null,
+    /** Angle shown while rotating. */
+    rotation: null as number | null,
+    spaceHeld: false,
+    dialog: null as null | 'document' | 'preferences' | 'shortcuts' | 'about' | 'reference',
+  })
+
+  const engineRef = shallowRef(engine)
+  let messageTimer: ReturnType<typeof setTimeout> | null = null
+
+  function refresh(): void {
+    state.fragments = engine.fragments()
+    state.tree = engine.tree()
+    state.settings = engine.settings()
+    state.canUndo = engine.canUndo()
+    state.canRedo = engine.canRedo()
+    state.selection = state.selection.filter((id) => findItem(state.tree, id) !== null)
+    state.revision++
+  }
+
+  function notify(message: string, kind: 'info' | 'error' = 'info'): void {
+    state.message = message
+    state.messageKind = kind
+    if (messageTimer) clearTimeout(messageTimer)
+    messageTimer = setTimeout(() => (state.message = ''), kind === 'error' ? 6000 : 3000)
+  }
+
+  /** Run an engine mutation, refresh the mirror and report failures. */
+  function run<T>(fn: (e: Engine) => T, opts: { quiet?: boolean } = {}): T | undefined {
+    try {
+      const out = fn(engine)
+      state.dirty = true
+      refresh()
+      return out
+    } catch (err) {
+      if (!opts.quiet) notify(errorMessage(err), 'error')
+      refresh()
+      return undefined
+    }
+  }
+
+  // ------------------------------------------------------------ selection
+
+  function select(ids: Id[], mode: 'replace' | 'add' | 'toggle' = 'replace'): void {
+    if (mode === 'replace') state.selection = [...new Set(ids)]
+    else if (mode === 'add') state.selection = [...new Set([...state.selection, ...ids])]
+    else {
+      const set = new Set(state.selection)
+      for (const id of ids) {
+        if (set.has(id)) set.delete(id)
+        else set.add(id)
+      }
+      state.selection = [...set]
+    }
+    if (state.selection.length === 0) state.transformMode = 'move'
+  }
+
+  function clearSelection(): void {
+    select([])
+  }
+
+  function selectAll(): void {
+    select(state.tree.filter((t) => !t.locked).map((t) => t.id))
+  }
+
+  /** Which node a click on leaf `id` should select, honoring the auto-select mode. */
+  function pickTarget(id: Id): Id {
+    return prefs.autoSelect === 'group' ? topLevelOf(state.tree, id) : id
+  }
+
+  function selectedLeaves(): Id[] {
+    return leafIds(state.tree, state.selection)
+  }
+
+  function node(id: Id): DocNode | null {
+    return engine.node(id)
+  }
+
+  // ----------------------------------------------------------------- view
+
+  function setViewport(width: number, height: number): void {
+    state.viewport = { width, height }
+  }
+
+  function zoomBy(factor: number, sx = state.viewport.width / 2, sy = state.viewport.height / 2): void {
+    state.view = zoomAt(state.view, sx, sy, factor, prefs.minZoom, prefs.maxZoom)
+  }
+
+  function setZoom(zoom: number): void {
+    zoomBy(zoom / state.view.zoom)
+  }
+
+  function panBy(dx: number, dy: number): void {
+    state.view = { ...state.view, x: state.view.x + dx, y: state.view.y + dy }
+  }
+
+  function contentBounds(ids?: Id[]): Rect | null {
+    const want = ids ? new Set(leafIds(state.tree, ids)) : null
+    return unionRects(state.fragments.filter((f) => !want || want.has(f.id)).map((f) => f.bounds))
+  }
+
+  function fitToScreen(): void {
+    const r = contentBounds()
+    if (!r) {
+      state.view = { x: state.viewport.width / 2, y: state.viewport.height / 2, zoom: 1 }
+      return
+    }
+    state.view = fitRect(r, state.viewport.width, state.viewport.height, 60, prefs.minZoom, Math.min(prefs.maxZoom, 4))
+  }
+
+  function actualSize(): void {
+    const r = contentBounds()
+    const cx = r ? r.x + r.w / 2 : 0
+    const cy = r ? r.y + r.h / 2 : 0
+    state.view = { zoom: 1, x: state.viewport.width / 2 - cx, y: state.viewport.height / 2 - cy }
+  }
+
+  // ---------------------------------------------------------------- tools
+
+  function setTool(tool: ToolId): void {
+    if (state.textEdit) finishTextEdit(true)
+    state.tool = tool
+    if (tool === 'pen' || tool === 'eraser') state.penSlot = tool
+    state.overlay = { preview: '', marquee: null, cells: [], cellsColor: prefs.selectionColor }
+    state.transformMode = 'move'
+  }
+
+  // -------------------------------------------------------------- history
+
+  function undo(): void {
+    if (state.textEdit) finishTextEdit(false)
+    if (engine.undo()) {
+      state.dirty = true
+      refresh()
+    }
+  }
+
+  function redo(): void {
+    if (engine.redo()) {
+      state.dirty = true
+      refresh()
+    }
+  }
+
+  // ---------------------------------------------------------- text editing
+
+  function startTextEdit(id: Id, isNew = false): void {
+    const n = engine.node(id)
+    if (!n || n.type !== 'layer' || n.content.kind !== 'text') return
+    state.textEdit = { id, isNew, value: n.content.text }
+    select([id])
+  }
+
+  /** Commit (or cancel) the inline text editor. New, cancelled or emptied texts are removed. */
+  function finishTextEdit(commit: boolean): void {
+    const edit = state.textEdit
+    if (!edit) return
+    state.textEdit = null
+    const value = edit.value
+    if (!commit) {
+      if (edit.isNew) {
+        engine.cancel()
+        refresh()
+      }
+      return
+    }
+    run((e) => {
+      if (value.trim() === '') e.delete([edit.id])
+      else e.updateContent(edit.id, { text: value })
+      if (edit.isNew) e.commit()
+    })
+  }
+
+  // ---------------------------------------------------------------- files
+
+  function newDocument(): void {
+    engine.newDocument()
+    state.selection = []
+    state.dirty = false
+    state.docName = 'Untitled-1'
+    refresh()
+    state.view = { x: state.viewport.width / 2, y: state.viewport.height / 2, zoom: 1 }
+  }
+
+  function openTransit(text: string, name: string): boolean {
+    try {
+      engine.loadTransit(text)
+    } catch (err) {
+      notify(errorMessage(err), 'error')
+      return false
+    }
+    state.selection = []
+    state.dirty = false
+    state.docName = name.replace(/\.transit$/i, '')
+    refresh()
+    fitToScreen()
+    notify(`Opened ${name}`)
+    return true
+  }
+
+  return {
+    state,
+    engine: engineRef,
+    refresh,
+    notify,
+    run,
+    select,
+    clearSelection,
+    selectAll,
+    pickTarget,
+    selectedLeaves,
+    node,
+    setViewport,
+    zoomBy,
+    setZoom,
+    panBy,
+    contentBounds,
+    fitToScreen,
+    actualSize,
+    setTool,
+    undo,
+    redo,
+    startTextEdit,
+    finishTextEdit,
+    newDocument,
+    openTransit,
+  }
+}
+
+export type EditorStore = ReturnType<typeof createEditor>
+
+export function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message
+  return String(err)
+}
+
+let instance: EditorStore | null = null
+
+export function provideEditor(store: EditorStore): EditorStore {
+  instance = store
+  return store
+}
+
+export function useEditor(): EditorStore {
+  if (!instance) instance = createEditor()
+  return instance
+}

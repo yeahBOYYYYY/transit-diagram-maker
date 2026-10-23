@@ -78,8 +78,8 @@ impl TransitEditor {
         json(self.inner.settings())
     }
 
-    pub fn node(&self, id: u64) -> String {
-        json(&self.inner.node(id))
+    pub fn node(&self, id: f64) -> String {
+        json(&self.inner.node(id as u64))
     }
 
     pub fn bounds(&self, ids_json: &str) -> Result<String, JsError> {
@@ -206,75 +206,75 @@ impl TransitEditor {
     }
 
     #[wasm_bindgen(js_name = setStationKind)]
-    pub fn set_station_kind(&mut self, id: u64, kind: &str) -> Result<(), JsError> {
+    pub fn set_station_kind(&mut self, id: f64, kind: &str) -> Result<(), JsError> {
         let kind: StationKind = parse(&format!("\"{kind}\""))?;
-        self.inner.set_station_kind(id, kind).map_err(err)
+        self.inner.set_station_kind(id as u64, kind).map_err(err)
     }
 
     #[wasm_bindgen(js_name = moveStationTo)]
-    pub fn move_station_to(&mut self, id: u64, x: f64, y: f64) -> Result<String, JsError> {
-        Ok(json(&self.inner.move_station_to(id, Vec2::new(x, y)).map_err(err)?))
+    pub fn move_station_to(&mut self, id: f64, x: f64, y: f64) -> Result<String, JsError> {
+        Ok(json(&self.inner.move_station_to(id as u64, Vec2::new(x, y)).map_err(err)?))
     }
 
     #[wasm_bindgen(js_name = addText)]
-    pub fn add_text(&mut self, text_json: &str) -> Result<u64, JsError> {
+    pub fn add_text(&mut self, text_json: &str) -> Result<f64, JsError> {
         let t: TextBox = parse(text_json)?;
-        self.inner.add_text(t).map_err(err)
+        self.inner.add_text(t).map(|v| v as f64).map_err(err)
     }
 
     #[wasm_bindgen(js_name = addIcon)]
-    pub fn add_icon(&mut self, icon_json: &str) -> Result<u64, JsError> {
+    pub fn add_icon(&mut self, icon_json: &str) -> Result<f64, JsError> {
         let i: Icon = parse(icon_json)?;
-        self.inner.add_icon(i).map_err(err)
+        self.inner.add_icon(i).map(|v| v as f64).map_err(err)
     }
 
     #[wasm_bindgen(js_name = updateContent)]
-    pub fn update_content(&mut self, id: u64, patch_json: &str) -> Result<(), JsError> {
+    pub fn update_content(&mut self, id: f64, patch_json: &str) -> Result<(), JsError> {
         let patch: Value = parse(patch_json)?;
-        self.inner.update_content(id, &patch).map_err(err)
+        self.inner.update_content(id as u64, &patch).map_err(err)
     }
 
-    pub fn rename(&mut self, id: u64, name: &str) -> Result<(), JsError> {
-        self.inner.rename(id, name).map_err(err)
+    pub fn rename(&mut self, id: f64, name: &str) -> Result<(), JsError> {
+        self.inner.rename(id as u64, name).map_err(err)
     }
 
     #[wasm_bindgen(js_name = setVisible)]
-    pub fn set_visible(&mut self, id: u64, visible: bool) -> Result<(), JsError> {
-        self.inner.set_visible(id, visible).map_err(err)
+    pub fn set_visible(&mut self, id: f64, visible: bool) -> Result<(), JsError> {
+        self.inner.set_visible(id as u64, visible).map_err(err)
     }
 
     #[wasm_bindgen(js_name = setLocked)]
-    pub fn set_locked(&mut self, id: u64, locked: bool) -> Result<(), JsError> {
-        self.inner.set_locked(id, locked).map_err(err)
+    pub fn set_locked(&mut self, id: f64, locked: bool) -> Result<(), JsError> {
+        self.inner.set_locked(id as u64, locked).map_err(err)
     }
 
     #[wasm_bindgen(js_name = setExpanded)]
-    pub fn set_expanded(&mut self, id: u64, expanded: bool) -> Result<(), JsError> {
-        self.inner.set_expanded(id, expanded).map_err(err)
+    pub fn set_expanded(&mut self, id: f64, expanded: bool) -> Result<(), JsError> {
+        self.inner.set_expanded(id as u64, expanded).map_err(err)
     }
 
     pub fn delete(&mut self, ids_json: &str) -> Result<usize, JsError> {
         self.inner.delete(&ids(ids_json)?).map_err(err)
     }
 
-    pub fn group(&mut self, ids_json: &str) -> Result<u64, JsError> {
-        self.inner.group(&ids(ids_json)?, None).map_err(err)
+    pub fn group(&mut self, ids_json: &str) -> Result<f64, JsError> {
+        self.inner.group(&ids(ids_json)?, None).map(|v| v as f64).map_err(err)
     }
 
-    pub fn ungroup(&mut self, id: u64) -> Result<String, JsError> {
-        Ok(json(&self.inner.ungroup(id).map_err(err)?))
+    pub fn ungroup(&mut self, id: f64) -> Result<String, JsError> {
+        Ok(json(&self.inner.ungroup(id as u64).map_err(err)?))
     }
 
     #[wasm_bindgen(js_name = newGroup)]
-    pub fn new_group(&mut self) -> Result<u64, JsError> {
-        self.inner.new_group(None).map_err(err)
+    pub fn new_group(&mut self) -> Result<f64, JsError> {
+        self.inner.new_group(None).map(|v| v as f64).map_err(err)
     }
 
     /// `parent` < 0 means the root.
     #[wasm_bindgen(js_name = moveNode)]
-    pub fn move_node(&mut self, id: u64, parent: f64, index: usize) -> Result<(), JsError> {
+    pub fn move_node(&mut self, id: f64, parent: f64, index: usize) -> Result<(), JsError> {
         let parent = if parent < 0.0 { None } else { Some(parent as u64) };
-        self.inner.move_node(id, parent, index).map_err(err)
+        self.inner.move_node(id as u64, parent, index).map_err(err)
     }
 
     pub fn restack(&mut self, ids_json: &str, delta: i32) -> Result<(), JsError> {
