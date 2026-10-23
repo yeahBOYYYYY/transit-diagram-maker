@@ -37,7 +37,7 @@ test.describe('saving, opening and exporting', () => {
 
     const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.keyboard.press('Control+o')])
     await chooser.setFiles({ name: 'city.transit', mimeType: 'application/json', buffer: readFileSync(path) })
-    await expect(page.getByTestId('doc-tab')).toContainText('city.transit')
+    await expect(page.getByTestId('doc-title')).toContainText('city.transit')
     const after = await state(page, (s) => ({ tree: s.tree, frags: s.fragments.map((f: any) => f.svg) }))
     expect(after).toEqual(before)
   })

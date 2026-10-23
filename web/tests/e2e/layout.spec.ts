@@ -14,7 +14,9 @@ test.describe('workspace layout', () => {
     }
     const tools = page.locator('[data-testid=tools-panel] .tool')
     await expect(tools).toHaveCount(6)
-    await expect(page.getByTestId('doc-tab')).toHaveText(/Untitled-1\.transit @ 100%/)
+    await expect(page.getByTestId('doc-title')).toHaveText(/^Untitled-1\.transit — /)
+    // One document at a time: there is no document tab strip.
+    await expect(page.locator('.doc-tabs')).toHaveCount(0)
   })
 
   test('tools panel is on the left, panels on the right', async ({ page }) => {
