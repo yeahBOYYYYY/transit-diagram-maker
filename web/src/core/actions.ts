@@ -4,7 +4,8 @@
 export const ACTIONS = {
   'file.new': { label: 'New', category: 'File', key: 'Ctrl+Alt+N' },
   'file.open': { label: 'Open…', category: 'File', key: 'Ctrl+O' },
-  'file.save': { label: 'Save as .transit', category: 'File', key: 'Ctrl+S' },
+  'file.save': { label: 'Save', category: 'File', key: 'Ctrl+S' },
+  'file.saveAs': { label: 'Save As…', category: 'File', key: 'Ctrl+Shift+S' },
   'file.exportSvg': { label: 'Export as SVG', category: 'File', key: 'Ctrl+Shift+E' },
 
   'edit.undo': { label: 'Undo', category: 'Edit', key: 'Ctrl+Z' },

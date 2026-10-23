@@ -42,6 +42,37 @@ test.describe('saving, opening and exporting', () => {
     expect(after).toEqual(before)
   })
 
+  test('the menu bar save button saves back to the same file after the first save', async ({ page }) => {
+    await page.evaluate(() => {
+      const w = window as any
+      w.__writes = []
+      w.__picks = 0
+      w.showSaveFilePicker = async () => {
+        w.__picks++
+        return {
+          name: 'metro.transit',
+          getFile: async () => new File([], 'metro.transit'),
+          createWritable: async () => ({ write: async (d: string) => void w.__writes.push(d), close: async () => {} }),
+        }
+      }
+    })
+    await page.keyboard.press('t')
+    await page.mouse.click(700, 400)
+    await page.keyboard.type('A')
+    await page.keyboard.press('Enter')
+    await page.getByTestId('quick-save').click()
+    await expect(page.getByTestId('doc-title')).toContainText('metro.transit')
+    await page.keyboard.press('Control+s')
+    await expect.poll(() => page.evaluate(() => (window as any).__writes.length)).toBe(2)
+    expect(await page.evaluate(() => (window as any).__picks)).toBe(1)
+  })
+
+  test('the menu bar links to the GitHub repository', async ({ page }) => {
+    const link = page.getByTestId('github-link')
+    await expect(link).toHaveAttribute('href', 'https://github.com/yeahBOYYYYY/transit-diagram-maker')
+    await expect(link).toHaveAttribute('target', '_blank')
+  })
+
   test('opening an invalid file shows an error and keeps the document', async ({ page }) => {
     await buildSampleMap(page)
     const count = (await fragmentKinds(page)).length

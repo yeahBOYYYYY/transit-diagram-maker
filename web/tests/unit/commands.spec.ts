@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { freshStore, key } from './helpers'
-import { actionForEvent, isEnabled, nudgeSelection, rotateSelection, runAction } from '../../src/stores/commands'
+import { actionForEvent, isEnabled, nudgeSelection, rotateSelection, runAction, saveTransit } from '../../src/stores/commands'
 import { prefs } from '../../src/stores/prefs'
 
 describe('commands', () => {
@@ -88,6 +88,59 @@ describe('commands', () => {
     expect(isEnabled(store, 'file.save')).toBe(true)
     store.run((e) => e.addText({}))
     expect(isEnabled(store, 'edit.undo')).toBe(true)
+  })
+
+  describe('save', () => {
+    afterEach(() => {
+      delete (window as any).showSaveFilePicker
+    })
+    function fakeHandle(name: string) {
+      const writes: string[] = []
+      return {
+        writes,
+        handle: {
+          name,
+          getFile: async () => new File([], name),
+          createWritable: async () => ({ write: async (d: string) => void writes.push(d), close: async () => {} }),
+        },
+      }
+    }
+
+    it('asks for a location once, then saves back to the same file', async () => {
+      const store = freshStore()
+      const f = fakeHandle('city.transit')
+      const picker = vi.fn(async () => f.handle)
+      ;(window as any).showSaveFilePicker = picker
+      store.run((e) => e.addText({}))
+      await saveTransit(store)
+      expect(picker).toHaveBeenCalledTimes(1)
+      expect(picker.mock.calls[0]).toEqual([expect.objectContaining({ suggestedName: 'Untitled-1.transit' })])
+      expect(store.state.docName).toBe('city')
+      expect(store.state.dirty).toBe(false)
+      store.run((e) => e.addText({}))
+      await saveTransit(store)
+      expect(picker).toHaveBeenCalledTimes(1)
+      expect(f.writes).toHaveLength(2)
+      expect(JSON.parse(f.writes[1]).format).toBe('transit-diagram')
+      // Save As always asks again.
+      await saveTransit(store, true)
+      expect(picker).toHaveBeenCalledTimes(2)
+      // A new document forgets the file.
+      store.newDocument()
+      await saveTransit(store)
+      expect(picker).toHaveBeenCalledTimes(3)
+    })
+
+    it('does nothing when the save dialog is cancelled', async () => {
+      const store = freshStore()
+      ;(window as any).showSaveFilePicker = async () => {
+        throw new DOMException('cancelled', 'AbortError')
+      }
+      store.run((e) => e.addText({}))
+      await saveTransit(store)
+      expect(store.state.dirty).toBe(true)
+      expect(store.state.messageKind).toBe('info')
+    })
   })
 
   it('opens dialogs and toggles the grid', () => {

@@ -1,6 +1,12 @@
 import { expect, type Page } from '@playwright/test'
 
 export async function openApp(page: Page): Promise<void> {
+  // Native save/open pickers can't be driven by Playwright; use the download
+  // and <input type=file> fallbacks unless a test installs its own picker.
+  await page.addInitScript(() => {
+    delete (window as any).showSaveFilePicker
+    delete (window as any).showOpenFilePicker
+  })
   await page.goto('/')
   await page.waitForSelector('[data-testid=canvas]')
   await page.evaluate(() => localStorage.clear())

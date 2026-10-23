@@ -7,6 +7,7 @@ import type { Cell, DocNode, DocSettings, Fragment, Id, Rect, TreeItem } from '.
 import { leafIds, findItem, topLevelOf } from '../core/tree'
 import { fitRect, unionRects, zoomAt, type View } from '../core/viewport'
 import { prefs } from './prefs'
+import type { FileHandle } from '../core/files'
 
 export type ToolId = 'select' | 'hand' | 'pen' | 'eraser' | 'station' | 'text' | 'icon'
 
@@ -55,6 +56,8 @@ export function createEditor(engine = new Engine()) {
   })
 
   const engineRef = shallowRef(engine)
+  /** Where the document was last saved or opened from, so Save can write back to it. */
+  let fileHandle: FileHandle | null = null
   let messageTimer: ReturnType<typeof setTimeout> | null = null
 
   function refresh(): void {
@@ -227,11 +230,12 @@ export function createEditor(engine = new Engine()) {
     state.selection = []
     state.dirty = false
     state.docName = 'Untitled-1'
+    fileHandle = null
     refresh()
     state.view = { x: state.viewport.width / 2, y: state.viewport.height / 2, zoom: 1 }
   }
 
-  function openTransit(text: string, name: string): boolean {
+  function openTransit(text: string, name: string, handle: FileHandle | null = null): boolean {
     try {
       engine.loadTransit(text)
     } catch (err) {
@@ -241,6 +245,7 @@ export function createEditor(engine = new Engine()) {
     state.selection = []
     state.dirty = false
     state.docName = name.replace(/\.transit$/i, '')
+    fileHandle = handle
     refresh()
     fitToScreen()
     notify(`Opened ${name}`)
@@ -273,6 +278,8 @@ export function createEditor(engine = new Engine()) {
     finishTextEdit,
     newDocument,
     openTransit,
+    getFileHandle: () => fileHandle,
+    setFileHandle: (h: FileHandle | null) => (fileHandle = h),
   }
 }
 
