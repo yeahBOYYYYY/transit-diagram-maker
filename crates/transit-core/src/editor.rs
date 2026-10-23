@@ -549,7 +549,8 @@ impl Editor {
 
     // ----------------------------------------------------------- text, icons
 
-    pub fn add_text(&mut self, text: TextBox) -> Result<Id> {
+    pub fn add_text(&mut self, mut text: TextBox) -> Result<Id> {
+        text.rotation = snap_rotation(text.rotation);
         self.apply(|d| {
             let id = d.alloc_id();
             let name = first_line_name(&text.text, "Text");
@@ -558,7 +559,8 @@ impl Editor {
         })
     }
 
-    pub fn add_icon(&mut self, icon: Icon) -> Result<Id> {
+    pub fn add_icon(&mut self, mut icon: Icon) -> Result<Id> {
+        icon.rotation = snap_rotation(icon.rotation);
         self.apply(|d| {
             let id = d.alloc_id();
             let name = crate::icons::find(&icon.icon).map(|i| i.label).unwrap_or("Icon").to_string();
@@ -580,7 +582,12 @@ impl Editor {
             let layer = tree::find_layer(&d.root, id).ok_or(EditError::NotFound(id))?;
             let mut v = serde_json::to_value(&layer.content).map_err(|e| EditError::Invalid(e.to_string()))?;
             merge(&mut v, patch);
-            let content: Content = serde_json::from_value(v).map_err(|e| EditError::Invalid(e.to_string()))?;
+            let mut content: Content = serde_json::from_value(v).map_err(|e| EditError::Invalid(e.to_string()))?;
+            match &mut content {
+                Content::Text(t) => t.rotation = snap_rotation(t.rotation),
+                Content::Icon(i) => i.rotation = snap_rotation(i.rotation),
+                _ => {}
+            }
             let rename = match (&layer.content, &content) {
                 (Content::Text(old), Content::Text(new)) if layer.name == first_line_name(&old.text, "Text") => {
                     Some(first_line_name(&new.text, "Text"))
@@ -818,25 +825,22 @@ impl Editor {
         })
     }
 
-    /// Rotate nodes by `deg` around `pivot` (cell units). Any selection that
-    /// contains grid-bound content (lines, stations) rotates in 45° steps.
-    /// Returns the angle actually applied.
+    /// Rotate nodes by `deg` around `pivot` (cell units). Everything rotates in
+    /// 45° steps; selections with grid-bound content (lines, stations) pivot
+    /// around a cell center so they land back on the grid. Returns the angle
+    /// actually applied.
     pub fn rotate(&mut self, ids: &[Id], deg: f64, pivot: Vec2) -> Result<f64> {
         self.apply(|d| {
             let leaves = editable_leaves(d, ids);
             let grid_bound = leaves.iter().any(|id| {
                 matches!(tree::find_layer(&d.root, *id).map(|l| &l.content), Some(Content::Line(_) | Content::Station(_)))
             });
-            let (angle, pivot) = if grid_bound {
-                let steps = (deg / 45.0).round();
-                (steps * 45.0, Cell::containing(pivot).center())
-            } else {
-                (deg, pivot)
-            };
-            if angle.abs() < 1e-9 {
+            let steps = (deg / 45.0).round() as i32;
+            let angle = steps as f64 * 45.0;
+            let pivot = if grid_bound { Cell::containing(pivot).center() } else { pivot };
+            if steps == 0 {
                 return Ok(0.0);
             }
-            let steps = (angle / 45.0).round() as i32;
             let route = d.settings.route_mode;
             let rot_cell = |c: Cell| Cell::containing(c.center().rotate_around(pivot, angle));
             let old_anchors = station_anchors(d);
@@ -869,11 +873,11 @@ impl Editor {
                     },
                     Content::Text(t) => {
                         t.pos = t.pos.rotate_around(pivot, angle);
-                        t.rotation = normalize_angle(t.rotation + angle);
+                        t.rotation = snap_rotation(t.rotation + angle);
                     }
                     Content::Icon(i) => {
                         i.pos = i.pos.rotate_around(pivot, angle);
-                        i.rotation = normalize_angle(i.rotation + angle);
+                        i.rotation = snap_rotation(i.rotation + angle);
                     }
                 }
             }
@@ -926,6 +930,14 @@ fn normalize_angle(a: f64) -> f64 {
         a += 360.0;
     }
     a
+}
+
+/// Rotations are always whole multiples of 45°, normalized to (-180, 180].
+pub fn snap_rotation(a: f64) -> f64 {
+    if !a.is_finite() {
+        return 0.0;
+    }
+    normalize_angle((a / 45.0).round() * 45.0)
 }
 
 fn first_line_name(text: &str, fallback: &str) -> String {
@@ -1236,6 +1248,14 @@ mod tests {
         assert_eq!(normalize_angle(190.0), -170.0);
         assert_eq!(normalize_angle(-180.0), 180.0);
         assert_eq!(normalize_angle(720.0), 0.0);
+    }
+
+    #[test]
+    fn snap_rotation_to_45() {
+        assert_eq!(snap_rotation(30.0), 45.0);
+        assert_eq!(snap_rotation(-200.0), 180.0);
+        assert_eq!(snap_rotation(22.0), 0.0);
+        assert_eq!(snap_rotation(f64::NAN), 0.0);
     }
 
     #[test]

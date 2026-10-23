@@ -576,14 +576,24 @@ fn rotate_tick_station_with_its_line() {
 }
 
 #[test]
-fn free_rotation_for_text_and_icons() {
+fn text_and_icons_rotate_in_45_degree_steps() {
     let mut ed = Editor::new();
     let t = ed.add_text(TextBox { pos: Vec2::new(2.0, 0.0), ..TextBox::default() }).unwrap();
     let applied = ed.rotate(&[t], 30.0, Vec2::new(2.0, 0.0)).unwrap();
-    assert_eq!(applied, 30.0);
-    assert_eq!(text(&ed, t).rotation, 30.0);
+    assert_eq!(applied, 45.0);
+    assert_eq!(text(&ed, t).rotation, 45.0);
     ed.rotate(&[t], 170.0, Vec2::new(2.0, 0.0)).unwrap();
-    assert_eq!(text(&ed, t).rotation, -160.0);
+    assert_eq!(text(&ed, t).rotation, -135.0);
+    assert_eq!(ed.rotate(&[t], 20.0, Vec2::new(2.0, 0.0)).unwrap(), 0.0);
+}
+
+#[test]
+fn rotation_properties_snap_to_45_degrees() {
+    let mut ed = Editor::new();
+    let t = ed.add_text(TextBox { rotation: 30.0, ..TextBox::default() }).unwrap();
+    assert_eq!(text(&ed, t).rotation, 45.0);
+    ed.update_content(t, &json!({"rotation": 100.0})).unwrap();
+    assert_eq!(text(&ed, t).rotation, 90.0);
 }
 
 #[test]

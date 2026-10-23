@@ -1,5 +1,6 @@
 //! `.transit` file format: a versioned JSON envelope around the document.
 
+use crate::editor::snap_rotation;
 use crate::error::{EditError, Result};
 use crate::geom;
 use crate::model::*;
@@ -57,8 +58,11 @@ pub fn validate(mut doc: Document) -> Result<Document> {
     doc.settings = doc.settings.sanitized();
     let route = doc.settings.route_mode;
     tree::walk_layers_mut(&mut doc.root, &mut |l| {
-        if let Content::Line(seg) = &mut l.content {
-            seg.points = geom::normalize_path(&seg.points, route);
+        match &mut l.content {
+            Content::Line(seg) => seg.points = geom::normalize_path(&seg.points, route),
+            Content::Text(t) => t.rotation = snap_rotation(t.rotation),
+            Content::Icon(i) => i.rotation = snap_rotation(i.rotation),
+            Content::Station(_) => {}
         }
     });
     remove_degenerate(&mut doc.root);
