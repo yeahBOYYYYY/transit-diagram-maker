@@ -13,7 +13,7 @@ import type { Engine } from '../../core/engine'
 import { findItem } from '../../core/tree'
 import { useEditor } from '../../stores/editor'
 import { FONT_FAMILIES } from '../../stores/prefs'
-import { rotateSelection } from '../../stores/commands'
+import { moveSelectionTo, rotateSelection, selectionOnGrid } from '../../stores/commands'
 
 const store = useEditor()
 const s = store.state
@@ -109,6 +109,19 @@ function setSetting<K extends keyof DocSettings>(key: K, value: DocSettings[K]):
   live((e) => e.setSettings({ ...s.settings, [key]: value }))
 }
 
+/** X / Y of the selection in cells (an object's anchor, see `Engine.position`). */
+const position = computed(() => {
+  void s.revision
+  return s.selection.length ? store.engine.value.position(s.selection) : null
+})
+const positionStep = computed(() => {
+  void s.revision
+  return selectionOnGrid(store) ? 1 : 0.1
+})
+function setPosition(axis: 'x' | 'y', value: number): void {
+  live((e) => moveSelectionTo(e, store, axis, value))
+}
+
 const kindLabel = computed(() => {
   if (group.value) {
     return { generic: 'Group', line: 'Transit line', station: 'Station group' }[group.value.kind.role]
@@ -164,6 +177,10 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
           <button class="ps-btn" @click="rotateSelection(store, 45)"><UiIcon name="rotate-cw" :size="14" /></button>
           <button class="ps-btn" @click="store.run((e) => e.group(s.selection))">Group</button>
         </div>
+        <div v-if="position" class="grid2" data-testid="prop-position">
+          <NumberField :model-value="position.x" label="X" :step="positionStep" :precision="1" unit="cells" title="Horizontal position in cells (an object's anchor; the top-left one for several)" @update:model-value="(v) => setPosition('x', v)" @commit="done" />
+          <NumberField :model-value="position.y" label="Y" :step="positionStep" :precision="1" unit="cells" title="Vertical position in cells (an object's anchor; the top-left one for several)" @update:model-value="(v) => setPosition('y', v)" @commit="done" />
+        </div>
       </template>
 
       <!-- single node -->
@@ -180,6 +197,10 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
         </div>
 
         <div v-if="group" class="dim small">{{ childCount }} item{{ childCount === 1 ? '' : 's' }} in group</div>
+        <div v-if="position" class="grid2" data-testid="prop-position">
+          <NumberField :model-value="position.x" label="X" :step="positionStep" :precision="1" unit="cells" title="Horizontal position in cells (an object's anchor; the top-left one for several)" @update:model-value="(v) => setPosition('x', v)" @commit="done" />
+          <NumberField :model-value="position.y" label="Y" :step="positionStep" :precision="1" unit="cells" title="Vertical position in cells (an object's anchor; the top-left one for several)" @update:model-value="(v) => setPosition('y', v)" @commit="done" />
+        </div>
 
         <!-- line style (segment or line group) -->
         <template v-if="lineSeg">
@@ -311,8 +332,6 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
           <div class="grid2">
             <NumberField :model-value="layer.content.size" label="Size" :min="0.05" :step="0.05" unit="cells" @update:model-value="(v) => patch({ size: v })" @commit="done" />
             <NumberField :model-value="layer.content.rotation" label="Angle" :min="-180" :max="180" :step="45" :precision="0" unit="°" @update:model-value="(v) => patch({ rotation: v })" @commit="done" />
-            <NumberField :model-value="layer.content.pos.x" label="X" :step="0.1" :precision="1" @update:model-value="(v) => patch({ pos: { x: v } })" @commit="done" />
-            <NumberField :model-value="layer.content.pos.y" label="Y" :step="0.1" :precision="1" @update:model-value="(v) => patch({ pos: { y: v } })" @commit="done" />
           </div>
         </template>
 
@@ -331,8 +350,6 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
           <div class="grid2">
             <NumberField :model-value="layer.content.size" label="Size" :min="0.1" :step="0.1" unit="cells" @update:model-value="(v) => patch({ size: v })" @commit="done" />
             <NumberField :model-value="layer.content.rotation" label="Angle" :min="-180" :max="180" :step="45" :precision="0" unit="°" @update:model-value="(v) => patch({ rotation: v })" @commit="done" />
-            <NumberField :model-value="layer.content.pos.x" label="X" :step="0.1" :precision="1" @update:model-value="(v) => patch({ pos: { x: v } })" @commit="done" />
-            <NumberField :model-value="layer.content.pos.y" label="Y" :step="0.1" :precision="1" @update:model-value="(v) => patch({ pos: { y: v } })" @commit="done" />
           </div>
         </template>
       </template>

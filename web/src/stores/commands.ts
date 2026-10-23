@@ -2,7 +2,8 @@
 import type { ActionId } from '../core/actions'
 import type { DocSettings } from '../core/types'
 import { matches } from '../core/shortcuts'
-import { findItem, isEffectivelyLocked } from '../core/tree'
+import { findItem, isEffectivelyLocked, leafIds } from '../core/tree'
+import type { Engine } from '../core/engine'
 import { canSaveInPlace, downloadText, pickSaveHandle, pickTransitFile, writeHandle } from '../core/files'
 import type { EditorStore, ToolId } from './editor'
 import { prefs } from './prefs'
@@ -23,6 +24,28 @@ export function rotateSelection(store: EditorStore, deg: number): void {
   const pivot = rotationPivot(store)
   if (!pivot || store.state.selection.length === 0) return
   store.run((e) => e.rotate(store.state.selection, deg, pivot))
+}
+
+/** Whether a selection moves in whole cells (it contains lines). */
+export function selectionOnGrid(store: EditorStore): boolean {
+  return leafIds(store.state.tree, store.state.selection).some((id) => findItem(store.state.tree, id)?.kind === 'line')
+}
+
+/**
+ * Move the selection so its position (see `Engine.position`) gets `value` on
+ * one axis. Lines move in whole cells; stations moved by a fraction of a cell
+ * leave their line, like an Alt-drag.
+ */
+export function moveSelectionTo(e: Engine, store: EditorStore, axis: 'x' | 'y', value: number): void {
+  const sel = store.state.selection
+  const pos = e.position(sel)
+  if (!pos) return
+  const onGrid = selectionOnGrid(store)
+  const round = (v: number) => (onGrid ? Math.round(v) : Math.round(v * 10) / 10)
+  const dx = axis === 'x' ? round(value - pos.x) : 0
+  const dy = axis === 'y' ? round(value - pos.y) : 0
+  if (dx === 0 && dy === 0) return
+  e.translate(sel, dx, dy, !Number.isInteger(dx) || !Number.isInteger(dy))
 }
 
 export function nudgeSelection(store: EditorStore, dx: number, dy: number): void {

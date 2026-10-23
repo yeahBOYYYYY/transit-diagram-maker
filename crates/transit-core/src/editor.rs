@@ -305,6 +305,17 @@ impl Editor {
             .reduce(|a, b| a.union(b))
     }
 
+    /// Position shown as X / Y for the given nodes, in cells: the anchor of a
+    /// single object (text and icon position, station center, top-left cell
+    /// center of a line), or the top-left-most anchor of several.
+    pub fn position(&self, ids: &[Id]) -> Option<Vec2> {
+        tree::leaf_ids(&self.doc.root, ids)
+            .iter()
+            .filter_map(|id| self.layer(*id))
+            .filter_map(|l| content_anchor(&l.content))
+            .reduce(|a, b| Vec2::new(a.x.min(b.x), a.y.min(b.y)))
+    }
+
     /// Line segments that may be edited: visible and not locked.
     fn editable_segments(&self) -> Vec<&Layer> {
         let mut out = Vec::new();
@@ -1005,6 +1016,15 @@ impl Editor {
 }
 
 // ------------------------------------------------------------------ helpers
+
+fn content_anchor(c: &Content) -> Option<Vec2> {
+    match c {
+        Content::Line(seg) => Rect::from_points(seg.points.iter().map(|p| p.center())).map(|r| Vec2::new(r.x, r.y)),
+        Content::Station(st) => Some(st.anchor()),
+        Content::Text(t) => Some(t.pos),
+        Content::Icon(i) => Some(i.pos),
+    }
+}
 
 fn normalize_angle(a: f64) -> f64 {
     let mut a = a % 360.0;

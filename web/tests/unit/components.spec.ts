@@ -169,6 +169,53 @@ describe('PropertiesPanel', () => {
     const n = store.node(t)
     expect(n?.type === 'layer' && n.content.kind === 'text' && n.content.text).toBe('Riverside')
   })
+
+  async function setField(w: VueWrapper, label: string, value: string) {
+    const input = w.find('[data-testid=prop-position]').findAll('.num-field').find((f) => f.find('.scrub').text() === label)!.find('input')
+    await input.setValue(value)
+    await input.trigger('blur')
+    vi.advanceTimersByTime(1000)
+    await nextTick()
+  }
+
+  it('shows and edits X / Y for every kind of object', async () => {
+    vi.useFakeTimers()
+    const store = freshStore()
+    const l = store.run((e) => e.createLine([{ x: 0, y: 0 }, { x: 9, y: 0 }], {}))!
+    const st = store.run((e) => e.addStation('dot', { x: 3, y: 0 }, { label: false }))!
+    const t = store.run((e) => e.addText({ pos: { x: 1, y: 4 } }))!
+    const w = mountIt(PropertiesPanel)
+    const pos = (id: number) => store.engine.value.position([id])
+
+    // Text moves in tenths.
+    store.select([t])
+    await nextTick()
+    await setField(w, 'X', '2.34')
+    expect(pos(t)).toEqual({ x: 2.3, y: 4 })
+
+    // A line group moves in whole cells and carries its station along.
+    store.select([l.group_id])
+    await nextTick()
+    expect(w.find('[data-testid=prop-position]').text()).toContain('cells')
+    await setField(w, 'Y', '2.5')
+    expect(pos(l.layer_id)).toEqual({ x: 0.5, y: 2.5 })
+    expect(pos(st.station_id)).toEqual({ x: 3.5, y: 2.5 })
+
+    // A station moved by whole cells stays on its line; by a fraction it leaves it.
+    store.select([st.station_id])
+    await nextTick()
+    await setField(w, 'X', '5.5')
+    const on = store.node(st.station_id)
+    expect(on?.type === 'layer' && on.content.kind === 'station' && on.content.offset).toEqual({ x: 0, y: 0 })
+    await setField(w, 'Y', '2.8')
+    expect(pos(st.station_id)).toEqual({ x: 5.5, y: 2.8 })
+
+    // Several objects: the top-left-most anchor.
+    store.select([l.group_id, t])
+    await nextTick()
+    expect(w.find('[data-testid=prop-position]').exists()).toBe(true)
+    vi.useRealTimers()
+  })
 })
 
 describe('ToolsPanel', () => {
