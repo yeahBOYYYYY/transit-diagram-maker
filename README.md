@@ -7,6 +7,33 @@ dark, Photoshop-style workspace is built with **Vue 3 + TypeScript**.
 
 See [`docs/requirements.md`](docs/requirements.md) for the specification.
 
+## Quick start
+
+You need [Rust](https://rustup.rs), [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/) and [Node.js](https://nodejs.org) 20+.
+
+**Build** (once, and again after changing Rust code):
+
+```bash
+rustup target add wasm32-unknown-unknown
+cd web
+npm install
+npm run build:wasm
+```
+
+**Run** (from `web/`), then open http://localhost:5173:
+
+```bash
+npm run dev
+```
+
+**Test**:
+
+```bash
+cargo test              # Rust tests (from the repo root)
+cd web && npm test      # web unit tests
+npx playwright test     # browser tests (from web/, needs Google Chrome)
+```
+
 ## Features
 
 - **Infinite canvas** with a square grid, hand tool / space-drag / middle-drag
