@@ -100,7 +100,7 @@ const selectionLocked = computed(
 </script>
 
 <template>
-  <PanelFrame title="Layers" :tabs="['Paths']" grow>
+  <PanelFrame title="Layers" grow>
     <div class="layers" data-testid="layers-panel" @click.self="store.clearSelection()">
       <LayerRow
         v-for="item in s.tree"

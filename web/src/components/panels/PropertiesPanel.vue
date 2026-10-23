@@ -139,7 +139,7 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
 </script>
 
 <template>
-  <PanelFrame title="Properties" :tabs="['Adjustments']">
+  <PanelFrame title="Properties">
     <div class="props" data-testid="properties-panel">
       <!-- nothing selected: document -->
       <template v-if="s.selection.length === 0">
