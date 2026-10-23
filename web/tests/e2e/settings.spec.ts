@@ -1,0 +1,70 @@
+import { expect, test } from '@playwright/test'
+import { clickCell, drawLine, openApp, state } from './helpers'
+
+test.describe('settings and shortcuts', () => {
+  test.beforeEach(async ({ page }) => openApp(page))
+
+  test('document settings change rendering constants', async ({ page }) => {
+    await drawLine(page, [[0, 0], [6, 0]])
+    await page.click('[data-menu=Document]')
+    await page.click('.dropdown .item:has-text("Document Settings")')
+    const dialog = page.getByTestId('dialog')
+    await expect(dialog).toBeVisible()
+    const cell = dialog.locator('.num-field', { hasText: 'Cell size' }).locator('input')
+    await cell.fill('48')
+    await cell.press('Tab')
+    await page.getByTestId('dialog-ok').click()
+    await expect(dialog).toHaveCount(0)
+    const svg = await state(page, (s) => s.fragments[0].svg)
+    expect(svg).toContain('stroke-width="48"')
+    await page.keyboard.press('Control+z')
+    expect(await state(page, (s) => s.settings.grid_size)).toBe(24)
+  })
+
+  test('rebinding a tool shortcut takes effect immediately', async ({ page }) => {
+    await page.keyboard.press('Control+Alt+Shift+K')
+    const dialog = page.getByTestId('dialog')
+    await expect(dialog).toContainText('Keyboard Shortcuts')
+    const binding = dialog.locator('[data-action="tool.pen"]')
+    await binding.click()
+    await page.keyboard.press('b')
+    await expect(binding).toHaveText('B')
+    await page.getByTestId('dialog-ok').click()
+    await page.click('[data-testid=canvas]', { position: { x: 5, y: 5 } })
+    await page.keyboard.press('b')
+    await expect(page.locator('[data-testid=tools-panel] .tool.on')).toHaveAttribute('data-tool', 'pen')
+    // persisted across reloads
+    await page.reload()
+    await page.waitForSelector('[data-testid=canvas]')
+    await page.click('[data-testid=canvas]', { position: { x: 5, y: 5 } })
+    await page.keyboard.press('b')
+    await expect(page.locator('[data-testid=tools-panel] .tool.on')).toHaveAttribute('data-tool', 'pen')
+  })
+
+  test('preferences change the history limit and canvas color', async ({ page }) => {
+    await page.keyboard.press('Control+k')
+    const dialog = page.getByTestId('dialog')
+    const hist = dialog.locator('.num-field', { hasText: 'History states' }).locator('input')
+    await hist.fill('2')
+    await hist.press('Tab')
+    const canvasColor = dialog.locator('.color-field', { hasText: 'Canvas' }).locator('input.hex')
+    await canvasColor.fill('#fafaf0')
+    await canvasColor.press('Tab')
+    await page.getByTestId('dialog-ok').click()
+    await expect(page.locator('svg.canvas > rect').first()).toHaveAttribute('fill', '#fafaf0')
+    for (let i = 0; i < 4; i++) await drawLine(page, [[0, i * 2], [4, i * 2]])
+    for (let i = 0; i < 4; i++) await page.keyboard.press('Control+z')
+    expect(await state(page, (s) => s.fragments.length)).toBe(2)
+  })
+
+  test('route mode toggles how the pen bends', async ({ page }) => {
+    await page.click('[data-menu=Document]')
+    await page.click('.dropdown .item:has-text("Diagonal then Straight")')
+    await drawLine(page, [[0, 0], [5, 2]])
+    const pts = await state(page, (s) => (window as any).__transit.node(s.fragments[0].id).content.points)
+    expect(pts).toEqual([{ x: 0, y: 0 }, { x: 2, y: 2 }, { x: 5, y: 2 }])
+    await page.keyboard.press('s')
+    await clickCell(page, 4, 2)
+    expect(await state(page, (s) => s.fragments.length)).toBe(3)
+  })
+})
