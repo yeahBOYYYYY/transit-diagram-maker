@@ -21,6 +21,10 @@ describe('preferences', () => {
     expect(p.shortcuts['tool.pen']).toBe('B')
     expect(p.shortcuts['tool.select']).toBe('V')
   })
+  it('round a stored snap step to the 0.1 cell precision', () => {
+    expect(loadPrefs(mem(JSON.stringify({ textSnap: 0.25 }))).textSnap).toBe(0.3)
+    expect(loadPrefs(mem(JSON.stringify({ textSnap: 0 }))).textSnap).toBe(0.1)
+  })
   it('accept values for nullable defaults', () => {
     const p = loadPrefs(mem(JSON.stringify({ icon: { size: 2 }, station: { tick_color: '#ff0000' } })))
     expect(p.icon.size).toBe(2)

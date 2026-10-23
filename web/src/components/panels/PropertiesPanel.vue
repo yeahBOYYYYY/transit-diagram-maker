@@ -320,8 +320,8 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
           <div class="grid2">
             <NumberField :model-value="layer.content.size" label="Size" :min="0.05" :step="0.05" unit="cells" @update:model-value="(v) => patch({ size: v })" @commit="done" />
             <NumberField :model-value="layer.content.rotation" label="Angle" :min="-180" :max="180" :step="45" :precision="0" unit="°" @update:model-value="(v) => patch({ rotation: v })" @commit="done" />
-            <NumberField :model-value="layer.content.pos.x" label="X" :step="0.25" @update:model-value="(v) => patch({ pos: { x: v } })" @commit="done" />
-            <NumberField :model-value="layer.content.pos.y" label="Y" :step="0.25" @update:model-value="(v) => patch({ pos: { y: v } })" @commit="done" />
+            <NumberField :model-value="layer.content.pos.x" label="X" :step="0.1" :precision="1" @update:model-value="(v) => patch({ pos: { x: v } })" @commit="done" />
+            <NumberField :model-value="layer.content.pos.y" label="Y" :step="0.1" :precision="1" @update:model-value="(v) => patch({ pos: { y: v } })" @commit="done" />
           </div>
         </template>
 
@@ -340,8 +340,8 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
           <div class="grid2">
             <NumberField :model-value="layer.content.size" label="Size" :min="0.1" :step="0.1" unit="cells" @update:model-value="(v) => patch({ size: v })" @commit="done" />
             <NumberField :model-value="layer.content.rotation" label="Angle" :min="-180" :max="180" :step="45" :precision="0" unit="°" @update:model-value="(v) => patch({ rotation: v })" @commit="done" />
-            <NumberField :model-value="layer.content.pos.x" label="X" :step="0.25" @update:model-value="(v) => patch({ pos: { x: v } })" @commit="done" />
-            <NumberField :model-value="layer.content.pos.y" label="Y" :step="0.25" @update:model-value="(v) => patch({ pos: { y: v } })" @commit="done" />
+            <NumberField :model-value="layer.content.pos.x" label="X" :step="0.1" :precision="1" @update:model-value="(v) => patch({ pos: { x: v } })" @commit="done" />
+            <NumberField :model-value="layer.content.pos.y" label="Y" :step="0.1" :precision="1" @update:model-value="(v) => patch({ pos: { y: v } })" @commit="done" />
           </div>
         </template>
       </template>
