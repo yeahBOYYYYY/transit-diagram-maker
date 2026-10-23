@@ -18,7 +18,7 @@ fn sample() -> Editor {
     ed.add_station(StationKind::Dot, c(1, 0), &StationOptions::default()).unwrap();
     ed.add_station(StationKind::Tick, c(3, -2), &StationOptions::default()).unwrap();
     ed.add_pill(&[c(3, 0), c(3, 1)], &StationOptions::default()).unwrap();
-    ed.add_text(TextBox { text: "Metro \"Map\" & <Co>".into(), rotation: 15.0, ..TextBox::default() }).unwrap();
+    ed.add_text(TextBox { text: "Metro \"Map\" & <Co>".into(), rotation: 45.0, ..TextBox::default() }).unwrap();
     ed.add_icon(Icon { icon: "ferry".into(), pos: Vec2::new(10.0, 5.0), ..Icon::default() }).unwrap();
     let g = ed.new_group(Some("Empty folder")).unwrap();
     ed.set_locked(g, true).unwrap();

@@ -158,8 +158,8 @@ function selectTool(store: EditorStore, boundsOf: BoundsProvider): Tool {
       } else if (mode === 'marquee') {
         s.overlay = { ...s.overlay, marquee: rectFromPoints(start.world, p.world) }
       } else if (mode === 'rotating') {
-        let deg = angleAt(p) - startAngle
-        if (p.shift) deg = snap(deg, 15)
+        // The engine snaps every rotation to 45° steps.
+        const deg = angleAt(p) - startAngle
         const pv = { x: pivot.x / g, y: pivot.y / g }
         const applied = store.run(
           (e) => {

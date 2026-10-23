@@ -200,6 +200,22 @@ describe('selection tool', () => {
     expect(store.state.rotation).toBeNull()
   })
 
+  it('snaps text rotation to 45° steps while dragging', () => {
+    const { store, tools } = setup()
+    const t = store.run((e) => e.addText({ pos: { x: 2, y: 2 }, text: 'Hi' }))!
+    store.select([t])
+    const b = store.state.fragments[0].bounds!
+    const cx = (b.x + b.w / 2) / 24
+    const cy = (b.y + b.h / 2) / 24
+    tools.select.down?.(at(store, cx + 2, cy, { handle: 'rotate' }))
+    // ~30° swing lands on 45°
+    tools.select.move?.(at(store, cx + 2 * Math.cos(Math.PI / 6), cy + 2 * Math.sin(Math.PI / 6)), true)
+    expect(store.state.rotation).toBe(45)
+    tools.select.up?.(at(store, cx, cy))
+    const n = store.node(t)
+    expect(n?.type === 'layer' && n.content.kind === 'text' && n.content.rotation).toBe(45)
+  })
+
   it('marquee selects intersecting unlocked layers', () => {
     const { store, tools } = setup()
     const a = store.run((e) => e.createLine([{ x: 0, y: 0 }, { x: 4, y: 0 }], {}))!
