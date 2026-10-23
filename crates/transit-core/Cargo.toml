@@ -1,0 +1,13 @@
+[package]
+name = "transit-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Document model, geometry, history and SVG rendering for Transit Diagram Maker"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+roxmltree = "0.20"
