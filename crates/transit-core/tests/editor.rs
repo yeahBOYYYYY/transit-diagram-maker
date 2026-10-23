@@ -805,12 +805,12 @@ fn no_op_changes_are_not_recorded() {
 #[test]
 fn settings_changes_are_undoable_and_sanitized() {
     let mut ed = Editor::new();
-    let s = DocSettings { grid_size: 1e9, station_inner_radius: 5.0, ..DocSettings::default() };
+    let s = DocSettings { line_width: 1e9, station_inner_radius: 5.0, ..DocSettings::default() };
     ed.set_settings(s).unwrap();
-    assert_eq!(ed.settings().grid_size, 512.0);
+    assert_eq!(ed.settings().line_width, 4.0);
     assert!(ed.settings().station_inner_radius <= ed.settings().station_outer_radius);
     ed.undo();
-    assert_eq!(ed.settings().grid_size, 24.0);
+    assert_eq!(ed.settings().line_width, 1.0);
 }
 
 #[test]

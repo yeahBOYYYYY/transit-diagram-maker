@@ -1,6 +1,9 @@
-// Screen <-> world conversions. World units are pixels at zoom 1 (cells × grid
-// size); screen = world × zoom + offset.
+// Screen <-> world conversions. World units are pixels at zoom 1 (cells ×
+// CELL_PX); screen = world × zoom + offset.
 import type { Cell, Rect, Vec2 } from './types'
+
+/** Pixels per cell on the canvas at 100% zoom (the engine's `CELL_PX`). */
+export const CELL_PX = 24
 
 export interface View {
   x: number

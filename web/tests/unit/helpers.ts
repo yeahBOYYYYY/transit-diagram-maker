@@ -1,3 +1,4 @@
+import { CELL_PX } from '../../src/core/viewport'
 import { createEditor, provideEditor, type EditorStore } from '../../src/stores/editor'
 import type { PointerInfo } from '../../src/tools'
 
@@ -10,7 +11,7 @@ export function freshStore(): EditorStore {
 
 /** Pointer info for a position given in cell units (zoom 1, view origin 0,0). */
 export function at(store: EditorStore, x: number, y: number, extra: Partial<PointerInfo> = {}): PointerInfo {
-  const g = store.state.settings.grid_size
+  const g = CELL_PX
   const world = { x: x * g, y: y * g }
   return {
     screen: { x: world.x * store.state.view.zoom + store.state.view.x, y: world.y * store.state.view.zoom + store.state.view.y },

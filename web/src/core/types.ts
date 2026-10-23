@@ -26,7 +26,6 @@ export type StationKind = 'dot' | 'tick' | 'pill'
 export type TextAlign = 'start' | 'middle' | 'end'
 
 export interface DocSettings {
-  grid_size: number
   line_width: number
   corner_radius: number
   cap_roundness: number

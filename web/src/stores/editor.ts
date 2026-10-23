@@ -54,7 +54,7 @@ export function createEditor(engine = new Engine()) {
     /** Angle shown while rotating. */
     rotation: null as number | null,
     spaceHeld: false,
-    dialog: null as null | 'document' | 'preferences' | 'shortcuts' | 'about' | 'reference',
+    dialog: null as null | 'document' | 'export' | 'preferences' | 'shortcuts' | 'about' | 'reference',
   })
 
   const engineRef = shallowRef(engine)

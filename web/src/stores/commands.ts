@@ -1,10 +1,12 @@
 // Implementation of every catalogued action.
 import type { ActionId } from '../core/actions'
+import type { DocSettings } from '../core/types'
 import { matches } from '../core/shortcuts'
 import { findItem, isEffectivelyLocked } from '../core/tree'
 import { canSaveInPlace, downloadText, pickSaveHandle, pickTransitFile, writeHandle } from '../core/files'
 import type { EditorStore, ToolId } from './editor'
 import { prefs } from './prefs'
+import { CELL_PX } from '../core/viewport'
 
 export interface CommandContext {
   store: EditorStore
@@ -13,7 +15,7 @@ export interface CommandContext {
 function rotationPivot(store: EditorStore): { x: number; y: number } | null {
   const r = store.contentBounds(store.state.selection)
   if (!r) return null
-  const g = store.state.settings.grid_size
+  const g = CELL_PX
   return { x: (r.x + r.w / 2) / g, y: (r.y + r.h / 2) / g }
 }
 
@@ -98,8 +100,9 @@ export async function saveTransit(store: EditorStore, saveAs = false): Promise<v
   }
 }
 
-export function exportSvg(store: EditorStore): void {
-  const svg = store.engine.value.exportSvg()
+/** Download the drawing as SVG, optionally with one-off settings and scale (pixels per cell). */
+export function exportSvg(store: EditorStore, settings?: DocSettings, cellPx = CELL_PX): void {
+  const svg = settings ? store.engine.value.exportSvgWith(settings, cellPx) : store.engine.value.exportSvg()
   downloadText(`${store.state.docName}.svg`, svg, 'image/svg+xml')
   store.notify(`Exported ${store.state.docName}.svg`)
 }
@@ -134,7 +137,7 @@ export function runAction(store: EditorStore, id: ActionId): void {
       void saveTransit(store, true)
       return
     case 'file.exportSvg':
-      exportSvg(store)
+      s.dialog = 'export'
       return
     case 'edit.undo':
       store.undo()

@@ -1,13 +1,15 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
-import { buildSampleMap, fragmentKinds, openApp, state } from './helpers'
+import { buildSampleMap, drawLine, fragmentKinds, openApp, state } from './helpers'
 
 test.describe('saving, opening and exporting', () => {
   test.beforeEach(async ({ page }) => openApp(page))
 
   test('export SVG downloads a standalone drawing', async ({ page }) => {
     await buildSampleMap(page)
-    const [download] = await Promise.all([page.waitForEvent('download'), page.keyboard.press('Control+Shift+e')])
+    await page.keyboard.press('Control+Shift+e')
+    await expect(page.getByTestId('dialog')).toContainText('Export as SVG')
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('dialog-ok').click()])
     expect(download.suggestedFilename()).toBe('Untitled-1.svg')
     const svg = readFileSync((await download.path())!, 'utf8')
     expect(svg).toMatch(/^<\?xml/)
@@ -20,6 +22,24 @@ test.describe('saving, opening and exporting', () => {
       return d.documentElement.nodeName === 'svg' && !d.querySelector('parsererror')
     }, svg)
     expect(ok).toBe(true)
+  })
+
+  test('export options apply to one export only', async ({ page }) => {
+    await drawLine(page, [[0, 0], [4, 0]])
+    await page.keyboard.press('Control+Shift+e')
+    const dialog = page.getByTestId('dialog')
+    const scale = dialog.getByTestId('export-cell-px').locator('input')
+    await expect(scale).toHaveValue('24')
+    await scale.fill('48')
+    await scale.press('Tab')
+    await dialog.locator('label', { hasText: 'Transparent background' }).locator('input').check()
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('dialog-ok').click()])
+    const svg = readFileSync((await download.path())!, 'utf8')
+    expect(svg).toContain('width="336" height="144"')
+    expect(svg).not.toContain('<rect')
+    // The document keeps its own settings.
+    expect(await state(page, (s) => s.settings.export_background)).toBe('#ffffff')
+    expect(await state(page, (s) => s.fragments[0].svg)).toContain('stroke-width="24"')
   })
 
   test('save .transit and open it again losslessly', async ({ page }) => {

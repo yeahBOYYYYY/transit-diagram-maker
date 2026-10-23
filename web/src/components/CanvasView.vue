@@ -4,7 +4,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import type { Id, Rect, TextBox } from '../core/types'
 import { leafIds } from '../core/tree'
-import { cellAt, screenToWorld, unionRects, worldToScreen } from '../core/viewport'
+import { CELL_PX, cellAt, screenToWorld, unionRects, worldToScreen } from '../core/viewport'
 import { useEditor } from '../stores/editor'
 import { prefs } from '../stores/prefs'
 import { actionForEvent, runAction } from '../stores/commands'
@@ -96,7 +96,7 @@ const handles = computed(() => {
 // ---------------------------------------------------------------- grid
 
 const grid = computed(() => {
-  const g = s.settings.grid_size * s.view.zoom
+  const g = CELL_PX * s.view.zoom
   const major = g * Math.max(1, prefs.gridMajorEvery)
   return {
     minor: g,
@@ -110,7 +110,7 @@ const grid = computed(() => {
 const worldTransform = computed(() => `translate(${s.view.x} ${s.view.y}) scale(${s.view.zoom})`)
 
 const overlayCells = computed(() => {
-  const g = s.settings.grid_size
+  const g = CELL_PX
   return s.overlay.cells.map((c) => ({ x: c.x * g, y: c.y * g, w: g, h: g }))
 })
 
@@ -141,7 +141,7 @@ function info(e: PointerEvent | MouseEvent): PointerInfo {
   const rect = host.value!.getBoundingClientRect()
   const screen = { x: e.clientX - rect.left, y: e.clientY - rect.top }
   const world = screenToWorld(s.view, screen.x, screen.y)
-  const g = s.settings.grid_size
+  const g = CELL_PX
   const handleEl = (e.target as Element | null)?.closest?.('[data-handle]')
   return {
     screen,
@@ -266,7 +266,7 @@ const editing = computed(() => {
 const editorStyle = computed(() => {
   const t = editing.value
   if (!t) return {}
-  const g = s.settings.grid_size
+  const g = CELL_PX
   const fs = t.size * g * s.view.zoom
   const p = worldToScreen(s.view, t.pos.x * g, t.pos.y * g)
   const lines = (s.textEdit?.value ?? '').split('\n')

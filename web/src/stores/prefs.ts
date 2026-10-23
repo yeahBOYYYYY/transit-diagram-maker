@@ -13,6 +13,8 @@ export interface Prefs {
   bigNudge: number
   dragThreshold: number
   textSnap: number
+  /** SVG export scale: pixels per grid cell. */
+  exportCellPx: number
   canvasBackground: string
   gridColor: string
   gridMajorColor: string
@@ -52,6 +54,7 @@ export function defaultPrefs(): Prefs {
     bigNudge: 5,
     dragThreshold: 3,
     textSnap: 0.5,
+    exportCellPx: 24,
     canvasBackground: '#ffffff',
     gridColor: '#ececec',
     gridMajorColor: '#d6d6d6',

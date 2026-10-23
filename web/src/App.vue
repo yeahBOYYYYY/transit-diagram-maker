@@ -8,6 +8,7 @@ import StatusBar from './components/StatusBar.vue'
 import LayersPanel from './components/panels/LayersPanel.vue'
 import PropertiesPanel from './components/panels/PropertiesPanel.vue'
 import DocumentSettingsDialog from './components/dialogs/DocumentSettingsDialog.vue'
+import ExportDialog from './components/dialogs/ExportDialog.vue'
 import PreferencesDialog from './components/dialogs/PreferencesDialog.vue'
 import ShortcutsDialog from './components/dialogs/ShortcutsDialog.vue'
 import ReferenceDialog from './components/dialogs/ReferenceDialog.vue'
@@ -42,6 +43,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     </div>
     <StatusBar />
     <DocumentSettingsDialog v-if="s.dialog === 'document'" />
+    <ExportDialog v-if="s.dialog === 'export'" />
     <PreferencesDialog v-if="s.dialog === 'preferences'" />
     <ShortcutsDialog v-if="s.dialog === 'shortcuts'" />
     <ReferenceDialog v-if="s.dialog === 'reference'" />

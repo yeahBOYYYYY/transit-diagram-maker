@@ -44,6 +44,10 @@ export class Engine {
   exportSvg(): string {
     return this.ed.exportSvg()
   }
+  /** Export with one-off settings and scale (pixels per cell) without changing the document. */
+  exportSvgWith(settings: DocSettings, cellPx: number): string {
+    return this.ed.exportSvgWith(j(settings), cellPx)
+  }
 
   // queries
   fragments(): Fragment[] {
