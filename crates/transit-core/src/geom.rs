@@ -369,6 +369,46 @@ pub fn fmt_num(v: f64) -> String {
     }
 }
 
+/// A rounded corner at vertex `i` of a polyline: the curve starts at `a`, ends
+/// at `b`, has radius `r` and turns by `theta` radians.
+struct Corner {
+    a: Vec2,
+    b: Vec2,
+    r: f64,
+    theta: f64,
+    sweep: u8,
+}
+
+/// The rounded corner at interior vertex `i`, or None where the polyline is straight.
+fn corner(pts: &[Vec2], i: usize, radius: f64) -> Option<Corner> {
+    let n = pts.len();
+    if i == 0 || i >= n - 1 || radius <= 0.0 {
+        return None;
+    }
+    let (prev, p, next) = (pts[i - 1], pts[i], pts[i + 1]);
+    let vin = p.sub(prev);
+    let vout = next.sub(p);
+    let (lin, lout) = (vin.len(), vout.len());
+    let (u, v) = (vin.normalized(), vout.normalized());
+    let cos = u.dot(v).clamp(-1.0, 1.0);
+    let theta = cos.acos(); // turning angle
+    if theta < 1e-6 || (std::f64::consts::PI - theta) < 1e-6 || lin == 0.0 || lout == 0.0 {
+        return None;
+    }
+    let t = (theta / 2.0).tan();
+    // Segments shared with another corner may only give away half their length.
+    let max_in = if i == 1 { lin } else { lin / 2.0 };
+    let max_out = if i + 1 == n - 1 { lout } else { lout / 2.0 };
+    let dist = (radius * t).min(max_in).min(max_out);
+    Some(Corner {
+        a: p.sub(u.scale(dist)),
+        b: p.add(v.scale(dist)),
+        r: dist / t,
+        theta,
+        sweep: if u.cross(v) > 0.0 { 1 } else { 0 },
+    })
+}
+
 /// Build an SVG path through `pts` whose corners are rounded with `radius`
 /// (all values already in output units). The radius shrinks automatically when
 /// segments are too short to fit the requested curve.
@@ -378,47 +418,62 @@ pub fn rounded_polyline(pts: &[Vec2], radius: f64) -> String {
         return d;
     }
     let _ = write!(d, "M{} {}", fmt_num(pts[0].x), fmt_num(pts[0].y));
-    let n = pts.len();
-    for i in 1..n {
-        let p = pts[i];
-        if i == n - 1 || radius <= 0.0 {
-            let _ = write!(d, "L{} {}", fmt_num(p.x), fmt_num(p.y));
-            continue;
+    for i in 1..pts.len() {
+        match corner(pts, i, radius) {
+            Some(c) => {
+                let _ = write!(
+                    d,
+                    "L{} {}A{} {} 0 0 {} {} {}",
+                    fmt_num(c.a.x),
+                    fmt_num(c.a.y),
+                    fmt_num(c.r),
+                    fmt_num(c.r),
+                    c.sweep,
+                    fmt_num(c.b.x),
+                    fmt_num(c.b.y)
+                );
+            }
+            None => {
+                let _ = write!(d, "L{} {}", fmt_num(pts[i].x), fmt_num(pts[i].y));
+            }
         }
-        let prev = pts[i - 1];
-        let next = pts[i + 1];
-        let vin = p.sub(prev);
-        let vout = next.sub(p);
-        let (lin, lout) = (vin.len(), vout.len());
-        let (u, v) = (vin.normalized(), vout.normalized());
-        let cos = u.dot(v).clamp(-1.0, 1.0);
-        let theta = cos.acos(); // turning angle
-        if theta < 1e-6 || (std::f64::consts::PI - theta) < 1e-6 || lin == 0.0 || lout == 0.0 {
-            let _ = write!(d, "L{} {}", fmt_num(p.x), fmt_num(p.y));
-            continue;
-        }
-        let t = (theta / 2.0).tan();
-        // Segments shared with another corner may only give away half their length.
-        let max_in = if i == 1 { lin } else { lin / 2.0 };
-        let max_out = if i + 1 == n - 1 { lout } else { lout / 2.0 };
-        let dist = (radius * t).min(max_in).min(max_out);
-        let r = dist / t;
-        let a = p.sub(u.scale(dist));
-        let b = p.add(v.scale(dist));
-        let sweep = if u.cross(v) > 0.0 { 1 } else { 0 };
-        let _ = write!(
-            d,
-            "L{} {}A{} {} 0 0 {} {} {}",
-            fmt_num(a.x),
-            fmt_num(a.y),
-            fmt_num(r),
-            fmt_num(r),
-            sweep,
-            fmt_num(b.x),
-            fmt_num(b.y)
-        );
     }
     d
+}
+
+/// Length of the path `rounded_polyline` draws for the same input.
+pub fn rounded_polyline_len(pts: &[Vec2], radius: f64) -> f64 {
+    let mut len = 0.0;
+    let mut at = match pts.first() {
+        Some(p) => *p,
+        None => return 0.0,
+    };
+    for i in 1..pts.len() {
+        match corner(pts, i, radius) {
+            Some(c) => {
+                len += c.a.sub(at).len() + c.r * c.theta;
+                at = c.b;
+            }
+            None => {
+                len += pts[i].sub(at).len();
+                at = pts[i];
+            }
+        }
+    }
+    len
+}
+
+/// Dash and gap lengths that fit a whole number of dashes into `len`, so the
+/// path starts and ends with a full dash. Both are scaled by the same factor,
+/// keeping the requested proportions as closely as possible.
+pub fn fit_dashes(len: f64, dash: f64, gap: f64) -> (f64, f64) {
+    let (dash, gap) = (dash.max(1e-6), gap.max(0.0));
+    if len <= dash {
+        return (len.max(0.0), 0.0);
+    }
+    let n = ((len + gap) / (dash + gap)).round().max(1.0);
+    let k = len / (n * dash + (n - 1.0) * gap);
+    (dash * k, gap * k)
 }
 
 #[cfg(test)]
@@ -527,6 +582,27 @@ mod tests {
         // Interior segment of length 2 is shared, so each corner can use at most 1.
         assert!(d.contains("A1 1 0 0 1 2 1"), "{d}");
         assert!(d.contains("A1 1 0 0 0 3 2"), "{d}");
+    }
+
+    #[test]
+    fn rounded_polyline_length_includes_arcs() {
+        let pts = [Vec2::new(0.0, 0.0), Vec2::new(10.0, 0.0), Vec2::new(10.0, 10.0)];
+        assert!((rounded_polyline_len(&pts, 0.0) - 20.0).abs() < 1e-9);
+        // 6 straight + quarter circle of radius 4 + 6 straight
+        let expected = 12.0 + std::f64::consts::FRAC_PI_2 * 4.0;
+        assert!((rounded_polyline_len(&pts, 4.0) - expected).abs() < 1e-9);
+    }
+
+    #[test]
+    fn dashes_fit_exactly() {
+        // 6 dashes and 5 gaps fill 11 exactly.
+        assert_eq!(fit_dashes(11.0, 1.0, 1.0), (1.0, 1.0));
+        for (len, dash, gap) in [(10.0, 1.0, 1.0), (7.3, 0.8, 0.5), (100.0, 3.0, 0.2), (2.0, 0.6, 0.4)] {
+            let (d, g) = fit_dashes(len, dash, gap);
+            let n = ((len + g) / (d + g)).round();
+            assert!((n * d + (n - 1.0) * g - len).abs() < 1e-9, "{len} {dash} {gap}");
+        }
+        assert_eq!(fit_dashes(0.5, 1.0, 1.0), (0.5, 0.0));
     }
 
     #[test]

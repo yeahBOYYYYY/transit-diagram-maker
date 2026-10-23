@@ -7,7 +7,8 @@ import ColorField from '../ui/ColorField.vue'
 import Segmented from '../ui/Segmented.vue'
 import IconPicker from '../ui/IconPicker.vue'
 import UiIcon from '../ui/UiIcon.vue'
-import type { DocNode, DocSettings, GroupNode, Id, LayerNode, LineSegment, LineStyle, StationKind } from '../../core/types'
+import type { DocNode, DocSettings, GroupNode, Id, LayerNode, LineSegment, LineStyle, StationKind, StrokeKind } from '../../core/types'
+import { STROKE_KINDS, hasChannel, hasDashes } from '../../core/lineStyles'
 import type { Engine } from '../../core/engine'
 import { findItem } from '../../core/tree'
 import { useEditor } from '../../stores/editor'
@@ -190,33 +191,24 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
           </div>
           <div class="field">
             <span class="lbl">Style</span>
-            <Segmented
-              :model-value="lineSeg.seg.style.kind"
-              :options="[
-                { value: 'plain', label: 'Plain' },
-                { value: 'hollow', label: 'Hollow' },
-                { value: 'dashed', label: 'Dashed' },
-              ]"
-              @update:model-value="(v) => setStyle('kind', v)"
-            />
+            <select :value="lineSeg.seg.style.kind" data-testid="prop-line-style" @change="setStyle('kind', ($event.target as HTMLSelectElement).value as StrokeKind); done()">
+              <option v-for="k in STROKE_KINDS" :key="k.value" :value="k.value">{{ k.label }}</option>
+            </select>
           </div>
-          <template v-if="lineSeg.seg.style.kind !== 'plain'">
+          <template v-if="hasChannel(lineSeg.seg.style.kind)">
             <div class="field">
-              <span class="lbl">Inner</span>
+              <span class="lbl">Channel</span>
               <ColorField :model-value="lineSeg.seg.style.inner_color" @update:model-value="(v) => setStyle('inner_color', v)" />
-            </div>
-            <div class="field">
-              <span class="lbl" />
-              <NumberField :model-value="lineSeg.seg.style.inner_width_pct" label="Inner width" :min="0" :max="100" unit="%" @update:model-value="(v) => setStyle('inner_width_pct', v)" @commit="done" />
+              <NumberField :model-value="lineSeg.seg.style.inner_width_pct" label="Width" :min="0" :max="100" :precision="0" unit="% of line" title="Channel width as a percentage of the line width" @update:model-value="(v) => setStyle('inner_width_pct', v)" @commit="done" />
             </div>
           </template>
-          <template v-if="lineSeg.seg.style.kind === 'dashed'">
+          <template v-if="hasDashes(lineSeg.seg.style.kind)">
             <div class="grid2">
-              <NumberField :model-value="lineSeg.seg.style.dash_length" label="Dash" :min="0.05" :step="0.05" unit="cells" @update:model-value="(v) => setStyle('dash_length', v)" @commit="done" />
-              <NumberField :model-value="lineSeg.seg.style.dash_gap" label="Spacing" :min="0" :step="0.05" unit="cells" @update:model-value="(v) => setStyle('dash_gap', v)" @commit="done" />
-              <NumberField :model-value="lineSeg.seg.style.dash_width_pct" label="Width" :min="0" :max="100" unit="%" @update:model-value="(v) => setStyle('dash_width_pct', v)" @commit="done" />
-              <NumberField :model-value="lineSeg.seg.style.dash_offset" label="Offset" :step="0.05" unit="cells" @update:model-value="(v) => setStyle('dash_offset', v)" @commit="done" />
+              <NumberField :model-value="lineSeg.seg.style.dash_length" label="Dash" :min="0.1" :step="0.1" :precision="1" unit="cells" title="Length of each dash" @update:model-value="(v) => setStyle('dash_length', v)" @commit="done" />
+              <NumberField :model-value="lineSeg.seg.style.dash_gap" label="Gap" :min="0" :step="0.1" :precision="1" unit="cells" title="Space between dashes" @update:model-value="(v) => setStyle('dash_gap', v)" @commit="done" />
+              <NumberField v-if="lineSeg.seg.style.kind === 'hollow_dashed'" :model-value="lineSeg.seg.style.dash_width_pct" label="Dash W" :min="0" :max="100" :precision="0" unit="%" title="Dash width as a percentage of the line width" @update:model-value="(v) => setStyle('dash_width_pct', v)" @commit="done" />
             </div>
+            <div class="dim small">Dash and gap are stretched slightly so the line starts and ends with a full dash.</div>
           </template>
           <div class="field">
             <span class="lbl">Caps</span>

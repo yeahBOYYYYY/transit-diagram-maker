@@ -2,7 +2,7 @@
 //! so what you see is exactly what gets exported. Output units are pixels
 //! (cell units × `grid_size`).
 
-use crate::geom::{fmt_num, rounded_polyline, Cell, Rect, Vec2};
+use crate::geom::{fit_dashes, fmt_num, rounded_polyline, rounded_polyline_len, Cell, Rect, Vec2};
 use crate::icons;
 use crate::model::*;
 use crate::tree;
@@ -83,14 +83,29 @@ pub fn line_svg(points: &[Cell], style: &LineStyle, settings: &DocSettings) -> S
         )
     };
     let color = esc(&style.color);
+    let radius = settings.corner_radius * g;
     let mut s = String::new();
-    let _ = write!(
-        s,
-        r#"<path d="{body}" fill="none" stroke="{color}" stroke-width="{}" stroke-linejoin="round"/><path d="{}" fill="{color}"/>"#,
-        n(w),
-        caps(h)
-    );
-    if matches!(style.kind, StrokeKind::Hollow | StrokeKind::Dashed) {
+    // Requested dash and gap in pixels; a dash is never shorter than a cap.
+    let dash = (style.dash_length * g).max(h).max(0.5);
+    let gap = (style.dash_gap * g).max(0.0);
+    if style.kind == StrokeKind::Dashed && gap > 0.0 {
+        // The caps reach half a line width past the end cells, so the dash
+        // pattern covers them too: it starts one cap length before the path
+        // and the caps complete the first and last dash.
+        let (d, gp) = fit_dashes(rounded_polyline_len(&pts, radius) + 2.0 * h, dash, gap);
+        let _ = write!(
+            s,
+            r#"<path d="{body}" fill="none" stroke="{color}" stroke-width="{}" stroke-linejoin="round" stroke-dasharray="{} {}" stroke-dashoffset="{}"/>"#,
+            n(w),
+            n(d),
+            n(gp),
+            n(h)
+        );
+    } else {
+        let _ = write!(s, r#"<path d="{body}" fill="none" stroke="{color}" stroke-width="{}" stroke-linejoin="round"/>"#, n(w));
+    }
+    let _ = write!(s, r#"<path d="{}" fill="{color}"/>"#, caps(h));
+    if matches!(style.kind, StrokeKind::Hollow | StrokeKind::HollowDashed) {
         let wi = w * (style.inner_width_pct / 100.0).clamp(0.0, 1.0);
         if wi > 0.0 {
             let inner = esc(&style.inner_color);
@@ -102,18 +117,17 @@ pub fn line_svg(points: &[Cell], style: &LineStyle, settings: &DocSettings) -> S
             );
         }
     }
-    if style.kind == StrokeKind::Dashed {
+    if style.kind == StrokeKind::HollowDashed {
+        // Dashes run down the channel from the first to the last cell center.
         let wd = w * (style.dash_width_pct / 100.0).clamp(0.0, 1.0);
-        let len = (style.dash_length * g).max(0.1);
-        let gap = (style.dash_gap * g).max(0.0);
         if wd > 0.0 {
+            let (d, gp) = fit_dashes(rounded_polyline_len(&pts, radius), (style.dash_length * g).max(0.5), gap);
             let _ = write!(
                 s,
-                r#"<path d="{body}" fill="none" stroke="{color}" stroke-width="{}" stroke-dasharray="{} {}" stroke-dashoffset="{}"/>"#,
+                r#"<path d="{body}" fill="none" stroke="{color}" stroke-width="{}" stroke-dasharray="{} {}"/>"#,
                 n(wd),
-                n(len),
-                n(gap),
-                n(-style.dash_offset * g)
+                n(d),
+                n(gp)
             );
         }
     }
@@ -472,19 +486,67 @@ mod tests {
     }
 
     #[test]
-    fn hollow_and_dashed_layers() {
+    fn hollow_and_hollow_dashed_layers() {
         let pts = [Cell::new(0, 0), Cell::new(4, 0), Cell::new(6, 2)];
         let hollow = LineStyle { kind: StrokeKind::Hollow, ..LineStyle::default() };
         let s = line_svg(&pts, &hollow, &settings());
         parse(&s);
         assert_eq!(s.matches("<path").count(), 4);
         assert!(s.contains("#ffffff"));
-        let dashed = LineStyle { kind: StrokeKind::Dashed, dash_offset: 0.5, ..LineStyle::default() };
+        assert!(!s.contains("dasharray"));
+        let dashed = LineStyle { kind: StrokeKind::HollowDashed, ..LineStyle::default() };
         let s = line_svg(&pts, &dashed, &settings());
         parse(&s);
         assert_eq!(s.matches("<path").count(), 5);
-        assert!(s.contains(r#"stroke-dasharray="14.4 9.6""#), "{s}");
-        assert!(s.contains(r#"stroke-dashoffset="-12""#), "{s}");
+        assert!(s.contains("stroke-dasharray"), "{s}");
+        assert!(!s.contains("stroke-dashoffset"), "{s}");
+    }
+
+    /// (dash, gap, offset) of the first dashed path in the markup.
+    fn dash_pattern(s: &str) -> (f64, f64, f64) {
+        let attr = |name: &str| -> String {
+            let start = s.find(&format!(r#"{name}=""#)).unwrap_or_else(|| panic!("no {name}: {s}")) + name.len() + 2;
+            s[start..].split('"').next().unwrap().to_string()
+        };
+        let arr: Vec<f64> = attr("stroke-dasharray").split(' ').map(|v| v.parse().unwrap()).collect();
+        (arr[0], arr[1], attr("stroke-dashoffset").parse().unwrap())
+    }
+
+    #[test]
+    fn dashed_line_starts_and_ends_with_a_full_dash() {
+        let s = settings();
+        let style = LineStyle { kind: StrokeKind::Dashed, ..LineStyle::default() };
+        // Straight line from cell 0 to cell 10: 240px between centers plus a
+        // 12px cap at each end.
+        let m = line_svg(&[Cell::new(0, 0), Cell::new(10, 0)], &style, &s);
+        parse(&m);
+        assert_eq!(m.matches("<path").count(), 2, "dashed body and caps: {m}");
+        let (dash, gap, offset) = dash_pattern(&m);
+        assert_eq!(offset, 12.0, "the pattern starts under the start cap");
+        let len = 240.0 + 24.0;
+        let count = ((len + gap) / (dash + gap)).round();
+        assert!((count * dash + (count - 1.0) * gap - len).abs() < 0.01, "{dash} {gap}");
+        assert!((dash - 24.0).abs() < 3.0 && (gap - 12.0).abs() < 2.0, "close to the requested 1 / 0.5 cells: {dash} {gap}");
+    }
+
+    #[test]
+    fn dashed_line_fits_around_rounded_corners() {
+        let s = settings();
+        let style = LineStyle { kind: StrokeKind::Dashed, dash_length: 0.7, dash_gap: 0.3, ..LineStyle::default() };
+        let pts = [Cell::new(0, 0), Cell::new(6, 0), Cell::new(6, 6)];
+        let m = line_svg(&pts, &style, &s);
+        let (dash, gap, _) = dash_pattern(&m);
+        let centers: Vec<Vec2> = pts.iter().map(|c| c.center().scale(24.0)).collect();
+        let len = rounded_polyline_len(&centers, s.corner_radius * 24.0) + 24.0;
+        let count = ((len + gap) / (dash + gap)).round();
+        assert!((count * dash + (count - 1.0) * gap - len).abs() < 0.01);
+    }
+
+    #[test]
+    fn dashed_line_without_gap_is_solid() {
+        let style = LineStyle { kind: StrokeKind::Dashed, dash_gap: 0.0, ..LineStyle::default() };
+        let m = line_svg(&[Cell::new(0, 0), Cell::new(4, 0)], &style, &settings());
+        assert!(!m.contains("dasharray"), "{m}");
     }
 
     #[test]

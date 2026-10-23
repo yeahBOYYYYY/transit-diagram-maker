@@ -10,6 +10,7 @@ import IconPicker from './ui/IconPicker.vue'
 import { useEditor } from '../stores/editor'
 import { FONT_FAMILIES, prefs } from '../stores/prefs'
 import { rotateSelection } from '../stores/commands'
+import { STROKE_KINDS, hasChannel, hasDashes } from '../core/lineStyles'
 
 const store = useEditor()
 const s = store.state
@@ -71,20 +72,17 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
         <label class="opt">
           <span class="dim">Style:</span>
           <select v-model="prefs.line.kind" data-testid="line-style">
-            <option value="plain">Plain</option>
-            <option value="hollow">Hollow</option>
-            <option value="dashed">Dashed</option>
+            <option v-for="k in STROKE_KINDS" :key="k.value" :value="k.value">{{ k.label }}</option>
           </select>
         </label>
-        <template v-if="prefs.line.kind !== 'plain'">
-          <ColorField v-model="prefs.line.inner_color" label="Inner" />
-          <NumberField v-model="prefs.line.inner_width_pct" label="Inner W" :min="0" :max="100" unit="%" :width="40" />
+        <template v-if="hasChannel(prefs.line.kind)">
+          <ColorField v-model="prefs.line.inner_color" label="Channel" />
+          <NumberField v-model="prefs.line.inner_width_pct" label="W" :min="0" :max="100" :precision="0" unit="%" :width="36" title="Channel width as a percentage of the line width" />
         </template>
-        <template v-if="prefs.line.kind === 'dashed'">
-          <NumberField v-model="prefs.line.dash_length" label="Dash" :min="0.05" :step="0.05" :width="40" title="Dash length (cells)" />
-          <NumberField v-model="prefs.line.dash_gap" label="Gap" :min="0" :step="0.05" :width="40" title="Spacing between dashes (cells)" />
-          <NumberField v-model="prefs.line.dash_width_pct" label="W" :min="0" :max="100" unit="%" :width="36" title="Dash width" />
-          <NumberField v-model="prefs.line.dash_offset" label="Offset" :step="0.05" :width="40" title="Offset from the start (cells)" />
+        <template v-if="hasDashes(prefs.line.kind)">
+          <NumberField v-model="prefs.line.dash_length" label="Dash" :min="0.1" :step="0.1" :precision="1" unit="cells" :width="36" title="Length of each dash" />
+          <NumberField v-model="prefs.line.dash_gap" label="Gap" :min="0" :step="0.1" :precision="1" unit="cells" :width="36" title="Space between dashes" />
+          <NumberField v-if="prefs.line.kind === 'hollow_dashed'" v-model="prefs.line.dash_width_pct" label="Dash W" :min="0" :max="100" :precision="0" unit="%" :width="36" title="Dash width as a percentage of the line width" />
         </template>
         <div class="sep-v" />
         <label class="opt">
