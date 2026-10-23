@@ -57,6 +57,24 @@ test.describe('workspace layout', () => {
     await expect(page.locator('[data-testid=tools-panel] .tool.on')).toHaveAttribute('data-tool', 'pen')
   })
 
+  test('long press, drag onto a flyout item and release picks it', async ({ page }) => {
+    const slot = page.locator('[data-testid=tools-panel] .tool[data-tool=pen]')
+    const box = (await slot.boundingBox())!
+    await page.mouse.move(box.x + 10, box.y + 10)
+    await page.mouse.down()
+    await page.waitForTimeout(700)
+    const item = (await page.getByTestId('tool-flyout').locator('[data-tool=eraser]').boundingBox())!
+    await page.mouse.move(item.x + 20, item.y + item.height / 2, { steps: 5 })
+    await page.mouse.up()
+    await expect(page.getByTestId('tool-flyout')).toHaveCount(0)
+    await expect(page.locator('[data-testid=tools-panel] .tool.on')).toHaveAttribute('data-tool', 'eraser')
+  })
+
+  test('double clicking the pen slot opens its flyout', async ({ page }) => {
+    await page.locator('[data-testid=tools-panel] .tool[data-tool=pen]').dblclick()
+    await expect(page.getByTestId('tool-flyout')).toBeVisible()
+  })
+
   test('tool shortcuts switch tools', async ({ page }) => {
     const pairs: [string, string][] = [
       ['h', 'hand'],
