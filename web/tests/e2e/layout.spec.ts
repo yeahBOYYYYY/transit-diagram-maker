@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { openApp } from './helpers'
+import { clickCell, drawLine, openApp } from './helpers'
 
 test.describe('workspace layout', () => {
   test.beforeEach(async ({ page }) => openApp(page))
@@ -75,6 +75,23 @@ test.describe('workspace layout', () => {
   test('double clicking the pen slot opens its flyout', async ({ page }) => {
     await page.locator('[data-testid=tools-panel] .tool[data-tool=pen]').dblclick()
     await expect(page.getByTestId('tool-flyout')).toBeVisible()
+  })
+
+  test('the properties panel keeps its size until the splitter is dragged', async ({ page }) => {
+    const panel = page.locator('[data-panel=Properties]')
+    const empty = (await panel.boundingBox())!.height
+    await drawLine(page, [[0, 0], [6, 0]])
+    await page.keyboard.press('v')
+    await clickCell(page, 2, 0)
+    await page.locator('[data-testid=properties-panel] [data-testid=prop-line-style]').selectOption('hollow_dashed')
+    expect((await panel.boundingBox())!.height).toBe(empty)
+    const split = (await page.getByTestId('dock-splitter').boundingBox())!
+    await page.mouse.move(split.x + 50, split.y + 2)
+    await page.mouse.down()
+    await page.mouse.move(split.x + 50, split.y + 102, { steps: 4 })
+    await page.mouse.up()
+    expect((await panel.boundingBox())!.height).toBeCloseTo(empty + 100, 0)
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('transit-diagram-maker.prefs')!).propertiesHeight)).toBe(Math.round(empty + 100))
   })
 
   test('tool shortcuts switch tools', async ({ page }) => {

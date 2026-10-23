@@ -32,6 +32,10 @@ const collapsed = ref(false)
   border-bottom: 1px solid var(--c-border);
   min-height: 0;
 }
+/* A collapsed panel shrinks to its header even when it has a fixed height. */
+.panel.collapsed {
+  height: auto !important;
+}
 .panel.grow:not(.collapsed) {
   flex: 1;
 }

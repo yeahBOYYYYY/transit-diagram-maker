@@ -27,6 +27,8 @@ export interface Prefs {
   eraserSize: number
   showThumbnails: boolean
   panels: { tools: boolean; options: boolean; properties: boolean; layers: boolean }
+  /** Height of the Properties panel in the dock (px); the Layers panel takes the rest. */
+  propertiesHeight: number
   shortcuts: Record<ActionId, string>
   line: LineStyle
   station: StationOptions & { kind: StationKind }
@@ -67,6 +69,7 @@ export function defaultPrefs(): Prefs {
     eraserSize: 1,
     showThumbnails: true,
     panels: { tools: true, options: true, properties: true, layers: true },
+    propertiesHeight: 330,
     shortcuts: { ...DEFAULT_SHORTCUTS },
     line: {
       color: '#e03c31',
