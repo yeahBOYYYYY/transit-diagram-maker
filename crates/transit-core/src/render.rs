@@ -120,23 +120,39 @@ pub fn line_svg(points: &[Cell], style: &LineStyle, settings: &DocSettings) -> S
     s
 }
 
-/// Skeleton of a blob of cells: centers plus links between all 8-neighbors.
-/// Stroking it with round joins gives the Minkowski sum of the blob with a
-/// disk, i.e. a shape whose outline has the same radius everywhere.
+/// Skeleton of a blob of cells: centers, links between orthogonal neighbors,
+/// filled squares for every 2×2 block and links between diagonal neighbors
+/// that are not already connected through a shared orthogonal neighbor.
+/// Stroking (and filling) it with round joins gives the Minkowski sum of the
+/// blob with a disk: an outline with the same radius everywhere, with true
+/// inside corners where the blob bends.
 pub fn blob_skeleton(cells: &[Cell], g: f64) -> String {
     let set: HashSet<Cell> = cells.iter().copied().collect();
     let mut sorted: Vec<Cell> = set.iter().copied().collect();
     sorted.sort();
-    let mut d = String::new();
-    for c in &sorted {
+    let pt = |c: Cell| {
         let p = c.center().scale(g);
-        let _ = write!(d, "M{} {}h0.01", n(p.x), n(p.y));
-        for (dx, dy) in [(1, 0), (0, 1), (1, 1), (1, -1)] {
+        format!("{} {}", n(p.x), n(p.y))
+    };
+    let mut d = String::new();
+    for &c in &sorted {
+        let _ = write!(d, "M{}h0.01", pt(c));
+        for (dx, dy) in [(1, 0), (0, 1)] {
             let o = c.offset(dx, dy);
             if set.contains(&o) {
-                let q = o.center().scale(g);
-                let _ = write!(d, "M{} {}L{} {}", n(p.x), n(p.y), n(q.x), n(q.y));
+                let _ = write!(d, "M{}L{}", pt(c), pt(o));
             }
+        }
+        for (dx, dy) in [(1, 1), (1, -1)] {
+            let o = c.offset(dx, dy);
+            let bridged = set.contains(&c.offset(dx, 0)) || set.contains(&c.offset(0, dy));
+            if set.contains(&o) && !bridged {
+                let _ = write!(d, "M{}L{}", pt(c), pt(o));
+            }
+        }
+        let (r, b, rb) = (c.offset(1, 0), c.offset(0, 1), c.offset(1, 1));
+        if set.contains(&r) && set.contains(&b) && set.contains(&rb) {
+            let _ = write!(d, "M{}L{}L{}L{}Z", pt(c), pt(r), pt(rb), pt(b));
         }
     }
     d
@@ -147,16 +163,15 @@ fn blob_svg(cells: &[Cell], outer: &str, inner: &str, settings: &DocSettings) ->
     let d = blob_skeleton(cells, g);
     let ro = settings.station_outer_radius * g;
     let ri = settings.station_inner_radius.min(settings.station_outer_radius) * g;
+    let (outer, inner) = (esc(outer), esc(inner));
     let mut s = format!(
-        r#"<path d="{d}" fill="none" stroke="{}" stroke-width="{}" stroke-linecap="round" stroke-linejoin="round"/>"#,
-        esc(outer),
+        r#"<path d="{d}" fill="{outer}" stroke="{outer}" stroke-width="{}" stroke-linecap="round" stroke-linejoin="round"/>"#,
         n(ro * 2.0)
     );
     if ri > 0.0 {
         let _ = write!(
             s,
-            r#"<path d="{d}" fill="none" stroke="{}" stroke-width="{}" stroke-linecap="round" stroke-linejoin="round"/>"#,
-            esc(inner),
+            r#"<path d="{d}" fill="{inner}" stroke="{inner}" stroke-width="{}" stroke-linecap="round" stroke-linejoin="round"/>"#,
             n(ri * 2.0)
         );
     }
@@ -469,8 +484,34 @@ mod tests {
     fn blob_skeleton_links_neighbors() {
         let d = blob_skeleton(&[Cell::new(0, 0), Cell::new(1, 0), Cell::new(1, 1), Cell::new(5, 5)], 10.0);
         assert_eq!(d.matches("h0.01").count(), 4);
-        // (0,0)-(1,0), (0,0)-(1,1) diagonal, (1,0)-(1,1)
-        assert_eq!(d.matches('L').count(), 3);
+        // (0,0)-(1,0) and (1,0)-(1,1); the diagonal (0,0)-(1,1) is bridged by
+        // (1,0) so it must not be linked (that would chamfer the inside corner).
+        assert_eq!(d.matches('L').count(), 2);
+        assert!(!d.contains("M5 5L15 15"), "{d}");
+    }
+
+    #[test]
+    fn blob_skeleton_links_pure_diagonals() {
+        let d = blob_skeleton(&[Cell::new(0, 0), Cell::new(1, 1), Cell::new(2, 0)], 10.0);
+        assert!(d.contains("M5 5L15 15"), "{d}");
+        assert!(d.contains("M15 15L25 5"), "{d}");
+    }
+
+    #[test]
+    fn blob_skeleton_fills_square_blocks() {
+        let cells = [Cell::new(0, 0), Cell::new(1, 0), Cell::new(0, 1), Cell::new(1, 1)];
+        let d = blob_skeleton(&cells, 10.0);
+        assert_eq!(d.matches('Z').count(), 1, "one 2x2 block: {d}");
+        assert!(d.contains("M5 5L15 5L15 15L5 15Z"), "{d}");
+        assert!(!d.contains("M5 5L15 15"), "no diagonals inside a block");
+        let m = station_svg(
+            &Station {
+                line_ids: vec![],
+                shape: StationShape::Pill { cells: cells.to_vec(), outer_color: "#000".into(), inner_color: "#fff".into() },
+            },
+            &DocSettings::default(),
+        );
+        assert!(m.contains(r##"fill="#fff""##), "the block interior is filled with the inner color: {m}");
     }
 
     #[test]
