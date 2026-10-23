@@ -252,6 +252,20 @@ fn pill_couples_to_all_touched_lines() {
 }
 
 #[test]
+fn pill_is_painted_above_all_touched_lines() {
+    let mut ed = Editor::new();
+    let a = line(&mut ed, &[c(0, 0), c(9, 0)]);
+    let b = line(&mut ed, &[c(4, -3), c(4, 3)]);
+    // First cell is only on line A (bottom); the pill must still join line B (top).
+    let s = ed.add_pill(&[c(3, 0), c(4, 0), c(4, 1)], &StationOptions::default()).unwrap();
+    let root = &ed.document().root;
+    assert_eq!(tree::ancestors(root, s.station_id).last(), Some(&b.group_id));
+    assert!(!tree::ancestors(root, s.station_id).contains(&a.group_id));
+    let order: Vec<Id> = render::render_fragments(ed.document()).iter().map(|f| f.id).collect();
+    assert_eq!(order.iter().position(|i| *i == s.station_id), Some(order.len() - 2), "only its label is above it");
+}
+
+#[test]
 fn station_kind_can_change() {
     let mut ed = Editor::new();
     line(&mut ed, &[c(0, 0), c(9, 0)]);

@@ -483,19 +483,20 @@ impl Editor {
             }
         }
         let mut line_ids: Vec<Id> = Vec::new();
-        let mut first_layer = None;
-        for c in &uniq {
-            for l in self.editable_segments().into_iter().rev() {
-                let Content::Line(seg) = &l.content else { continue };
-                if geom::expand(&seg.points).contains(c) {
-                    if !line_ids.contains(&seg.line_id) {
-                        line_ids.push(seg.line_id);
-                    }
-                    first_layer.get_or_insert(l.id);
+        // The station goes into the group of the topmost touched line so it is
+        // painted above every line it covers.
+        let mut top_layer = None;
+        for l in self.editable_segments() {
+            let Content::Line(seg) = &l.content else { continue };
+            let cells = geom::expand(&seg.points);
+            if uniq.iter().any(|c| cells.contains(c)) {
+                if !line_ids.contains(&seg.line_id) {
+                    line_ids.push(seg.line_id);
                 }
+                top_layer = Some(l.id);
             }
         }
-        let Some(anchor_layer) = first_layer else {
+        let Some(anchor_layer) = top_layer else {
             return Err(EditError::Invalid("a pill station must touch at least one line".into()));
         };
         self.apply(|d| {
