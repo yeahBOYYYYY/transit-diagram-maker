@@ -19,7 +19,7 @@ function commitZoom(): void {
 
 const cursor = computed(() => {
   if (!s.cursor) return ''
-  return `X ${s.cursor.x.toFixed(2)}  Y ${s.cursor.y.toFixed(2)}  · cell ${Math.floor(s.cursor.x)}, ${Math.floor(s.cursor.y)}`
+  return `X ${s.cursor.x.toFixed(1)}  Y ${s.cursor.y.toFixed(1)}  · cell ${Math.floor(s.cursor.x)}, ${Math.floor(s.cursor.y)}`
 })
 const layerCount = computed(() => s.fragments.length)
 </script>

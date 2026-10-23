@@ -51,7 +51,7 @@ export function defaultPrefs(): Prefs {
     nudge: 1,
     bigNudge: 5,
     dragThreshold: 3,
-    textSnap: 0.25,
+    textSnap: 0.5,
     canvasBackground: '#ffffff',
     gridColor: '#ececec',
     gridMajorColor: '#d6d6d6',
@@ -111,7 +111,11 @@ function deepMerge<T>(base: T, over: unknown): T {
 export function loadPrefs(storage: Pick<Storage, 'getItem'> | null = safeStorage()): Prefs {
   try {
     const raw = storage?.getItem(KEY)
-    return raw ? deepMerge(defaultPrefs(), JSON.parse(raw)) : defaultPrefs()
+    if (!raw) return defaultPrefs()
+    const p = deepMerge(defaultPrefs(), JSON.parse(raw))
+    // Positions have a precision of 0.1 cell, so the snap step must be a multiple of it.
+    p.textSnap = Math.max(0.1, Math.round(p.textSnap * 10) / 10)
+    return p
   } catch {
     return defaultPrefs()
   }

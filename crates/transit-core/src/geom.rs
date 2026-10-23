@@ -78,6 +78,10 @@ impl Vec2 {
     pub fn perp(self) -> Vec2 {
         Vec2::new(self.y, -self.x)
     }
+    /// Round both coordinates to the document precision of 0.1 cell.
+    pub fn snapped(self) -> Vec2 {
+        Vec2::new(snap_tenth(self.x), snap_tenth(self.y))
+    }
     /// Rotate by `deg` degrees around `pivot` (clockwise on screen for positive angles).
     pub fn rotate_around(self, pivot: Vec2, deg: f64) -> Vec2 {
         let (s, c) = deg.to_radians().sin_cos();
@@ -94,6 +98,19 @@ impl Vec2 {
         };
         let p = pivot.add(r);
         Vec2::new(clean(p.x), clean(p.y))
+    }
+}
+
+/// Positions are stored with a precision of one decimal (0.1 cell).
+pub fn snap_tenth(v: f64) -> f64 {
+    if !v.is_finite() {
+        return 0.0;
+    }
+    let r = (v * 10.0).round() / 10.0;
+    if r == 0.0 {
+        0.0
+    } else {
+        r
     }
 }
 
@@ -465,6 +482,13 @@ mod tests {
     fn rotate_quarter_turn_is_exact() {
         let p = Vec2::new(3.5, 0.5).rotate_around(Vec2::new(0.5, 0.5), 90.0);
         assert_eq!(p, Vec2::new(0.5, 3.5));
+    }
+
+    #[test]
+    fn positions_snap_to_tenths() {
+        assert_eq!(snap_tenth(1.26), 1.3);
+        assert_eq!(snap_tenth(-0.04), 0.0);
+        assert_eq!(Vec2::new(0.123, 4.449).snapped(), Vec2::new(0.1, 4.4));
     }
 
     #[test]

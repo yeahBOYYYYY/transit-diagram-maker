@@ -60,8 +60,14 @@ pub fn validate(mut doc: Document) -> Result<Document> {
     tree::walk_layers_mut(&mut doc.root, &mut |l| {
         match &mut l.content {
             Content::Line(seg) => seg.points = geom::normalize_path(&seg.points, route),
-            Content::Text(t) => t.rotation = snap_rotation(t.rotation),
-            Content::Icon(i) => i.rotation = snap_rotation(i.rotation),
+            Content::Text(t) => {
+                t.rotation = snap_rotation(t.rotation);
+                t.pos = t.pos.snapped();
+            }
+            Content::Icon(i) => {
+                i.rotation = snap_rotation(i.rotation);
+                i.pos = i.pos.snapped();
+            }
             Content::Station(_) => {}
         }
     });

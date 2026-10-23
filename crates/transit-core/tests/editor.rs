@@ -588,6 +588,17 @@ fn text_and_icons_rotate_in_45_degree_steps() {
 }
 
 #[test]
+fn text_and_icon_positions_have_one_decimal() {
+    let mut ed = Editor::new();
+    let t = ed.add_text(TextBox { pos: Vec2::new(1.234, 5.678), ..TextBox::default() }).unwrap();
+    assert_eq!(text(&ed, t).pos, Vec2::new(1.2, 5.7));
+    ed.translate(&[t], 0.33, -0.01).unwrap();
+    assert_eq!(text(&ed, t).pos, Vec2::new(1.5, 5.7));
+    ed.update_content(t, &json!({"pos": {"x": 0.05}})).unwrap();
+    assert_eq!(text(&ed, t).pos.x, 0.1);
+}
+
+#[test]
 fn rotation_properties_snap_to_45_degrees() {
     let mut ed = Editor::new();
     let t = ed.add_text(TextBox { rotation: 30.0, ..TextBox::default() }).unwrap();

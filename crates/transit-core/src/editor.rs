@@ -551,6 +551,7 @@ impl Editor {
 
     pub fn add_text(&mut self, mut text: TextBox) -> Result<Id> {
         text.rotation = snap_rotation(text.rotation);
+        text.pos = text.pos.snapped();
         self.apply(|d| {
             let id = d.alloc_id();
             let name = first_line_name(&text.text, "Text");
@@ -561,6 +562,7 @@ impl Editor {
 
     pub fn add_icon(&mut self, mut icon: Icon) -> Result<Id> {
         icon.rotation = snap_rotation(icon.rotation);
+        icon.pos = icon.pos.snapped();
         self.apply(|d| {
             let id = d.alloc_id();
             let name = crate::icons::find(&icon.icon).map(|i| i.label).unwrap_or("Icon").to_string();
@@ -584,8 +586,14 @@ impl Editor {
             merge(&mut v, patch);
             let mut content: Content = serde_json::from_value(v).map_err(|e| EditError::Invalid(e.to_string()))?;
             match &mut content {
-                Content::Text(t) => t.rotation = snap_rotation(t.rotation),
-                Content::Icon(i) => i.rotation = snap_rotation(i.rotation),
+                Content::Text(t) => {
+                    t.rotation = snap_rotation(t.rotation);
+                    t.pos = t.pos.snapped();
+                }
+                Content::Icon(i) => {
+                    i.rotation = snap_rotation(i.rotation);
+                    i.pos = i.pos.snapped();
+                }
                 _ => {}
             }
             let rename = match (&layer.content, &content) {
@@ -872,11 +880,11 @@ impl Editor {
                         }
                     },
                     Content::Text(t) => {
-                        t.pos = t.pos.rotate_around(pivot, angle);
+                        t.pos = t.pos.rotate_around(pivot, angle).snapped();
                         t.rotation = snap_rotation(t.rotation + angle);
                     }
                     Content::Icon(i) => {
-                        i.pos = i.pos.rotate_around(pivot, angle);
+                        i.pos = i.pos.rotate_around(pivot, angle).snapped();
                         i.rotation = snap_rotation(i.rotation + angle);
                     }
                 }
@@ -1036,7 +1044,7 @@ fn insert_station(
             visible: true,
             locked: false,
             content: Content::Text(TextBox {
-                pos: label_pos,
+                pos: label_pos.snapped(),
                 text: name.clone(),
                 size: s.label_font_size,
                 color: opts.label_color.clone(),
@@ -1114,7 +1122,7 @@ fn move_orphan_labels(d: &mut Document, moved: &[Id], old: &HashMap<Id, Vec2>) {
                     return;
                 }
                 if let (Some(a), Some(b)) = (old.get(&sid), new.get(&sid)) {
-                    t.pos = t.pos.add(b.sub(*a));
+                    t.pos = t.pos.add(b.sub(*a)).snapped();
                 }
             }
         }
@@ -1169,8 +1177,8 @@ fn translate_layers(d: &mut Document, leaves: &[Id], dx: f64, dy: f64) {
                     }
                 }
             },
-            Content::Text(t) => t.pos = t.pos.add(Vec2::new(dx, dy)),
-            Content::Icon(i) => i.pos = i.pos.add(Vec2::new(dx, dy)),
+            Content::Text(t) => t.pos = t.pos.add(Vec2::new(dx, dy)).snapped(),
+            Content::Icon(i) => i.pos = i.pos.add(Vec2::new(dx, dy)).snapped(),
         }
     }
     snap_stations(d, leaves);
