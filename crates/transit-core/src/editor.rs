@@ -429,36 +429,15 @@ impl Editor {
     // ------------------------------------------------------------- stations
 
     pub fn add_station(&mut self, kind: StationKind, cell: Cell, opts: &StationOptions) -> Result<CreatedStation> {
-        let hit = self
-            .line_hit_at(cell)
-            .or_else(|| self.nearest_line_cell(cell.center(), 1.5))
-            .ok_or_else(|| EditError::Invalid("stations must be placed on a line".into()))?;
-        let line_color = match self.layer(hit.layer_id).map(|l| &l.content) {
-            Some(Content::Line(seg)) => seg.style.color.clone(),
-            _ => "#000000".into(),
-        };
+        self.add_station_at(kind, cell, cell.center(), opts)
+    }
+
+    /// Add a station on the line through (or near) `cell`. `pos` is the exact
+    /// pointer position in cells; a tick goes into the cell corner nearest to it.
+    pub fn add_station_at(&mut self, kind: StationKind, cell: Cell, pos: Vec2, opts: &StationOptions) -> Result<CreatedStation> {
+        let (hit, shape) = self.station_shape_at(kind, cell, pos, opts)?;
         self.apply(|d| {
             let s = d.settings.clone();
-            let shape = match kind {
-                StationKind::Dot => StationShape::Dot {
-                    cell: hit.cell,
-                    outer_color: opts.outer_color.clone(),
-                    inner_color: opts.inner_color.clone(),
-                },
-                StationKind::Pill => StationShape::Pill {
-                    cells: vec![hit.cell],
-                    outer_color: opts.outer_color.clone(),
-                    inner_color: opts.inner_color.clone(),
-                },
-                StationKind::Tick => StationShape::Tick {
-                    cell: hit.cell,
-                    dir: hit.dir,
-                    side: if opts.tick_side < 0 { -1 } else { 1 },
-                    width: opts.tick_width.unwrap_or(s.tick_width),
-                    length: opts.tick_length.unwrap_or(s.tick_length),
-                    color: opts.tick_color.clone().unwrap_or(line_color),
-                },
-            };
             let normal = {
                 let n = hit.dir.unit().perp();
                 if kind == StationKind::Tick && opts.tick_side < 0 {
@@ -468,9 +447,50 @@ impl Editor {
                 }
             };
             let extra = if kind == StationKind::Tick { s.tick_length + s.line_width / 2.0 } else { 0.0 };
-            let label_pos = hit.cell.center().add(normal.scale(s.label_offset + extra));
+            let label_pos = shape.anchor().add(normal.scale(s.label_offset + extra));
             insert_station(d, hit.layer_id, vec![hit.line_id], shape, opts, label_pos, normal)
         })
+    }
+
+    /// The station `add_station_at` would create, without creating it (used
+    /// for the station tool's hover preview).
+    pub fn station_preview(&self, kind: StationKind, cell: Cell, pos: Vec2, opts: &StationOptions) -> Option<Station> {
+        let (hit, shape) = self.station_shape_at(kind, cell, pos, opts).ok()?;
+        Some(Station::new(vec![hit.line_id], shape))
+    }
+
+    fn station_shape_at(&self, kind: StationKind, cell: Cell, pos: Vec2, opts: &StationOptions) -> Result<(LineHit, StationShape)> {
+        let hit = self
+            .line_hit_at(cell)
+            .or_else(|| self.nearest_line_cell(cell.center(), 1.5))
+            .ok_or_else(|| EditError::Invalid("stations must be placed on a line".into()))?;
+        let line_color = match self.layer(hit.layer_id).map(|l| &l.content) {
+            Some(Content::Line(seg)) => seg.style.color.clone(),
+            _ => "#000000".into(),
+        };
+        let s = &self.doc.settings;
+        let shape = match kind {
+            StationKind::Dot => StationShape::Dot {
+                cell: hit.cell,
+                outer_color: opts.outer_color.clone(),
+                inner_color: opts.inner_color.clone(),
+            },
+            StationKind::Pill => StationShape::Pill {
+                cells: vec![hit.cell],
+                outer_color: opts.outer_color.clone(),
+                inner_color: opts.inner_color.clone(),
+            },
+            StationKind::Tick => StationShape::Tick {
+                cell: hit.cell,
+                dir: hit.dir,
+                side: if opts.tick_side < 0 { -1 } else { 1 },
+                along: nearest_corner(hit.cell, hit.dir, pos),
+                width: opts.tick_width.unwrap_or(s.tick_width),
+                length: opts.tick_length.unwrap_or(s.tick_length),
+                color: opts.tick_color.clone().unwrap_or(line_color),
+            },
+        };
+        Ok((hit, shape))
     }
 
     /// Create a pill station covering a blob of cells. At least one cell must
@@ -538,6 +558,7 @@ impl Editor {
                     cell,
                     dir: hit_dir(&snapshot, &st.line_ids, cell).unwrap_or(Dir8::E),
                     side: 1,
+                    along: -1,
                     width: s.tick_width,
                     length: s.tick_length,
                     color,
@@ -921,9 +942,11 @@ impl Editor {
             }
             match &mut st.shape {
                 StationShape::Dot { cell: c, .. } => *c = cell,
-                StationShape::Tick { cell: c, dir: dd, .. } => {
-                    *c = cell;
-                    *dd = dir;
+                StationShape::Tick { cell: c, dir: dd, along, width, .. } => {
+                    let (sc, sd, sa) = snap_tick(&snapshot, &st.line_ids, pos, *width).unwrap_or((cell, dir, -1));
+                    *c = sc;
+                    *dd = sd;
+                    *along = sa;
                 }
                 StationShape::Pill { .. } => {}
             }
@@ -1100,6 +1123,42 @@ fn snap_to_lines(doc: &Document, line_ids: &[Id], pos: Vec2) -> Option<(Cell, Di
     best.map(|(_, c, d)| (c, d))
 }
 
+/// Which corner of `cell` (along the line direction) is closest to `pos`.
+fn nearest_corner(cell: Cell, dir: Dir8, pos: Vec2) -> i8 {
+    if dir.is_diagonal() {
+        return 0;
+    }
+    if pos.sub(cell.center()).dot(dir.unit()) > 1e-9 {
+        1
+    } else {
+        -1
+    }
+}
+
+/// Closest tick slot (cell, line direction, corner) on the given lines to a
+/// tick center at `pos`. Every straight cell offers two corner slots.
+fn snap_tick(doc: &Document, line_ids: &[Id], pos: Vec2, width: f64) -> Option<(Cell, Dir8, i8)> {
+    let mut best: Option<(f64, Cell, Dir8, i8)> = None;
+    tree::walk_layers(&doc.root, &mut |l, _, _| {
+        let Content::Line(seg) = &l.content else { return };
+        if !line_ids.contains(&seg.line_id) {
+            return;
+        }
+        let cells = geom::expand(&seg.points);
+        for (i, c) in cells.iter().enumerate() {
+            let Some(dir) = geom::direction_at(&cells, i) else { continue };
+            let corners: &[i8] = if dir.is_diagonal() { &[0] } else { &[-1, 1] };
+            for &along in corners {
+                let dist = geom::tick_center(*c, dir, along, width).sub(pos).len();
+                if best.as_ref().is_none_or(|b| dist < b.0 - 1e-9) {
+                    best = Some((dist, *c, dir, along));
+                }
+            }
+        }
+    });
+    best.map(|(_, c, d, a)| (c, d, a))
+}
+
 fn editable_leaves(d: &Document, ids: &[Id]) -> Vec<Id> {
     tree::leaf_ids(&d.root, ids).into_iter().filter(|id| !tree::is_locked(&d.root, *id)).collect()
 }
@@ -1176,6 +1235,7 @@ fn translate_layers(d: &mut Document, leaves: &[Id], dx: f64, dy: f64, free: boo
         }
     }
     let mut snap = Vec::new();
+    let mut ticks = Vec::new();
     for id in leaves {
         let Some(layer) = tree::find_layer_mut(&mut d.root, *id) else { continue };
         match &mut layer.content {
@@ -1186,6 +1246,12 @@ fn translate_layers(d: &mut Document, leaves: &[Id], dx: f64, dy: f64, free: boo
             }
             Content::Station(st) => {
                 let with_line = !st.line_ids.is_empty() && st.line_ids.iter().all(|l| moved_lines.contains(l));
+                if !free && !with_line && st.shape.kind() == StationKind::Tick {
+                    // Ticks hop between cell corners, so they follow the exact delta.
+                    st.offset = Vec2::default();
+                    ticks.push((*id, st.shape.anchor().add(delta)));
+                    continue;
+                }
                 let (cx, cy) = if free && !with_line { (0, 0) } else { (ix, iy) };
                 match &mut st.shape {
                     StationShape::Dot { cell, .. } | StationShape::Tick { cell, .. } => *cell = cell.offset(cx, cy),
@@ -1209,6 +1275,23 @@ fn translate_layers(d: &mut Document, leaves: &[Id], dx: f64, dy: f64, free: boo
         }
     }
     snap_stations(d, &snap);
+    let snapshot = d.clone();
+    for (id, target) in ticks {
+        let Some(Content::Station(st)) = tree::find_layer_mut(&mut d.root, id).map(|l| &mut l.content) else { continue };
+        let line_ids = st.line_ids.clone();
+        if let StationShape::Tick { cell, dir, along, width, .. } = &mut st.shape {
+            if let Some((c, dd, a)) = snap_tick(&snapshot, &line_ids, target, *width) {
+                *cell = c;
+                // Keep the tick on the same side when the line runs the other way.
+                if dd == dir.opposite() {
+                    *along = -a;
+                } else {
+                    *dir = dd;
+                    *along = a;
+                }
+            }
+        }
+    }
     move_orphan_labels(d, leaves, &old);
 }
 

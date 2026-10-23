@@ -170,6 +170,11 @@ pub enum StationShape {
         dir: Dir8,
         /// +1 pokes out to the left of the line direction, -1 to the right.
         side: i8,
+        /// Corner of the cell along the line: -1 = the edge the line enters
+        /// through, +1 = the edge it leaves through, 0 = centered. Ignored on
+        /// diagonal lines.
+        #[serde(default = "start_corner")]
+        along: i8,
         width: f64,
         length: f64,
         color: String,
@@ -206,6 +211,9 @@ impl StationShape {
     }
 
     pub fn anchor(&self) -> Vec2 {
+        if let StationShape::Tick { cell, dir, along, width, .. } = self {
+            return crate::geom::tick_center(*cell, *dir, *along, *width);
+        }
         let cells = self.cells();
         let n = cells.len().max(1) as f64;
         let sum = cells.iter().fold(Vec2::default(), |acc, c| acc.add(c.center()));
@@ -366,6 +374,10 @@ pub struct Group {
 
 fn yes() -> bool {
     true
+}
+
+fn start_corner() -> i8 {
+    -1
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -191,11 +191,24 @@ impl TransitEditor {
         self.inner.erase(&cells).map_err(err)
     }
 
+    /// `(px, py)` is the exact pointer position in cells (picks a tick's corner).
     #[wasm_bindgen(js_name = addStation)]
-    pub fn add_station(&mut self, kind: &str, x: i32, y: i32, opts_json: &str) -> Result<String, JsError> {
+    pub fn add_station(&mut self, kind: &str, x: i32, y: i32, px: f64, py: f64, opts_json: &str) -> Result<String, JsError> {
         let kind: StationKind = parse(&format!("\"{kind}\""))?;
         let opts: StationOptions = parse(opts_json)?;
-        Ok(json(&self.inner.add_station(kind, Cell::new(x, y), &opts).map_err(err)?))
+        Ok(json(&self.inner.add_station_at(kind, Cell::new(x, y), Vec2::new(px, py), &opts).map_err(err)?))
+    }
+
+    /// Markup of the station `addStation` would create, or "" when there is no line nearby.
+    #[wasm_bindgen(js_name = previewStation)]
+    pub fn preview_station(&self, kind: &str, x: i32, y: i32, px: f64, py: f64, opts_json: &str) -> Result<String, JsError> {
+        let kind: StationKind = parse(&format!("\"{kind}\""))?;
+        let opts: StationOptions = parse(opts_json)?;
+        Ok(self
+            .inner
+            .station_preview(kind, Cell::new(x, y), Vec2::new(px, py), &opts)
+            .map(|st| render::station_svg(&st, self.inner.settings()))
+            .unwrap_or_default())
     }
 
     #[wasm_bindgen(js_name = addPill)]

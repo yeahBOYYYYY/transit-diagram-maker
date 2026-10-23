@@ -19,6 +19,7 @@ import type {
   StationOptions,
   TextBox,
   TreeItem,
+  Vec2,
 } from './types'
 
 const j = JSON.stringify
@@ -118,8 +119,14 @@ export class Engine {
   erase(cells: Cell[]): number {
     return this.ed.erase(j(cells))
   }
-  addStation(kind: StationKind, cell: Cell, opts: Partial<StationOptions>): CreatedStation {
-    return JSON.parse(this.ed.addStation(kind, cell.x, cell.y, j(opts)))
+  /** `pos` is the exact pointer position in cells (defaults to the cell center); it picks a tick's corner. */
+  addStation(kind: StationKind, cell: Cell, opts: Partial<StationOptions>, pos?: Vec2): CreatedStation {
+    const p = pos ?? { x: cell.x + 0.5, y: cell.y + 0.5 }
+    return JSON.parse(this.ed.addStation(kind, cell.x, cell.y, p.x, p.y, j(opts)))
+  }
+  /** Markup of the station `addStation` would create ("" when no line is near). */
+  previewStation(kind: StationKind, cell: Cell, pos: Vec2, opts: Partial<StationOptions>): string {
+    return this.ed.previewStation(kind, cell.x, cell.y, pos.x, pos.y, j(opts))
   }
   addPill(cells: Cell[], opts: Partial<StationOptions>): CreatedStation {
     return JSON.parse(this.ed.addPill(j(cells), j(opts)))

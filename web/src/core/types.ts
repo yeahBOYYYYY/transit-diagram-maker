@@ -65,7 +65,8 @@ export interface LineSegment {
 
 export type StationShape =
   | { shape: 'dot'; cell: Cell; outer_color: string; inner_color: string }
-  | { shape: 'tick'; cell: Cell; dir: number; side: number; width: number; length: number; color: string }
+  /** `along`: -1/+1 = corner of the cell along the line direction, 0 = centered. */
+  | { shape: 'tick'; cell: Cell; dir: number; side: number; along: number; width: number; length: number; color: string }
   | { shape: 'pill'; cells: Cell[]; outer_color: string; inner_color: string }
 
 /** `offset` is the free displacement from the line cell (Alt-drag), in cells. */
