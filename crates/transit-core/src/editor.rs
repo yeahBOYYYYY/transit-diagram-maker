@@ -563,6 +563,52 @@ impl Editor {
         })
     }
 
+    /// Replace the cells of a pill station, e.g. to grow it into a neighboring
+    /// cell or drop one. The blob must stay connected (8-way) and touch at
+    /// least one line; the station is coupled to every line it covers.
+    pub fn set_pill_cells(&mut self, id: Id, cells: &[Cell]) -> Result<()> {
+        let mut uniq: Vec<Cell> = Vec::new();
+        for c in cells {
+            if !uniq.contains(c) {
+                uniq.push(*c);
+            }
+        }
+        if uniq.is_empty() {
+            return Err(EditError::Invalid("a pill station needs at least one cell".into()));
+        }
+        if !geom::is_connected(&uniq) {
+            return Err(EditError::Invalid("a pill station must stay in one piece".into()));
+        }
+        let mut touched: Vec<Id> = Vec::new();
+        for l in self.editable_segments() {
+            let Content::Line(seg) = &l.content else { continue };
+            if !touched.contains(&seg.line_id) && geom::expand(&seg.points).iter().any(|c| uniq.contains(c)) {
+                touched.push(seg.line_id);
+            }
+        }
+        if touched.is_empty() {
+            return Err(EditError::Invalid("a pill station must touch at least one line".into()));
+        }
+        self.apply(|d| {
+            let layer = tree::find_layer_mut(&mut d.root, id).ok_or(EditError::NotFound(id))?;
+            let Content::Station(st) = &mut layer.content else {
+                return Err(EditError::Invalid("not a station".into()));
+            };
+            let StationShape::Pill { cells, .. } = &mut st.shape else {
+                return Err(EditError::Invalid("only pill stations can change their cells".into()));
+            };
+            *cells = uniq;
+            // Keep the existing coupling order, then add newly covered lines.
+            st.line_ids.retain(|l| touched.contains(l));
+            for l in touched {
+                if !st.line_ids.contains(&l) {
+                    st.line_ids.push(l);
+                }
+            }
+            Ok(())
+        })
+    }
+
     /// Change a station's shape while keeping its position and colors.
     pub fn set_station_kind(&mut self, id: Id, kind: StationKind) -> Result<()> {
         let hit_dir = |doc: &Document, line_ids: &[Id], cell: Cell| snap_to_lines(doc, line_ids, cell.center()).map(|h| h.1);

@@ -81,6 +81,25 @@ test.describe('selection, transforms and history', () => {
     expect(st.label.x).toBeCloseTo(7.5)
   })
 
+  test('a selected pill grows into the cell of a double-clicked arrow', async ({ page }) => {
+    await drawLine(page, [[0, 0], [8, 0]])
+    await drawLine(page, [[0, 2], [8, 2]])
+    await page.keyboard.press('s')
+    await page.click('[data-testid=options-bar] button[role=radio]:has-text("Pill")')
+    await clickCell(page, 4, 0) // creates and selects the pill
+    await page.keyboard.press('v')
+    await expect(page.getByTestId('pill-grow')).toHaveCount(8)
+    await page.locator('[data-testid=pill-grow][data-cell="4,1"]').dblclick()
+    await page.locator('[data-testid=pill-grow][data-cell="4,2"]').dblclick()
+    const st = await state(page, (s) => {
+      const f = s.fragments.find((x: any) => x.kind === 'station')
+      return (window as any).__transit.node(f.id).content
+    })
+    expect(st.cells).toEqual([{ x: 4, y: 0 }, { x: 4, y: 1 }, { x: 4, y: 2 }])
+    expect(st.line_ids).toHaveLength(2)
+    await expect(page.getByTestId('pill-grow')).toHaveCount(12)
+  })
+
   test('double click edits text in place', async ({ page }) => {
     await page.keyboard.press('t')
     await clickCell(page, 0, 0)
@@ -102,7 +121,7 @@ test.describe('selection, transforms and history', () => {
     await clickCell(page, 5, 0)
     await page.keyboard.press('v')
     await clickCell(page, 1, 0)
-    await page.locator('[data-testid=properties-panel] button[role=radio]', { hasText: 'Hollow' }).click()
+    await page.locator('[data-testid=properties-panel] [data-testid=prop-line-style]').selectOption('hollow')
     const hollow = await state(page, (s) => s.fragments.every((f: any) => f.svg.split('<path').length - 1 === 4))
     expect(hollow).toBe(true)
   })

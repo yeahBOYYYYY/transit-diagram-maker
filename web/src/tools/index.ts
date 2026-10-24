@@ -21,8 +21,10 @@ export interface PointerInfo {
   ctrl: boolean
   /** Topmost unlocked leaf layer under the pointer. */
   hitId: Id | null
-  /** Overlay handle under the pointer ("rotate"), if any. */
+  /** Overlay handle under the pointer ("rotate", "grow"), if any. */
   handle: string | null
+  /** Cell a "grow" handle points into. */
+  handleCell?: Cell | null
 }
 
 export interface Tool {
@@ -42,6 +44,33 @@ export type BoundsProvider = (ids: Id[]) => Map<Id, Rect>
 
 function sameCell(a: Cell | undefined, b: Cell): boolean {
   return !!a && a.x === b.x && a.y === b.y
+}
+
+/** The pill station the selection consists of, if it is exactly one pill (or its station group). */
+export function selectedPill(store: EditorStore): { id: Id; cells: Cell[]; offset: Vec2 } | null {
+  const s = store.state
+  if (s.selection.length !== 1) return null
+  const stations = leafIds(s.tree, s.selection).filter((id) => findItem(s.tree, id)?.kind === 'station')
+  if (stations.length !== 1) return null
+  const n = store.node(stations[0])
+  if (n?.type !== 'layer' || n.content.kind !== 'station' || n.content.shape !== 'pill') return null
+  return { id: n.id, cells: n.content.cells, offset: n.content.offset ?? { x: 0, y: 0 } }
+}
+
+/** Empty cells around a pill (8 directions), each with the direction from the pill cell it extends. */
+export function pillGrowTargets(cells: Cell[]): { cell: Cell; dx: number; dy: number }[] {
+  const key = (c: Cell) => `${c.x},${c.y}`
+  const taken = new Set(cells.map(key))
+  const out = new Map<string, { cell: Cell; dx: number; dy: number }>()
+  // Orthogonal neighbors first so a cell reachable both ways points straight.
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]
+  for (const [dx, dy] of dirs) {
+    for (const c of cells) {
+      const n = { x: c.x + dx, y: c.y + dy }
+      if (!taken.has(key(n)) && !out.has(key(n))) out.set(key(n), { cell: n, dx, dy })
+    }
+  }
+  return [...out.values()]
 }
 
 function clearOverlay(store: EditorStore): void {
@@ -102,6 +131,8 @@ function selectTool(store: EditorStore, boundsOf: BoundsProvider): Tool {
     },
     down(p) {
       if (p.button !== 0) return
+      // Pill arrows act on double click only.
+      if (p.handle === 'grow') return
       start = p
       if (p.handle === 'rotate' && s.selection.length) {
         const c = selectionCenter()
@@ -198,7 +229,20 @@ function selectTool(store: EditorStore, boundsOf: BoundsProvider): Tool {
       start = null
     },
     dblclick(p) {
+      const pill = selectedPill(store)
+      if (pill && p.handle === 'grow' && p.handleCell) {
+        const cell = p.handleCell
+        if (store.run((e) => e.setPillCells(pill.id, [...pill.cells, cell])) !== undefined) store.notify('Pill extended')
+        return
+      }
       if (p.hitId === null) return
+      if (pill && p.hitId === pill.id && pill.cells.length > 1) {
+        // Double clicking one of the pill's own cells removes it.
+        const at = { x: Math.floor(p.cells.x - pill.offset.x), y: Math.floor(p.cells.y - pill.offset.y) }
+        const rest = pill.cells.filter((c) => c.x !== at.x || c.y !== at.y)
+        if (rest.length < pill.cells.length) store.run((e) => e.setPillCells(pill.id, rest))
+        return
+      }
       const n = findItem(s.tree, p.hitId)
       if (n?.kind === 'text') store.startTextEdit(p.hitId)
     },

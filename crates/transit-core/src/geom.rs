@@ -291,6 +291,23 @@ pub fn direction_at(cells: &[Cell], index: usize) -> Option<Dir8> {
     }
 }
 
+/// Whether the cells form one 8-connected piece.
+pub fn is_connected(cells: &[Cell]) -> bool {
+    let Some(&first) = cells.first() else { return true };
+    let mut seen = vec![first];
+    let mut todo = vec![first];
+    while let Some(c) = todo.pop() {
+        for d in 0..8 {
+            let n = c.step(Dir8(d));
+            if cells.contains(&n) && !seen.contains(&n) {
+                seen.push(n);
+                todo.push(n);
+            }
+        }
+    }
+    seen.len() == cells.iter().collect::<std::collections::HashSet<_>>().len()
+}
+
 /// Every cell on the straight 8-connected (Bresenham style) run between two cells,
 /// used to interpolate fast mouse drags so no cell is skipped.
 pub fn cells_between(a: Cell, b: Cell) -> Vec<Cell> {
@@ -534,6 +551,13 @@ mod tests {
         assert_eq!(direction_at(&cells, 0), Some(Dir8::E));
         assert_eq!(direction_at(&cells, 2), Some(Dir8::S));
         assert_eq!(direction_at(&cells, cells.len() - 1), Some(Dir8::S));
+    }
+
+    #[test]
+    fn connectivity_is_eight_way() {
+        assert!(is_connected(&[c(0, 0), c(1, 1), c(2, 1)]));
+        assert!(!is_connected(&[c(0, 0), c(2, 0)]));
+        assert!(is_connected(&[]));
     }
 
     #[test]

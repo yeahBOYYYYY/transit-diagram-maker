@@ -1,7 +1,7 @@
 // Tool behavior driven with synthetic pointer events against the real engine.
 import { describe, expect, it } from 'vitest'
 import { at, freshStore, key } from './helpers'
-import { createTools } from '../../src/tools'
+import { createTools, pillGrowTargets, selectedPill } from '../../src/tools'
 import type { EditorStore } from '../../src/stores/editor'
 import type { Id, Rect } from '../../src/core/types'
 import { prefs } from '../../src/stores/prefs'
@@ -213,6 +213,31 @@ describe('selection tool', () => {
     store.undo()
     const m = store.node(l.layer_id)
     expect(m?.type === 'layer' && m.content.kind === 'line' && m.content.points[0]).toEqual({ x: 0, y: 0 })
+  })
+
+  it('grows a selected pill by double clicking an arrow and shrinks it by double clicking a cell', () => {
+    const { store, tools } = setup()
+    store.run((e) => e.createLine([{ x: 0, y: 0 }, { x: 8, y: 0 }], {}))
+    store.run((e) => e.createLine([{ x: 0, y: 1 }, { x: 8, y: 1 }], {}))
+    const st = store.run((e) => e.addPill([{ x: 3, y: 0 }], { label: false }))!
+    store.select([st.station_id])
+    const pill = selectedPill(store)!
+    expect(pillGrowTargets(pill.cells)).toHaveLength(8)
+    const below = pillGrowTargets(pill.cells).find((t) => t.cell.x === 3 && t.cell.y === 1)!
+    expect([below.dx, below.dy]).toEqual([0, 1])
+    // A single click on an arrow does nothing; a double click grows.
+    tools.select.down?.(at(store, 3.5, 1.5, { handle: 'grow', handleCell: { x: 3, y: 1 } }))
+    tools.select.up?.(at(store, 3.5, 1.5, { handle: 'grow', handleCell: { x: 3, y: 1 } }))
+    expect(store.state.selection).toEqual([st.station_id])
+    tools.select.dblclick?.(at(store, 3.5, 1.5, { handle: 'grow', handleCell: { x: 3, y: 1 } }))
+    const cells = () => {
+      const n = store.node(st.station_id)
+      return n?.type === 'layer' && n.content.kind === 'station' && n.content.shape === 'pill' ? n.content.cells : []
+    }
+    expect(cells()).toEqual([{ x: 3, y: 0 }, { x: 3, y: 1 }])
+    expect(pillGrowTargets(cells())).toHaveLength(10)
+    tools.select.dblclick?.(at(store, 3.5, 0.5, { hitId: st.station_id }))
+    expect(cells()).toEqual([{ x: 3, y: 1 }])
   })
 
   it('alt-dragging a station moves it off its line', () => {
