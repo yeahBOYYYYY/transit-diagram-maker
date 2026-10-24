@@ -13,6 +13,7 @@ cargo test -p transit-core --test editor     # one integration test file
 cargo test -p transit-core pill              # tests whose name matches "pill"
 cargo clippy --all-targets                   # expected to be warning-free
 ```
+Do not run `cargo fmt`: the code is not rustfmt-clean (long lines, compact literals, no `rustfmt.toml`), so it rewrites nearly every file. Match the surrounding style by hand.
 
 Web (from `web/`):
 ```bash
@@ -24,9 +25,12 @@ npm run typecheck       # vue-tsc
 npm run build           # typecheck + vite build to web/dist
 npx playwright test                         # e2e (tests/e2e), starts its own vite on :5174
 npx playwright test editing -g "rotate"     # single e2e file / test
-npx playwright test --update-snapshots      # refresh visual baselines (Linux-specific PNGs)
+npx playwright test --update-snapshots      # refresh failing visual baselines (Linux-specific PNGs)
+npx playwright test visual --update-snapshots=all   # rewrite every baseline (small UI changes pass the 2% tolerance)
 ```
-Playwright uses the locally installed Google Chrome (`channel: 'chrome'`); `PW_CHANNEL=chromium` switches to the bundled browser. Unit and e2e tests both need the wasm package built first.
+Playwright uses the locally installed Google Chrome (`channel: 'chrome'`); `PW_CHANNEL=chromium` switches to the bundled browser. Unit and e2e tests both need the wasm package built first. Outside CI the e2e config reuses a server already listening on :5174, so a leftover vite (e.g. started with `npx vite` and killed only at the `npx` level) can serve stale code; kill stray `vite.js` processes if tests behave as if your change isn't there.
+
+Unit tests run components in happy-dom, which can crash while patching `OptionsBar` from one tool's branch to another (real Chrome is fine); mount a fresh component per tool instead of switching tools on a mounted one.
 
 ## Architecture
 
