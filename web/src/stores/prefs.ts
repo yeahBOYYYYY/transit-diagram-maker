@@ -2,6 +2,7 @@
 import { reactive, watch } from 'vue'
 import type { Icon, LineStyle, StationKind, StationOptions, TextAlign } from '../core/types'
 import { DEFAULT_SHORTCUTS, type ActionId } from '../core/actions'
+import { FONT_FAMILIES } from '../core/fonts'
 
 export interface Prefs {
   historyLimit: number
@@ -36,14 +37,6 @@ export interface Prefs {
   icon: Pick<Icon, 'icon' | 'color' | 'background'> & { size: number | null }
 }
 
-export const FONT_FAMILIES = [
-  'Helvetica, Arial, sans-serif',
-  'Inter, Helvetica, Arial, sans-serif',
-  'Georgia, serif',
-  '"Trebuchet MS", sans-serif',
-  'Verdana, sans-serif',
-  '"Courier New", monospace',
-]
 
 export function defaultPrefs(): Prefs {
   return {

@@ -179,3 +179,10 @@ export interface IconInfo {
   label: string
   svg: string
 }
+
+/** Fonts and icons uploaded into the document. */
+export interface AssetList {
+  /** Font family names. */
+  fonts: string[]
+  icons: IconInfo[]
+}

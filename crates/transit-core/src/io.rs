@@ -56,6 +56,7 @@ pub fn validate(mut doc: Document) -> Result<Document> {
     }
     doc.next_id = doc.next_id.max(max_id + 1);
     doc.settings = doc.settings.sanitized();
+    doc.assets = std::mem::take(&mut doc.assets).sanitized();
     let route = doc.settings.route_mode;
     tree::walk_layers_mut(&mut doc.root, &mut |l| {
         match &mut l.content {

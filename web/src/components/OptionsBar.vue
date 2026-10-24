@@ -10,7 +10,8 @@ import ColorField from './ui/ColorField.vue'
 import Segmented from './ui/Segmented.vue'
 import IconPicker from './ui/IconPicker.vue'
 import { useEditor } from '../stores/editor'
-import { FONT_FAMILIES, prefs } from '../stores/prefs'
+import { prefs } from '../stores/prefs'
+import FontSelect from './ui/FontSelect.vue'
 import { rotateSelection } from '../stores/commands'
 import { selectedPill } from '../tools'
 import { STROKE_KINDS, hasChannel, hasDashes } from '../core/lineStyles'
@@ -24,7 +25,6 @@ const pillSelected = computed(() => {
   void s.revision
   return selectedPill(store) !== null
 })
-const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
 </script>
 
 <template>
@@ -155,9 +155,7 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
 
     <template v-else-if="tool === 'text'">
       <span class="dim opt">Font<HelpTip :text="HELP['text.font']" /></span>
-      <select v-model="prefs.text.font_family">
-        <option v-for="f in FONT_FAMILIES" :key="f" :value="f">{{ fontLabel(f) }}</option>
-      </select>
+      <FontSelect v-model="prefs.text.font_family" />
       <NumberField v-model="prefs.text.size" label="Size" :min="0.1" :step="0.05" :width="40" unit="cells" :help="HELP['text.size']" />
       <ColorField v-model="prefs.text.color" label="Color" :help="HELP['text.color']" />
       <button class="icon-btn" :class="{ on: prefs.text.bold }" title="Bold" @click="prefs.text.bold = !prefs.text.bold">

@@ -43,6 +43,7 @@ const menus = computed<{ name: string; items: Item[] }[]>(() => [
     name: 'Document',
     items: [
       { action: 'document.settings' },
+      { action: 'document.assets' },
       { sep: true },
       {
         label: 'Route: Straight then Diagonal',

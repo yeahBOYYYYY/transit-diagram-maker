@@ -3,7 +3,8 @@
 // purely visual state (selection, view, active tool, overlays).
 import { reactive, shallowRef } from 'vue'
 import { Engine } from '../core/engine'
-import type { Cell, DocNode, DocSettings, Fragment, Id, Rect, TreeItem } from '../core/types'
+import type { AssetList, Cell, DocNode, DocSettings, Fragment, Id, Rect, TreeItem } from '../core/types'
+import { registerFonts } from '../core/fonts'
 import { leafIds, findItem, topLevelOf } from '../core/tree'
 import { fitRect, unionRects, zoomAt, type View } from '../core/viewport'
 import { prefs } from './prefs'
@@ -34,6 +35,8 @@ export function createEditor(engine = new Engine()) {
     fragments: [] as Fragment[],
     tree: [] as TreeItem[],
     settings: engine.settings() as DocSettings,
+    /** Fonts and icons uploaded into the document. */
+    assets: engine.assetList() as AssetList,
     selection: [] as Id[],
     tool: 'select' as ToolId,
     penSlot: 'pen' as 'pen' | 'eraser',
@@ -54,7 +57,7 @@ export function createEditor(engine = new Engine()) {
     /** Angle shown while rotating. */
     rotation: null as number | null,
     spaceHeld: false,
-    dialog: null as null | 'document' | 'export' | 'preferences' | 'shortcuts' | 'about' | 'reference',
+    dialog: null as null | 'document' | 'assets' | 'export' | 'preferences' | 'shortcuts' | 'about' | 'reference',
   })
 
   const engineRef = shallowRef(engine)
@@ -66,6 +69,8 @@ export function createEditor(engine = new Engine()) {
     state.fragments = engine.fragments()
     state.tree = engine.tree()
     state.settings = engine.settings()
+    state.assets = engine.assetList()
+    registerFonts(engine, state.assets.fonts)
     state.canUndo = engine.canUndo()
     state.canRedo = engine.canRedo()
     state.selection = state.selection.filter((id) => findItem(state.tree, id) !== null)

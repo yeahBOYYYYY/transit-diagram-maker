@@ -97,3 +97,41 @@ export async function pickTransitFile(): Promise<{ name: string; text: string; h
     throw err
   }
 }
+
+/** Ask the user for one file. */
+export function pickFile(accept: string): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = accept
+    input.style.display = 'none'
+    input.addEventListener('change', () => {
+      const file = input.files?.[0] ?? null
+      input.remove()
+      resolve(file)
+    })
+    input.addEventListener('cancel', () => {
+      input.remove()
+      resolve(null)
+    })
+    document.body.appendChild(input)
+    input.click()
+  })
+}
+
+const FONT_TYPES: Record<string, string> = { ttf: 'font/ttf', otf: 'font/otf', woff: 'font/woff', woff2: 'font/woff2' }
+
+/** A font file as a base64 data URL with a font MIME type taken from its extension. */
+export async function fontDataUrl(file: File): Promise<string> {
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+  const mime = FONT_TYPES[ext] ?? 'application/octet-stream'
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  let bin = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  return `data:${mime};base64,${btoa(bin)}`
+}
+
+/** File name without its extension, as a default display name. */
+export function baseName(name: string): string {
+  return name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim()
+}

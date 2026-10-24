@@ -4,7 +4,7 @@ import type { DocSettings } from '../core/types'
 import { matches } from '../core/shortcuts'
 import { findItem, isEffectivelyLocked, leafIds } from '../core/tree'
 import type { Engine } from '../core/engine'
-import { canSaveInPlace, downloadText, pickSaveHandle, pickTransitFile, writeHandle } from '../core/files'
+import { baseName, canSaveInPlace, downloadText, fontDataUrl, pickFile, pickSaveHandle, pickTransitFile, writeHandle } from '../core/files'
 import type { EditorStore, ToolId } from './editor'
 import { prefs } from './prefs'
 import { CELL_PX } from '../core/viewport'
@@ -130,6 +130,26 @@ export function exportSvg(store: EditorStore, settings?: DocSettings, cellPx = C
   store.notify(`Exported ${store.state.docName}.svg`)
 }
 
+/** Ask for a font file and store it in the document; resolves to the CSS font-family to use. */
+export async function uploadFont(store: EditorStore): Promise<string | null> {
+  const file = await pickFile('.ttf,.otf,.woff,.woff2')
+  if (!file) return null
+  const data = await fontDataUrl(file)
+  const family = store.run((e) => e.addFont(baseName(file.name), data))
+  if (family) store.notify(`Added font ${baseName(file.name)}`)
+  return family ?? null
+}
+
+/** Ask for an SVG file and store it as a pictogram; resolves to its icon name. */
+export async function uploadIcon(store: EditorStore): Promise<string | null> {
+  const file = await pickFile('.svg,image/svg+xml')
+  if (!file) return null
+  const svg = await file.text()
+  const name = store.run((e) => e.addIconAsset(baseName(file.name), svg))
+  if (name) store.notify(`Added icon ${baseName(file.name)}`)
+  return name ?? null
+}
+
 export async function openTransit(store: EditorStore): Promise<void> {
   try {
     const file = await pickTransitFile()
@@ -197,6 +217,9 @@ export function runAction(store: EditorStore, id: ActionId): void {
       return
     case 'document.settings':
       s.dialog = 'document'
+      return
+    case 'document.assets':
+      s.dialog = 'assets'
       return
     case 'layer.newGroup': {
       const id = store.run((e) => e.newGroup())

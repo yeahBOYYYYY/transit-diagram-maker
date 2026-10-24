@@ -8,6 +8,5 @@ description = "Document model, geometry, history and SVG rendering for Transit D
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
-
-[dev-dependencies]
+# Parses uploaded SVG icons so they can be sanitized.
 roxmltree = "0.20"

@@ -5,14 +5,13 @@
 import NumberField from '../ui/NumberField.vue'
 import ColorField from '../ui/ColorField.vue'
 import type { DocSettings } from '../../core/types'
-import { FONT_FAMILIES } from '../../stores/prefs'
+import FontSelect from '../ui/FontSelect.vue'
 import { HELP } from '../../core/help'
 import HelpTip from '../ui/HelpTip.vue'
 
 export type SettingsSection = 'drawing' | 'lines' | 'stations' | 'ticks' | 'labels' | 'icons' | 'export'
 
 defineProps<{ draft: DocSettings; sections: SettingsSection[] }>()
-const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
 </script>
 
 <template>
@@ -48,9 +47,7 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
       <NumberField v-model="draft.label_font_size" :help="HELP['settings.label_font_size']" label="Font size" :min="0.05" :max="20" :step="0.05" unit="cells" />
       <label class="f">
         <span class="dim">Font<HelpTip :text="HELP['settings.label_font_family']" /></span>
-        <select v-model="draft.label_font_family">
-          <option v-for="f in FONT_FAMILIES" :key="f" :value="f">{{ fontLabel(f) }}</option>
-        </select>
+        <FontSelect v-model="draft.label_font_family" />
       </label>
     </fieldset>
     <fieldset v-if="sections.includes('icons')">
@@ -89,13 +86,14 @@ fieldset {
   gap: 7px;
   margin: 0;
 }
-fieldset :deep(.num-field),
 fieldset :deep(.color-field) {
   justify-content: space-between;
 }
-/* Line the inputs up: every unit column has the same width. */
-fieldset :deep(.unit) {
-  min-width: 30px;
+/* label | input | unit columns, so inputs line up with or without a unit */
+fieldset :deep(.num-field) {
+  display: grid;
+  grid-template-columns: 1fr auto 34px;
+  column-gap: 4px;
 }
 legend {
   padding: 0 4px;

@@ -1,6 +1,7 @@
 //! The editor: every document mutation goes through here so it can be recorded
 //! on the undo/redo history.
 
+use crate::assets::{self, Assets, FontAsset, IconAsset};
 use crate::error::{EditError, Result};
 use crate::geom::{self, Cell, Dir8, Rect, Vec2};
 use crate::model::*;
@@ -662,9 +663,94 @@ impl Editor {
         icon.pos = icon.pos.snapped();
         self.apply(|d| {
             let id = d.alloc_id();
-            let name = crate::icons::find(&icon.icon).map(|i| i.label).unwrap_or("Icon").to_string();
+            let name = match d.assets.icon(&icon.icon) {
+                Some(custom) => custom.label.clone(),
+                None => crate::icons::find(&icon.icon).map(|i| i.label).unwrap_or("Icon").to_string(),
+            };
             d.root.push(Node::Layer(Layer { id, name, visible: true, locked: false, content: Content::Icon(icon) }));
             Ok(id)
+        })
+    }
+
+    // --------------------------------------------------------------- assets
+
+    pub fn assets(&self) -> &Assets {
+        &self.doc.assets
+    }
+
+    /// Store an uploaded font in the document (replacing one with the same
+    /// name). Returns the CSS font-family value for text layers.
+    pub fn add_font(&mut self, family: &str, data: &str) -> Result<String> {
+        let family = assets::clean_family(family).ok_or_else(|| EditError::Invalid("the font needs a name".into()))?;
+        if !assets::valid_font_data(data) {
+            return Err(EditError::Invalid("not a supported font file (TTF, OTF, WOFF or WOFF2, up to 8 MB)".into()));
+        }
+        self.apply(|d| {
+            match d.assets.fonts.iter_mut().find(|f| f.family == family) {
+                Some(f) => f.data = data.into(),
+                None => d.assets.fonts.push(FontAsset { family: family.clone(), data: data.into() }),
+            }
+            Ok(assets::font_family_css(&family))
+        })
+    }
+
+    /// Store an uploaded SVG icon (sanitized) for the pictogram library.
+    /// Returns the name icons refer to it by.
+    pub fn add_icon_asset(&mut self, label: &str, svg: &str) -> Result<String> {
+        let (view_box, body) = assets::sanitize_svg(svg).map_err(EditError::Invalid)?;
+        let label: String = label.trim().chars().take(40).collect();
+        let label = if label.is_empty() { "Custom icon".to_string() } else { label };
+        self.apply(|d| {
+            let n = (1..).find(|n| d.assets.icon(&format!("custom-{n}")).is_none()).unwrap_or(1);
+            let name = format!("custom-{n}");
+            d.assets.icons.push(IconAsset { name: name.clone(), label, view_box, body });
+            Ok(name)
+        })
+    }
+
+    /// Remove an uploaded font, unless text still uses it.
+    pub fn remove_font(&mut self, family: &str) -> Result<()> {
+        let css = format!("\"{family}\"");
+        let mut uses = 0;
+        tree::walk_layers(&self.doc.root, &mut |l, _, _| {
+            if matches!(&l.content, Content::Text(t) if t.font_family.contains(&css)) {
+                uses += 1;
+            }
+        });
+        if self.doc.settings.label_font_family.contains(&css) {
+            return Err(EditError::Invalid(format!("{family} is the station label font in the document settings")));
+        }
+        if uses > 0 {
+            return Err(EditError::Invalid(format!("{family} is used by {uses} text layer{}", if uses == 1 { "" } else { "s" })));
+        }
+        self.apply(|d| {
+            let before = d.assets.fonts.len();
+            d.assets.fonts.retain(|f| f.family != family);
+            if d.assets.fonts.len() == before {
+                return Err(EditError::Invalid(format!("no font named {family}")));
+            }
+            Ok(())
+        })
+    }
+
+    /// Remove an uploaded icon, unless a pictogram still shows it.
+    pub fn remove_icon_asset(&mut self, name: &str) -> Result<()> {
+        let mut uses = 0;
+        tree::walk_layers(&self.doc.root, &mut |l, _, _| {
+            if matches!(&l.content, Content::Icon(i) if i.icon == name) {
+                uses += 1;
+            }
+        });
+        if uses > 0 {
+            return Err(EditError::Invalid(format!("the icon is used by {uses} pictogram{}", if uses == 1 { "" } else { "s" })));
+        }
+        self.apply(|d| {
+            let before = d.assets.icons.len();
+            d.assets.icons.retain(|i| i.name != name);
+            if d.assets.icons.len() == before {
+                return Err(EditError::Invalid(format!("no icon named {name}")));
+            }
+            Ok(())
         })
     }
 

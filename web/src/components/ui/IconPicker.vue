@@ -1,14 +1,25 @@
 <script setup lang="ts">
-// Dropdown grid with the pictogram library.
+// Dropdown grid with the pictogram library: built-in pictograms, the icons
+// uploaded into the document, and a button to upload another SVG.
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { Engine } from '../../core/engine'
+import { useEditor } from '../../stores/editor'
+import { uploadIcon } from '../../stores/commands'
 
 const props = defineProps<{ modelValue: string }>()
 const emit = defineEmits<{ 'update:modelValue': [string] }>()
 
-const library = Engine.iconLibrary()
+const store = useEditor()
+const builtIn = Engine.iconLibrary()
+const library = computed(() => [...builtIn, ...store.state.assets.icons])
 const open = ref(false)
-const current = computed(() => library.find((i) => i.name === props.modelValue) ?? library[0])
+const current = computed(() => library.value.find((i) => i.name === props.modelValue) ?? builtIn[0])
+
+async function upload(): Promise<void> {
+  open.value = false
+  const name = await uploadIcon(store)
+  if (name) emit('update:modelValue', name)
+}
 const root = ref<HTMLElement | null>(null)
 
 function choose(name: string): void {
@@ -43,6 +54,13 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocDown))
       >
         <svg viewBox="0 0 24 24" width="28" height="28" v-html="i.svg" />
         <span>{{ i.label }}</span>
+      </button>
+      <button type="button" class="cell upload" title="Add your own SVG icon to this document" data-testid="upload-icon" @click="upload">
+        <svg viewBox="0 0 24 24" width="28" height="28">
+          <rect x="1" y="1" width="22" height="22" rx="5" fill="none" stroke="currentColor" stroke-dasharray="3 2" />
+          <path d="M12 7v10M7 12h10" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        </svg>
+        <span>Upload SVG…</span>
       </button>
     </div>
   </div>

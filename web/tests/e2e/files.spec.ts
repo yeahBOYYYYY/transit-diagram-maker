@@ -93,6 +93,47 @@ test.describe('saving, opening and exporting', () => {
     await expect(link).toHaveAttribute('target', '_blank')
   })
 
+  test('uploaded fonts and SVG icons are stored in the document and exported', async ({ page }) => {
+    // A font: upload it from the text tool's font list.
+    await page.keyboard.press('t')
+    const [fontChooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      page.locator('[data-testid=options-bar] [data-testid=font-select]').selectOption({ label: 'Upload font…' }),
+    ])
+    await fontChooser.setFiles({ name: 'City_Sans.woff2', mimeType: 'font/woff2', buffer: Buffer.from('wOF2 fake font bytes') })
+    await expect(page.locator('[data-testid=options-bar] [data-testid=font-select] option:checked')).toHaveText('City Sans')
+    await page.mouse.click(700, 300)
+    await page.keyboard.type('Central')
+    await page.keyboard.press('Enter')
+
+    // An icon: upload it from the pictogram picker.
+    await page.keyboard.press('i')
+    await page.getByTestId('icon-picker').click()
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M5 0L10 10H0Z" fill="currentColor" onclick="alert(1)"/><script>alert(1)</script></svg>'
+    const [iconChooser] = await Promise.all([page.waitForEvent('filechooser'), page.getByTestId('upload-icon').click()])
+    await iconChooser.setFiles({ name: 'star.svg', mimeType: 'image/svg+xml', buffer: Buffer.from(svg) })
+    await expect(page.getByTestId('icon-picker')).toContainText('star')
+    await page.mouse.click(700, 450)
+    const iconSvg = await state(page, (s) => s.fragments.find((f: any) => f.kind === 'icon').svg)
+    expect(iconSvg).toContain('M5 0L10 10H0Z')
+    expect(iconSvg).not.toContain('onclick')
+    expect(iconSvg).not.toContain('script')
+
+    // Both are listed in Document > Fonts & Icons…
+    await page.click('[data-menu=Document]')
+    await page.click('.dropdown .item:has-text("Fonts & Icons")')
+    await expect(page.getByTestId('asset-fonts')).toContainText('City Sans')
+    await expect(page.getByTestId('asset-icons')).toContainText('star')
+    await page.getByTestId('dialog-ok').click()
+
+    // Saved in the .transit file and embedded in the SVG export.
+    const saved = JSON.parse(await page.evaluate(() => (window as any).__transit.engine.value.saveTransit()))
+    expect(saved.document.assets.fonts[0].family).toBe('City Sans')
+    expect(saved.document.assets.icons[0].label).toBe('star')
+    const exported = await page.evaluate(() => (window as any).__transit.engine.value.exportSvg())
+    expect(exported).toContain('@font-face{font-family:"City Sans"')
+  })
+
   test('opening an invalid file shows an error and keeps the document', async ({ page }) => {
     await buildSampleMap(page)
     const count = (await fragmentKinds(page)).length

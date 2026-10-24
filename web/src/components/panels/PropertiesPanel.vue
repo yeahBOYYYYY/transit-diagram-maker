@@ -14,7 +14,7 @@ import { STROKE_KINDS, hasChannel, hasDashes } from '../../core/lineStyles'
 import type { Engine } from '../../core/engine'
 import { findItem } from '../../core/tree'
 import { useEditor } from '../../stores/editor'
-import { FONT_FAMILIES } from '../../stores/prefs'
+import FontSelect from '../ui/FontSelect.vue'
 import { moveSelectionTo, rotateSelection, selectionOnGrid } from '../../stores/commands'
 
 const store = useEditor()
@@ -151,7 +151,6 @@ const coupledLines = computed(() => {
 const toggleLocked = () => single.value && store.run((e) => e.setLocked(single.value!.id, !single.value!.locked))
 const toggleVisible = () => single.value && store.run((e) => e.setVisible(single.value!.id, !single.value!.visible))
 const childCount = computed(() => (group.value ? (findItem(s.tree, group.value.id)?.children.length ?? 0) : 0))
-const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
 </script>
 
 <template>
@@ -160,7 +159,7 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
       <!-- nothing selected: document -->
       <template v-if="s.selection.length === 0">
         <div class="section-title">Document</div>
-        <div class="grid2">
+        <div class="stack">
           <NumberField :model-value="s.settings.line_width" label="Line W" :min="0.05" :max="4" :step="0.05" unit="cells" :help="HELP['settings.line_width']" @update:model-value="(v) => setSetting('line_width', v)" @commit="done" />
           <NumberField :model-value="s.settings.corner_radius" label="Curve" :min="0" :max="50" :step="0.25" unit="cells" :help="HELP['settings.corner_radius']" @update:model-value="(v) => setSetting('corner_radius', v)" @commit="done" />
           <NumberField :model-value="s.settings.cap_roundness" label="Cap round" :min="0" :max="1" :step="0.05" :help="HELP['settings.cap_roundness']" @update:model-value="(v) => setSetting('cap_roundness', v)" @commit="done" />
@@ -312,9 +311,7 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
           />
           <div class="field">
             <span class="lbl">Font<HelpTip :text="HELP['text.font']" /></span>
-            <select :value="layer.content.font_family" @change="patch({ font_family: ($event.target as HTMLSelectElement).value }); done()">
-              <option v-for="f in FONT_FAMILIES" :key="f" :value="f">{{ fontLabel(f) }}</option>
-            </select>
+            <FontSelect :model-value="layer.content.font_family" @update:model-value="(v) => (patch({ font_family: v }), done())" />
             <button class="icon-btn" :class="{ on: layer.content.bold }" title="Bold" @click="patch({ bold: !(layer.content as any).bold }); done()">
               <UiIcon name="bold" :size="15" />
             </button>
@@ -422,8 +419,23 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
   grid-template-columns: 1fr 1fr;
   gap: 6px 10px;
 }
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+/* label | input | unit columns, so inputs line up with or without a unit */
+.stack :deep(.num-field) {
+  display: grid;
+  grid-template-columns: 1fr auto 34px;
+  column-gap: 4px;
+}
 .grid2 :deep(.num-field) {
   justify-content: space-between;
+  min-width: 0;
+}
+.grid2 :deep(.num-field input) {
+  width: 40px;
 }
 .row {
   display: flex;

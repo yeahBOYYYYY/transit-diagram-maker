@@ -20,6 +20,7 @@ export const ACTIONS = {
   'edit.shortcuts': { label: 'Keyboard Shortcuts…', category: 'Edit', key: 'Ctrl+Alt+Shift+K' },
 
   'document.settings': { label: 'Document Settings…', category: 'Document', key: 'Ctrl+Alt+D' },
+  'document.assets': { label: 'Fonts & Icons…', category: 'Document', key: '' },
 
   'layer.newGroup': { label: 'New Group', category: 'Layer', key: 'Ctrl+Shift+N' },
   'layer.group': { label: 'Group Layers', category: 'Layer', key: 'Ctrl+G' },
