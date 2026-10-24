@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { clickCell, cellPos, dragCells, drawLine, fragmentKinds, layerRow, openApp, state } from './helpers'
+import { clickCell, cellPos, dragCells, drawLine, fragmentKinds, layerRow, openApp, setPenColor, state } from './helpers'
 
 test.describe('drawing tools', () => {
   test.beforeEach(async ({ page }) => openApp(page))
@@ -78,16 +78,53 @@ test.describe('drawing tools', () => {
     expect(await fragmentKinds(page)).toEqual(['text'])
   })
 
-  test('icon tool drops library pictograms', async ({ page }) => {
-    await page.keyboard.press('i')
-    await page.getByTestId('icon-picker').click()
+  test('clicking a pictogram in the Icons panel adds it in the middle of the view', async ({ page }) => {
+    await page.click('[data-testid=dock] [data-tab=Icons]')
     await page.click('[data-testid=icons-panel] [data-icon=ferry]')
-    expect(await state(page, (s) => s.tool)).toBe('icon')
-    await clickCell(page, 2, 2)
     await layerRow(page, 'Ferry')
     const icon = await state(page, (s) => (window as any).__transit.node(s.fragments[0].id).content)
-    expect(icon.pos).toEqual({ x: 2.5, y: 2.5 })
+    const middle = await state(page, (s) => ({
+      x: Math.floor((s.viewport.width / 2 - s.view.x) / s.view.zoom / 24) + 0.5,
+      y: Math.floor((s.viewport.height / 2 - s.view.y) / s.view.zoom / 24) + 0.5,
+    }))
+    expect(icon.pos).toEqual(middle)
     expect(icon.size).toBeCloseTo(1.24)
+    expect(await state(page, (s) => s.tool)).toBe('select')
+  })
+
+  test('the eyedropper of a color field takes a color from the canvas', async ({ page }) => {
+    await page.keyboard.press('p')
+    await setPenColor(page, '#0098d4')
+    await drawLine(page, [[0, 0], [6, 0]])
+    await setPenColor(page, '#000000')
+    const field = page.locator('[data-testid=options-bar] .color-field').first()
+    await field.getByTestId('eyedropper').click()
+    await expect(page.locator('body')).toHaveClass(/picking-color/)
+    await clickCell(page, 3, 0)
+    await expect(field.locator('input.hex')).toHaveValue('#0098d4')
+    await expect(page.locator('body')).not.toHaveClass(/picking-color/)
+    // The click only picked the color: the pen did not start a new line.
+    expect(await fragmentKinds(page)).toEqual(['line'])
+    expect(await state(page, (s) => s.overlay.preview)).toBe('')
+  })
+
+  test('dragged pictograms snap from cell to cell', async ({ page }) => {
+    await page.click('[data-testid=dock] [data-tab=Icons]')
+    const target = await cellPos(page, 2, 2)
+    const canvas = (await page.getByTestId('canvas').boundingBox())!
+    await page.locator('[data-testid=icons-panel] [data-icon=bus]').dragTo(page.getByTestId('canvas'), {
+      targetPosition: { x: target.x - canvas.x, y: target.y - canvas.y },
+    })
+    await page.keyboard.press('v')
+    const a = await cellPos(page, 2, 2)
+    const b = await cellPos(page, 5, 4)
+    await page.mouse.move(a.x, a.y)
+    await page.mouse.down()
+    // End a little off the cell center: the pictogram still lands on it.
+    await page.mouse.move(b.x + 7, b.y - 6, { steps: 10 })
+    await page.mouse.up()
+    const pos = await state(page, (s) => (window as any).__transit.node(s.fragments[0].id).content.pos)
+    expect(pos).toEqual({ x: 5.5, y: 4.5 })
   })
 
   test('pictograms can be dragged from the Icons panel onto the canvas', async ({ page }) => {

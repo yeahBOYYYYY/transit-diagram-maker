@@ -18,6 +18,7 @@ import ExportDialog from '../../src/components/dialogs/ExportDialog.vue'
 import IconsPanel from '../../src/components/panels/IconsPanel.vue'
 import * as files from '../../src/core/files'
 import { prefs } from '../../src/stores/prefs'
+import { picking, toHex } from '../../src/core/eyedropper'
 
 let wrappers: VueWrapper[] = []
 function mountIt<T>(c: T, opts: Record<string, unknown> = {}) {
@@ -139,10 +140,13 @@ describe('PropertiesPanel', () => {
     expect(dashed()).toBe(1)
     expect(w.text()).toContain('Gap')
     expect(w.text()).not.toContain('Dash width')
-    await w.find('[data-testid=prop-line-style]').setValue('hollow_dashed')
+    expect(w.text()).toContain('Start offset')
+    expect(w.text()).not.toContain('Dashes')
+    await w.find('[data-testid=prop-line-style]').setValue('inner_dashed')
     await nextTick()
-    expect(w.text()).toContain('Channel')
-    expect(w.text()).toContain('Dash width')
+    expect(w.text()).not.toContain('Channel')
+    expect(w.text()).toContain('Dashes')
+    expect(w.text()).toContain('End offset')
     await w.find('[data-testid=end-cap]').setValue('butt')
     vi.advanceTimersByTime(1000)
     const n = store.node(l.layer_id)
@@ -183,6 +187,17 @@ describe('PropertiesPanel', () => {
     await ta.trigger('change')
     const n = store.node(t)
     expect(n?.type === 'layer' && n.content.kind === 'text' && n.content.text).toBe('Riverside')
+  })
+
+  it('switches the writing direction of text', async () => {
+    const store = freshStore()
+    const t = store.run((e) => e.addText({ text: 'תחנה' }))!
+    store.select([t])
+    const w = mountIt(PropertiesPanel)
+    await w.find('[data-testid=prop-text-direction] [title="Right to left"]').trigger('click')
+    const n = store.node(t)
+    expect(n?.type === 'layer' && n.content.kind === 'text' && n.content.direction).toBe('rtl')
+    expect(store.state.fragments.find((f) => f.id === t)!.svg).toContain('direction="rtl"')
   })
 
   async function setField(w: VueWrapper, label: string, value: string) {
@@ -247,7 +262,7 @@ describe('property help', () => {
 
   it('every property in the Properties panel has help, for every kind of object', async () => {
     const store = freshStore()
-    const l = store.run((e) => e.createLine([{ x: 0, y: 0 }, { x: 9, y: 0 }], { kind: 'hollow_dashed' }))!
+    const l = store.run((e) => e.createLine([{ x: 0, y: 0 }, { x: 9, y: 0 }], { kind: 'inner_dashed' }))!
     const dot = store.run((e) => e.addStation('dot', { x: 2, y: 0 }, { label: false }))!
     const tick = store.run((e) => e.addStation('tick', { x: 5, y: 0 }, { label: false }))!
     const t = store.run((e) => e.addText({}))!
@@ -268,7 +283,7 @@ describe('property help', () => {
     const store = freshStore()
     expectHelpEverywhere(mountIt(DocumentSettingsDialog))
     expectHelpEverywhere(mountIt(ExportDialog))
-    for (const tool of ['pen', 'eraser', 'station', 'text', 'icon'] as const) {
+    for (const tool of ['pen', 'eraser', 'station', 'text'] as const) {
       store.setTool(tool)
       // Mounted per tool: happy-dom can't patch the bar between some tools.
       const w = mount(OptionsBar as never, { attachTo: document.body })
@@ -290,35 +305,15 @@ describe('property help', () => {
 })
 
 describe('ToolsPanel', () => {
-  it('activates tools and shows the pen / eraser flyout on long press', async () => {
-    vi.useFakeTimers()
+  it('has one button per tool, including the eraser, and none for pictograms', async () => {
     const store = freshStore()
     const w = mountIt(ToolsPanel)
-    await w.find('[data-tool=hand]').trigger('pointerdown')
-    await w.find('[data-tool=hand]').trigger('pointerup')
-    expect(store.state.tool).toBe('hand')
-    const pen = w.find('[data-tool=pen]')
-    await pen.trigger('pointerdown')
-    vi.advanceTimersByTime(prefs.longPressMs + 50)
-    await nextTick()
-    await pen.trigger('pointerup')
-    expect(store.state.tool).toBe('hand')
-    expect(w.find('[data-testid=tool-flyout]').exists()).toBe(true)
-    await w.find('[data-testid=tool-flyout] [data-tool=eraser]').trigger('click')
+    expect(w.findAll('.tool').map((b) => b.attributes('data-tool'))).toEqual(['select', 'hand', 'pen', 'eraser', 'station', 'text'])
+    await w.find('[data-tool=eraser]').trigger('click')
     expect(store.state.tool).toBe('eraser')
-    expect(w.find('.tools > .slot .tool[data-tool=eraser]').exists()).toBe(true)
-    vi.useRealTimers()
-  })
-
-  it('opens the flyout on double click and picks a tool on release', async () => {
-    const store = freshStore()
-    const w = mountIt(ToolsPanel)
-    await w.find('[data-tool=pen]').trigger('dblclick')
-    expect(w.find('[data-testid=tool-flyout]').exists()).toBe(true)
-    // Releasing over an item (press-and-drag from the slot) picks it.
-    await w.find('[data-testid=tool-flyout] [data-tool=eraser]').trigger('pointerup')
-    expect(store.state.tool).toBe('eraser')
-    expect(w.find('[data-testid=tool-flyout]').exists()).toBe(false)
+    expect(w.find('[data-tool=eraser]').classes()).toContain('on')
+    await w.find('[data-tool=hand]').trigger('click')
+    expect(store.state.tool).toBe('hand')
   })
 })
 
@@ -379,12 +374,16 @@ describe('OptionsBar', () => {
 })
 
 describe('IconsPanel', () => {
-  it('picks a pictogram for the Icon tool, or for the selected pictograms', async () => {
+  it('adds a pictogram in the middle of the view, or changes the selected pictograms', async () => {
     const store = freshStore()
+    store.state.viewport = { width: 480, height: 240 }
+    store.state.view = { x: 0, y: 0, zoom: 1 }
     const w = mountIt(IconsPanel)
     await w.find('[data-icon=ferry]').trigger('click')
     expect(prefs.icon.icon).toBe('ferry')
-    expect(store.state.tool).toBe('icon')
+    expect(store.state.tool).toBe('select')
+    const added = store.node(store.state.selection[0])
+    expect(added?.type === 'layer' && added.content.kind === 'icon' && added.content).toMatchObject({ icon: 'ferry', pos: { x: 10.5, y: 5.5 } })
     const id = store.run((e) => e.addIcon({ icon: 'wheelchair' }))!
     store.select([id])
     await nextTick()
@@ -460,6 +459,44 @@ describe('form controls', () => {
     await hex.setValue('nope')
     await hex.trigger('blur')
     expect((hex.element as HTMLInputElement).value).toBe('#000000')
+  })
+
+  it('ColorField picks a color from the screen with its eyedropper', async () => {
+    const w = mountIt(ColorField, { props: { modelValue: '#000000' } })
+    const other = document.createElement('div')
+    other.dataset.swatch = ''
+    other.style.background = 'rgb(224, 60, 49)'
+    document.body.appendChild(other)
+    const spy = vi.fn(() => [other])
+    ;(document as unknown as { elementsFromPoint: unknown }).elementsFromPoint = spy
+    await w.find('[data-testid=eyedropper]').trigger('click')
+    expect(picking.value).not.toBeNull()
+    expect(document.body.classList.contains('picking-color')).toBe(true)
+    other.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 5, clientY: 5 }))
+    expect(w.emitted('update:modelValue')!.at(-1)).toEqual(['#e03c31'])
+    // The click that ends the press doesn't reach what was under the pointer.
+    const clicked = vi.fn()
+    other.addEventListener('click', clicked)
+    other.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(clicked).not.toHaveBeenCalled()
+    other.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(clicked).toHaveBeenCalledTimes(1)
+    expect(picking.value).toBeNull()
+    expect(document.body.classList.contains('picking-color')).toBe(false)
+    // Escape stops picking without a color.
+    await w.find('[data-testid=eyedropper]').trigger('click')
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    expect(picking.value).toBeNull()
+    other.remove()
+  })
+
+  it('reads the colors the eyedropper finds', () => {
+    expect(toHex('rgb(0, 152, 212)')).toBe('#0098d4')
+    expect(toHex('rgba(255, 255, 255, 0.5)')).toBe('#ffffff')
+    expect(toHex('#F0A')).toBe('#ff00aa')
+    expect(toHex('rgba(0, 0, 0, 0)')).toBeNull()
+    expect(toHex('none')).toBeNull()
+    expect(toHex('url(#grid-minor)')).toBeNull()
   })
 })
 

@@ -32,6 +32,13 @@ fn text(ed: &Editor, id: Id) -> &TextBox {
     }
 }
 
+fn icon(ed: &Editor, id: Id) -> &Icon {
+    match &ed.layer(id).unwrap().content {
+        Content::Icon(i) => i,
+        other => panic!("not an icon: {other:?}"),
+    }
+}
+
 fn segments_of(ed: &Editor, line_id: Id) -> Vec<Id> {
     let mut out = Vec::new();
     tree::walk_layers(&ed.document().root, &mut |l, _, _| {
@@ -674,14 +681,43 @@ fn duplicate_line_with_station_gets_fresh_ids_and_references() {
 // ------------------------------------------------------------- transforms
 
 #[test]
-fn translate_rounds_grid_content_but_not_text() {
+fn translate_moves_text_with_grid_content_in_whole_cells() {
     let mut ed = Editor::new();
     let l = line(&mut ed, &[c(0, 0), c(3, 0)]);
-    let t = ed.add_text(TextBox { pos: Vec2::new(1.0, 1.0), ..TextBox::default() }).unwrap();
+    let t = ed.add_text(TextBox { pos: Vec2::new(1.2, 1.0), ..TextBox::default() }).unwrap();
     ed.translate(&[l.group_id, t], 1.6, -0.4, false).unwrap();
     assert_eq!(segment(&ed, l.layer_id).points, vec![c(2, 0), c(5, 0)]);
-    let p = text(&ed, t).pos;
-    assert!((p.x - 2.6).abs() < 1e-9 && (p.y - 0.6).abs() < 1e-9);
+    assert_eq!(text(&ed, t).pos, Vec2::new(3.2, 1.0), "keeps its place next to the line");
+}
+
+#[test]
+fn moved_icons_and_text_snap_to_cell_centers() {
+    let mut ed = Editor::new();
+    let i = ed.add_icon(Icon { pos: Vec2::new(2.5, 2.5), ..Icon::default() }).unwrap();
+    // A small drag leaves it in its cell, a larger one moves it a whole cell.
+    ed.translate(&[i], 0.3, 0.1, false).unwrap();
+    assert_eq!(icon(&ed, i).pos, Vec2::new(2.5, 2.5));
+    ed.translate(&[i], 0.7, -1.2, false).unwrap();
+    assert_eq!(icon(&ed, i).pos, Vec2::new(3.5, 1.5));
+    // Content off the grid lands on the nearest cell center.
+    let t = ed.add_text(TextBox { pos: Vec2::new(1.2, 5.7), ..TextBox::default() }).unwrap();
+    ed.translate(&[t], 1.0, 0.0, false).unwrap();
+    assert_eq!(text(&ed, t).pos, Vec2::new(2.5, 5.5));
+    // Moved together, the top-left anchor snaps and the rest keeps its distance.
+    ed.translate(&[i, t], 0.4, 0.4, false).unwrap();
+    assert_eq!(text(&ed, t).pos, Vec2::new(2.5, 5.5));
+    assert_eq!(icon(&ed, i).pos, Vec2::new(3.5, 1.5));
+    ed.translate(&[i, t], 1.0, 1.0, false).unwrap();
+    assert_eq!(text(&ed, t).pos, Vec2::new(3.5, 6.5));
+    assert_eq!(icon(&ed, i).pos, Vec2::new(4.5, 2.5));
+}
+
+#[test]
+fn free_moves_place_icons_and_text_in_tenths() {
+    let mut ed = Editor::new();
+    let i = ed.add_icon(Icon { pos: Vec2::new(2.5, 2.5), ..Icon::default() }).unwrap();
+    ed.translate(&[i], 0.33, -0.01, true).unwrap();
+    assert_eq!(icon(&ed, i).pos, Vec2::new(2.8, 2.5));
 }
 
 #[test]
@@ -771,7 +807,7 @@ fn text_and_icon_positions_have_one_decimal() {
     let mut ed = Editor::new();
     let t = ed.add_text(TextBox { pos: Vec2::new(1.234, 5.678), ..TextBox::default() }).unwrap();
     assert_eq!(text(&ed, t).pos, Vec2::new(1.2, 5.7));
-    ed.translate(&[t], 0.33, -0.01, false).unwrap();
+    ed.translate(&[t], 0.33, -0.01, true).unwrap();
     assert_eq!(text(&ed, t).pos, Vec2::new(1.5, 5.7));
     ed.update_content(t, &json!({"pos": {"x": 0.05}})).unwrap();
     assert_eq!(text(&ed, t).pos.x, 0.1);

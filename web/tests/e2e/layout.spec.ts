@@ -42,39 +42,15 @@ test.describe('workspace layout', () => {
     await expect(page.getByTestId('layers-panel')).toBeVisible()
   })
 
-  test('pen and eraser share a slot with a long-press flyout', async ({ page }) => {
-    const slot = page.locator('[data-testid=tools-panel] .tool[data-tool=pen]')
-    const box = (await slot.boundingBox())!
-    await page.mouse.move(box.x + 10, box.y + 10)
-    await page.mouse.down()
-    await page.waitForTimeout(700)
-    await page.mouse.up()
-    const flyout = page.getByTestId('tool-flyout')
-    await expect(flyout).toBeVisible()
-    await flyout.locator('[data-tool=eraser]').click()
+  test('the eraser has its own tool button and there is no icon tool', async ({ page }) => {
+    const tools = page.locator('[data-testid=tools-panel] .tool')
+    await expect(tools).toHaveCount(6)
+    await expect(page.locator('[data-testid=tools-panel] .tool[data-tool=icon]')).toHaveCount(0)
+    await page.locator('[data-testid=tools-panel] .tool[data-tool=eraser]').click()
     await expect(page.locator('[data-testid=tools-panel] .tool.on')).toHaveAttribute('data-tool', 'eraser')
-    // keyboard shortcut swaps the slot back
-    await page.click('[data-testid=canvas]', { position: { x: 5, y: 5 } })
-    await page.keyboard.press('p')
+    await expect(page.getByTestId('options-bar')).toContainText('Drag across a line')
+    await page.locator('[data-testid=tools-panel] .tool[data-tool=pen]').click()
     await expect(page.locator('[data-testid=tools-panel] .tool.on')).toHaveAttribute('data-tool', 'pen')
-  })
-
-  test('long press, drag onto a flyout item and release picks it', async ({ page }) => {
-    const slot = page.locator('[data-testid=tools-panel] .tool[data-tool=pen]')
-    const box = (await slot.boundingBox())!
-    await page.mouse.move(box.x + 10, box.y + 10)
-    await page.mouse.down()
-    await page.waitForTimeout(700)
-    const item = (await page.getByTestId('tool-flyout').locator('[data-tool=eraser]').boundingBox())!
-    await page.mouse.move(item.x + 20, item.y + item.height / 2, { steps: 5 })
-    await page.mouse.up()
-    await expect(page.getByTestId('tool-flyout')).toHaveCount(0)
-    await expect(page.locator('[data-testid=tools-panel] .tool.on')).toHaveAttribute('data-tool', 'eraser')
-  })
-
-  test('double clicking the pen slot opens its flyout', async ({ page }) => {
-    await page.locator('[data-testid=tools-panel] .tool[data-tool=pen]').dblclick()
-    await expect(page.getByTestId('tool-flyout')).toBeVisible()
   })
 
   test('the properties panel keeps its size until the splitter is dragged', async ({ page }) => {
@@ -83,7 +59,7 @@ test.describe('workspace layout', () => {
     await drawLine(page, [[0, 0], [6, 0]])
     await page.keyboard.press('v')
     await clickCell(page, 2, 0)
-    await page.locator('[data-testid=properties-panel] [data-testid=prop-line-style]').selectOption('hollow_dashed')
+    await page.locator('[data-testid=properties-panel] [data-testid=prop-line-style]').selectOption('inner_dashed')
     expect((await panel.boundingBox())!.height).toBe(empty)
     const split = (await page.getByTestId('dock-splitter').boundingBox())!
     await page.mouse.move(split.x + 50, split.y + 2)
@@ -99,7 +75,6 @@ test.describe('workspace layout', () => {
       ['h', 'hand'],
       ['s', 'station'],
       ['t', 'text'],
-      ['i', 'icon'],
       ['e', 'eraser'],
       ['v', 'select'],
     ]

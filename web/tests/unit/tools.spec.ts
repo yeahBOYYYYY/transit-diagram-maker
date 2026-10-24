@@ -1,7 +1,7 @@
 // Tool behavior driven with synthetic pointer events against the real engine.
 import { describe, expect, it } from 'vitest'
 import { at, freshStore, key } from './helpers'
-import { createTools, pillGrowTargets, selectedPill } from '../../src/tools'
+import { createTools, pillGrowTargets, placeAt, placeIcon, selectedPill } from '../../src/tools'
 import type { EditorStore } from '../../src/stores/editor'
 import type { Id, Rect } from '../../src/core/types'
 import { prefs } from '../../src/stores/prefs'
@@ -167,8 +167,8 @@ describe('station tool', () => {
   })
 })
 
-describe('text and icon tools', () => {
-  it('creates text and opens the inline editor', () => {
+describe('text tool and pictograms', () => {
+  it('creates text in the middle of a cell and opens the inline editor', () => {
     const { store, tools } = setup()
     tools.text.down?.(at(store, 3.1, 2.1))
     expect(store.state.textEdit?.isNew).toBe(true)
@@ -177,25 +177,59 @@ describe('text and icon tools', () => {
     store.finishTextEdit(true)
     const n = store.node(id)
     expect(n?.type === 'layer' && n.content.kind === 'text' && n.content.text).toBe('Central')
-    expect(n?.type === 'layer' && n.content.kind === 'text' && n.content.pos).toEqual({ x: 3, y: 2 })
+    expect(n?.type === 'layer' && n.content.kind === 'text' && n.content.pos).toEqual({ x: 3.5, y: 2.5 })
     // a single undo removes the whole creation
     store.undo()
     expect(store.state.fragments).toHaveLength(0)
   })
 
-  it('drops icons centered in a cell at the station size', () => {
+  it('places text off the grid with Alt', () => {
     const { store, tools } = setup()
-    prefs.icon.icon = 'ferry'
-    tools.icon.down?.(at(store, 2.2, 3.9))
+    tools.text.down?.(at(store, 3.1, 2.1, { alt: true }))
+    const id = store.state.textEdit!.id
+    store.finishTextEdit(true)
+    const n = store.node(id)
+    expect(n?.type === 'layer' && n.content.kind === 'text' && n.content.pos).toEqual({ x: 3.1, y: 2.1 })
+  })
+
+  it('drops pictograms centered in a cell at the station size', () => {
+    const { store } = setup()
+    placeIcon(store, 'ferry', placeAt(at(store, 2.2, 3.9)))
     const n = store.node(store.state.selection[0])
     expect(n?.type === 'layer' && n.content.kind === 'icon' && n.content).toMatchObject({
       icon: 'ferry',
       pos: { x: 2.5, y: 3.5 },
       size: store.state.settings.station_outer_radius * 2,
     })
-    tools.icon.down?.(at(store, 2.2, 3.9, { alt: true }))
+    placeIcon(store, 'ferry', placeAt(at(store, 2.2, 3.9, { alt: true })))
     const m = store.node(store.state.selection[0])
     expect(m?.type === 'layer' && m.content.kind === 'icon' && m.content.pos).toEqual({ x: 2.2, y: 3.9 })
+  })
+
+  it('dragged pictograms and text move from cell to cell, or freely with Alt', () => {
+    const { store, tools } = setup()
+    const i = store.run((e) => e.addIcon({ pos: { x: 2.5, y: 2.5 } }))!
+    const t = store.run((e) => e.addText({ pos: { x: 6.2, y: 1.3 } }))!
+    const pos = (id: Id) => {
+      const n = store.node(id)
+      return n?.type === 'layer' && (n.content.kind === 'icon' || n.content.kind === 'text') ? n.content.pos : null
+    }
+    const drag = (id: Id, from: [number, number], to: [number, number], alt = false) => {
+      tools.select.down?.(at(store, from[0], from[1], { hitId: id }))
+      tools.select.move?.(at(store, to[0], to[1], { hitId: id, alt }), true)
+      tools.select.up?.(at(store, to[0], to[1], { alt }))
+    }
+    // A small drag keeps the pictogram in its cell, a longer one moves whole cells.
+    drag(i, [2.5, 2.5], [2.8, 2.6])
+    expect(pos(i)).toEqual({ x: 2.5, y: 2.5 })
+    drag(i, [2.5, 2.5], [4.3, 3.1])
+    expect(pos(i)).toEqual({ x: 4.5, y: 3.5 })
+    // Text off the grid snaps to the nearest cell center.
+    drag(t, [6.2, 1.3], [7.2, 1.3])
+    expect(pos(t)).toEqual({ x: 7.5, y: 1.5 })
+    // Alt moves in tenths of a cell.
+    drag(i, [4.5, 3.5], [4.83, 3.21], true)
+    expect(pos(i)).toEqual({ x: 4.8, y: 3.2 })
   })
 })
 
@@ -321,7 +355,8 @@ describe('selection tool', () => {
     store.select([t])
     expect(tools.select.key?.(key('ArrowRight', { shiftKey: true }))).toBe(true)
     const n = store.node(t)
-    expect(n?.type === 'layer' && n.content.kind === 'text' && n.content.pos.x).toBe(6)
+    // Nudged off-grid text lands on a cell center like any other move.
+    expect(n?.type === 'layer' && n.content.kind === 'text' && n.content.pos).toEqual({ x: 6.5, y: 1.5 })
     click(store, tools.select, 20, 20)
     expect(store.state.selection).toEqual([])
     store.select([t])
@@ -329,7 +364,7 @@ describe('selection tool', () => {
     tools.select.move?.(at(store, 9, 1, { hitId: t }), true)
     tools.select.key?.(key('Escape'))
     const m = store.node(t)
-    expect(m?.type === 'layer' && m.content.kind === 'text' && m.content.pos.x).toBe(6)
+    expect(m?.type === 'layer' && m.content.kind === 'text' && m.content.pos.x).toBe(6.5)
   })
 
   it('double clicking text starts editing', () => {

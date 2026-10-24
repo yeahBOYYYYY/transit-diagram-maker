@@ -6,18 +6,21 @@
 export const HELP = {
   // Selection
   position:
-    'Position in grid cells. Text and pictograms use their anchor point, stations their center, lines the top-left cell center they pass through, and several objects the top-left-most of those. Lines move in whole cells; moving a station by a fraction of a cell takes it off its line.',
+    'Position in grid cells. Text and pictograms use their anchor point, stations their center, lines the top-left cell center they pass through, and several objects the top-left-most of those. Dragged objects snap to the cells (hold Alt to move in steps of 0.1 cell). Typed values can use 0.1 steps, except for lines, which move in whole cells; moving a station by a fraction of a cell takes it off its line.',
 
   // Lines
   'line.target': 'Draw a new line, or add a disconnected segment to an existing line. New segments take that line\'s style.',
   'line.color': 'Main color of the line. It is shared by all segments of the line, so changing it recolors the whole line.',
   'line.kind':
-    'Plain: a solid line. Hollow: a line with an inner channel. Dashed: the line is broken into dashes with empty gaps. Hollow dashed: dashes run down the channel of a hollow line.',
+    'Plain: a solid line. Hollow: a line with an inner channel. Dashed: the line is broken into dashes with empty gaps. Inner dashed: a solid line with thinner dashes of another color running down its middle.',
   'line.channel': 'Color of the inner channel of a hollow line.',
+  'line.dash_color': 'Color of the dashes running down the middle of an inner dashed line.',
   'line.channel_width': 'Width of the inner channel as a percentage of the line width.',
   'line.dash_length': 'Length of each dash, in cells. Dashes and gaps are stretched slightly so the line starts and ends with a full dash.',
   'line.dash_gap': 'Space between two dashes, in cells. 0 makes the line solid.',
-  'line.dash_width': 'Width of the dashes inside a hollow dashed line, as a percentage of the line width.',
+  'line.dash_width': 'Width of the dashes inside an inner dashed line, as a percentage of the line width.',
+  'line.dash_start_offset': 'Length at the start of the line where the dashes do not begin yet, in cells. That part looks like a plain line. 0 starts the dashes right at the line end.',
+  'line.dash_end_offset': 'Length at the end of the line where the dashes have already stopped, in cells. That part looks like a plain line. 0 runs the dashes up to the line end.',
   'line.caps': 'Shape of the line ends. Round ends follow the document\'s cap roundness; butt ends are square and fill the end cell.',
   'line.points': 'The cells where the segment starts, turns and ends.',
   'line.style_scope':
@@ -41,13 +44,15 @@ export const HELP = {
   'text.font': 'Font family, bold and italic.',
   'text.color': 'Text color.',
   'text.align': 'How the text lines up with its position: left edge, center or right edge.',
+  'text.direction': 'Writing direction. Right to left orders the words for languages such as Hebrew and Arabic, including mixed runs with numbers and Latin words. It does not change the alignment.',
   'text.size': 'Font size, in cells.',
   'text.rotation': 'Rotation in degrees, in steps of 45°.',
 
   // Pictograms
   'icon.icon': 'Which pictogram to show. Pick another one in the Icons panel.',
   'icon.panel':
-    'Clicking a pictogram picks it for the Icon tool, or changes the selected pictograms to it. Dragging a pictogram onto the canvas places it in the cell under the pointer (hold Alt to place it exactly under the pointer).',
+    'Clicking a pictogram changes the selected pictograms to it, or adds it in the middle of the view when no pictogram is selected. Dragging a pictogram onto the canvas places it in the cell under the pointer (hold Alt to place it exactly under the pointer).',
+  'icon.defaults': 'Colors and size given to pictograms you add from this panel.',
   'icon.upload': 'SVG files you uploaded into this document. They are saved inside the file. Remove them in Document ▸ Fonts & Icons.',
   'icon.color': 'Color of the pictogram symbol.',
   'icon.background': 'Color of the rounded tile behind the symbol.',
@@ -79,7 +84,6 @@ export const HELP = {
 
   // Preferences
   'prefs.historyLimit': 'How many steps Undo can go back.',
-  'prefs.longPressMs': 'How long to hold the pen tool button before its hidden tools appear.',
   'prefs.dragThreshold': 'How far the pointer must move before a click becomes a drag, in screen pixels.',
   'prefs.autoSelect': 'What a click on the canvas selects: the layer under the pointer, or its outermost group.',
   'prefs.zoomStep': 'Zoom factor of one wheel step or zoom command.',
@@ -89,7 +93,6 @@ export const HELP = {
   'prefs.showThumbnails': 'Show a small preview of each layer in the Layers panel.',
   'prefs.nudge': 'How far the arrow keys move the selection, in cells.',
   'prefs.bigNudge': 'How far Shift + arrow keys move the selection, in cells.',
-  'prefs.textSnap': 'Text and pictograms snap to this step while dragged, in cells. Hold Alt to move in 0.1 steps.',
   'prefs.eraserSize': 'Default eraser width, in cells.',
   'prefs.canvasBackground': 'Color of the drawing area.',
   'prefs.pasteboardColor': 'Color around the drawing area.',

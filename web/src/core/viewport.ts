@@ -98,7 +98,3 @@ export function brush(c: Cell, size: number): Cell[] {
   for (let dy = 0; dy < s; dy++) for (let dx = 0; dx < s; dx++) out.push({ x: c.x + r0 + dx, y: c.y + r0 + dy })
   return out
 }
-
-export function snap(v: number, step: number): number {
-  return step > 0 ? Math.round(v / step) * step : v
-}

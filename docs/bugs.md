@@ -1,5 +1,14 @@
 # Bugs & Teaks
 
+## 24/10/2026 - Commit 7d6e338
+
+1. Getting to the "Erase tool" has funky behavior, it should much other programs like Photoshop or Gimp or Inkscape in terms of feeling.
+2. There is still an "Icon tool" and also a panel for icons, it's weird to have both at the same time, only the panel is enough.
+3. When being moved icons move only tenth of a cell instead of snapping to a full cell, we need to make all objects snap to cells by default (unless otherwise stated) and add tests for it.
+4. In the styles of a transit line, the style of "Hollow dashed" shouldn't exists, instead I want an inner dashed version without the hollow surrounding it (meaning just a regular line with inner dashed line!). Also for all dashed variants it would be good to add option for offset from start and (if needed) from finish, to let the user select the offset from where the dashing should start inside the line itself (meaning how much room should the dash affect take from the start and end of the line).
+5. Add an option for RTL and LTR alignment for text (not just if the text should be aligned left right or center).
+6. Add a color picker from all color choices (meaning a tool to pick a color from the screen from it's hex value!)
+
 ## 24/10/2026 - Commit db38ed1
 
 1. All line segments of the same line must share a style, this is weird since there are lines in which the style will change along the line, in those cases we want to seperate the line into segments with different styles.

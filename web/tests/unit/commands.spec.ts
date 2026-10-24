@@ -20,7 +20,7 @@ describe('commands', () => {
     runAction(store, 'tool.station')
     expect(store.state.tool).toBe('station')
     runAction(store, 'tool.eraser')
-    expect(store.state.penSlot).toBe('eraser')
+    expect(store.state.tool).toBe('eraser')
   })
 
   it('groups, ungroups and deletes the selection', () => {

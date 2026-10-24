@@ -34,7 +34,8 @@ export function selectionOnGrid(store: EditorStore): boolean {
 /**
  * Move the selection so its position (see `Engine.position`) gets `value` on
  * one axis. Lines move in whole cells; stations moved by a fraction of a cell
- * leave their line, like an Alt-drag.
+ * leave their line, like an Alt-drag. Text and pictograms go exactly where
+ * typed instead of snapping to a cell center.
  */
 export function moveSelectionTo(e: Engine, store: EditorStore, axis: 'x' | 'y', value: number): void {
   const sel = store.state.selection
@@ -45,7 +46,9 @@ export function moveSelectionTo(e: Engine, store: EditorStore, axis: 'x' | 'y', 
   const dx = axis === 'x' ? round(value - pos.x) : 0
   const dy = axis === 'y' ? round(value - pos.y) : 0
   if (dx === 0 && dy === 0) return
-  e.translate(sel, dx, dy, !Number.isInteger(dx) || !Number.isInteger(dy))
+  const kinds = leafIds(store.state.tree, sel).map((id) => findItem(store.state.tree, id)?.kind)
+  const gridBound = kinds.some((k) => k === 'line' || k === 'station')
+  e.translate(sel, dx, dy, !gridBound || !Number.isInteger(dx) || !Number.isInteger(dy))
 }
 
 export function nudgeSelection(store: EditorStore, dx: number, dy: number): void {
@@ -93,7 +96,6 @@ const TOOL_ACTIONS: Partial<Record<ActionId, ToolId>> = {
   'tool.eraser': 'eraser',
   'tool.station': 'station',
   'tool.text': 'text',
-  'tool.icon': 'icon',
 }
 
 /**

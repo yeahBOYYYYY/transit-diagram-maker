@@ -7,7 +7,6 @@ import {
   rectFromPoints,
   rectsIntersect,
   screenToWorld,
-  snap,
   unionRects,
   worldToScreen,
   zoomAt,
@@ -64,9 +63,5 @@ describe('rects and cells', () => {
     expect(b3).toHaveLength(9)
     expect(b3).toContainEqual({ x: -1, y: -1 })
     expect(b3).toContainEqual({ x: 1, y: 1 })
-  })
-  it('snaps values', () => {
-    expect(snap(1.13, 0.25)).toBe(1.25)
-    expect(snap(1.13, 0)).toBe(1.13)
   })
 })

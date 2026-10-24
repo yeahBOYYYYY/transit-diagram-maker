@@ -1,6 +1,6 @@
 // Application preferences (not part of the document), persisted in localStorage.
 import { reactive, watch } from 'vue'
-import type { ExportOptions, Icon, LineStyle, StationKind, StationOptions, TextAlign } from '../core/types'
+import type { ExportOptions, Icon, LineStyle, StationKind, StationOptions, TextAlign, TextDirection } from '../core/types'
 import { DEFAULT_SHORTCUTS, type ActionId } from '../core/actions'
 import { FONT_FAMILIES } from '../core/fonts'
 
@@ -9,11 +9,9 @@ export interface Prefs {
   zoomStep: number
   minZoom: number
   maxZoom: number
-  longPressMs: number
   nudge: number
   bigNudge: number
   dragThreshold: number
-  textSnap: number
   /** Last used SVG export options. */
   export: ExportOptions
   canvasBackground: string
@@ -33,7 +31,7 @@ export interface Prefs {
   shortcuts: Record<ActionId, string>
   line: LineStyle
   station: StationOptions & { kind: StationKind }
-  text: { size: number; color: string; font_family: string; bold: boolean; italic: boolean; align: TextAlign }
+  text: { size: number; color: string; font_family: string; bold: boolean; italic: boolean; align: TextAlign; direction: TextDirection }
   icon: Pick<Icon, 'icon' | 'color' | 'background'> & { size: number | null }
 }
 
@@ -44,11 +42,9 @@ export function defaultPrefs(): Prefs {
     zoomStep: 1.15,
     minZoom: 0.05,
     maxZoom: 16,
-    longPressMs: 450,
     nudge: 1,
     bigNudge: 5,
     dragThreshold: 3,
-    textSnap: 0.5,
     export: { cell_px: 24, margin: 1, background: '#ffffff' },
     canvasBackground: '#ffffff',
     gridColor: '#ececec',
@@ -72,6 +68,8 @@ export function defaultPrefs(): Prefs {
       dash_length: 1,
       dash_gap: 0.5,
       dash_width_pct: 30,
+      dash_start_offset: 0,
+      dash_end_offset: 0,
       start_cap: 'round',
       end_cap: 'round',
     },
@@ -86,7 +84,7 @@ export function defaultPrefs(): Prefs {
       label: true,
       label_color: '#1a1a1a',
     },
-    text: { size: 0.75, color: '#1a1a1a', font_family: FONT_FAMILIES[0], bold: false, italic: false, align: 'middle' },
+    text: { size: 0.75, color: '#1a1a1a', font_family: FONT_FAMILIES[0], bold: false, italic: false, align: 'middle', direction: 'ltr' },
     icon: { icon: 'wheelchair', color: '#ffffff', background: '#1d4f91', size: null },
   }
 }
@@ -111,8 +109,8 @@ export function loadPrefs(storage: Pick<Storage, 'getItem'> | null = safeStorage
     const raw = storage?.getItem(KEY)
     if (!raw) return defaultPrefs()
     const p = deepMerge(defaultPrefs(), JSON.parse(raw))
-    // Positions have a precision of 0.1 cell, so the snap step must be a multiple of it.
-    p.textSnap = Math.max(0.1, Math.round(p.textSnap * 10) / 10)
+    // The hollow dashed style was replaced by the inner dashed one.
+    if ((p.line.kind as string) === 'hollow_dashed') p.line.kind = 'inner_dashed'
     return p
   } catch {
     return defaultPrefs()

@@ -3,7 +3,7 @@
 //! (cell units × `DocSettings::cell_px`).
 
 use crate::assets::{Assets, FontAsset};
-use crate::geom::{fit_dashes, fmt_num, rounded_polyline, rounded_polyline_len, Cell, Rect, Vec2};
+use crate::geom::{dash_array, fmt_num, rounded_polyline, rounded_polyline_len, Cell, Rect, Vec2};
 use crate::icons;
 use crate::model::*;
 use crate::tree;
@@ -89,24 +89,32 @@ pub fn line_svg(points: &[Cell], style: &LineStyle, settings: &DocSettings) -> S
     // Requested dash and gap in pixels; a dash is never shorter than a cap.
     let dash = (style.dash_length * g).max(h).max(0.5);
     let gap = (style.dash_gap * g).max(0.0);
-    if style.kind == StrokeKind::Dashed && gap > 0.0 {
-        // The caps reach half a line width past the end cells, so the dash
-        // pattern covers them too: it starts one cap length before the path
-        // and the caps complete the first and last dash.
-        let (d, gp) = fit_dashes(rounded_polyline_len(&pts, radius) + 2.0 * h, dash, gap);
-        let _ = write!(
-            s,
-            r#"<path d="{body}" fill="none" stroke="{color}" stroke-width="{}" stroke-linejoin="round" stroke-dasharray="{} {}" stroke-dashoffset="{}"/>"#,
-            n(w),
-            n(d),
-            n(gp),
-            n(h)
-        );
+    let (lead, trail) = (style.dash_start_offset * g, style.dash_end_offset * g);
+    let dash_attrs = |v: &[f64]| v.iter().map(|x| n(*x)).collect::<Vec<_>>().join(" ");
+    // The caps reach half a line width past the end cells, so the dash
+    // pattern of a dashed line covers them too: it starts one cap length
+    // before the path and the caps complete the first and last dash.
+    let outer = if style.kind == StrokeKind::Dashed && gap > 0.0 {
+        dash_array(rounded_polyline_len(&pts, radius) + 2.0 * h, lead, trail, dash, gap, true)
     } else {
-        let _ = write!(s, r#"<path d="{body}" fill="none" stroke="{color}" stroke-width="{}" stroke-linejoin="round"/>"#, n(w));
+        None
+    };
+    match outer {
+        Some(v) => {
+            let _ = write!(
+                s,
+                r#"<path d="{body}" fill="none" stroke="{color}" stroke-width="{}" stroke-linejoin="round" stroke-dasharray="{}" stroke-dashoffset="{}"/>"#,
+                n(w),
+                dash_attrs(&v),
+                n(h)
+            );
+        }
+        None => {
+            let _ = write!(s, r#"<path d="{body}" fill="none" stroke="{color}" stroke-width="{}" stroke-linejoin="round"/>"#, n(w));
+        }
     }
     let _ = write!(s, r#"<path d="{}" fill="{color}"/>"#, caps(h));
-    if matches!(style.kind, StrokeKind::Hollow | StrokeKind::HollowDashed) {
+    if style.kind == StrokeKind::Hollow {
         let wi = w * (style.inner_width_pct / 100.0).clamp(0.0, 1.0);
         if wi > 0.0 {
             let inner = esc(&style.inner_color);
@@ -118,17 +126,18 @@ pub fn line_svg(points: &[Cell], style: &LineStyle, settings: &DocSettings) -> S
             );
         }
     }
-    if style.kind == StrokeKind::HollowDashed {
-        // Dashes run down the channel from the first to the last cell center.
+    if style.kind == StrokeKind::InnerDashed {
+        // Dashes of the inner color run down the middle of the line, from the
+        // first to the last cell center.
         let wd = w * (style.dash_width_pct / 100.0).clamp(0.0, 1.0);
-        if wd > 0.0 {
-            let (d, gp) = fit_dashes(rounded_polyline_len(&pts, radius), (style.dash_length * g).max(0.5), gap);
+        let pattern = dash_array(rounded_polyline_len(&pts, radius), lead, trail, (style.dash_length * g).max(0.5), gap, false);
+        if let (true, Some(v)) = (wd > 0.0, pattern) {
             let _ = write!(
                 s,
-                r#"<path d="{body}" fill="none" stroke="{color}" stroke-width="{}" stroke-dasharray="{} {}"/>"#,
+                r#"<path d="{body}" fill="none" stroke="{}" stroke-width="{}" stroke-dasharray="{}"/>"#,
+                esc(&style.inner_color),
                 n(wd),
-                n(d),
-                n(gp)
+                dash_attrs(&v)
             );
         }
     }
@@ -250,10 +259,13 @@ pub fn text_svg(t: &TextBox, settings: &DocSettings) -> String {
     let p = t.pos.scale(g);
     let fs = t.size * g;
     let (lines, _, _) = text_metrics(t, g);
-    let anchor = match t.align {
-        TextAlign::Start => "start",
-        TextAlign::Middle => "middle",
-        TextAlign::End => "end",
+    // `align` is visual (start = left), while SVG anchors follow the writing
+    // direction, so right-to-left text swaps them.
+    let rtl = t.direction == TextDirection::Rtl;
+    let anchor = match (t.align, rtl) {
+        (TextAlign::Middle, _) => "middle",
+        (TextAlign::Start, false) | (TextAlign::End, true) => "start",
+        (TextAlign::End, false) | (TextAlign::Start, true) => "end",
     };
     let mut s = format!(
         r#"<text x="{}" y="{}" font-size="{}" font-family="{}" fill="{}" text-anchor="{anchor}" dominant-baseline="central""#,
@@ -263,6 +275,9 @@ pub fn text_svg(t: &TextBox, settings: &DocSettings) -> String {
         esc(&t.font_family),
         esc(&t.color)
     );
+    if rtl {
+        s.push_str(r#" direction="rtl""#);
+    }
     if t.bold {
         s.push_str(r#" font-weight="bold""#);
     }
@@ -524,7 +539,7 @@ mod tests {
     }
 
     #[test]
-    fn hollow_and_hollow_dashed_layers() {
+    fn hollow_and_inner_dashed_layers() {
         let pts = [Cell::new(0, 0), Cell::new(4, 0), Cell::new(6, 2)];
         let hollow = LineStyle { kind: StrokeKind::Hollow, ..LineStyle::default() };
         let s = line_svg(&pts, &hollow, &settings());
@@ -532,12 +547,37 @@ mod tests {
         assert_eq!(s.matches("<path").count(), 4);
         assert!(s.contains("#ffffff"));
         assert!(!s.contains("dasharray"));
-        let dashed = LineStyle { kind: StrokeKind::HollowDashed, ..LineStyle::default() };
+        // A plain line (body and caps) with dashes of the inner color on top.
+        let dashed = LineStyle { kind: StrokeKind::InnerDashed, ..LineStyle::default() };
         let s = line_svg(&pts, &dashed, &settings());
         parse(&s);
-        assert_eq!(s.matches("<path").count(), 5);
-        assert!(s.contains("stroke-dasharray"), "{s}");
+        assert_eq!(s.matches("<path").count(), 3);
+        let inner = s.split("<path").nth(3).unwrap();
+        assert!(inner.contains(r##"stroke="#ffffff""##) && inner.contains("stroke-dasharray"), "{s}");
         assert!(!s.contains("stroke-dashoffset"), "{s}");
+    }
+
+    #[test]
+    fn dash_offsets_keep_the_line_ends_solid() {
+        let s = settings();
+        let style = LineStyle { kind: StrokeKind::Dashed, dash_start_offset: 2.0, dash_end_offset: 1.0, ..LineStyle::default() };
+        let m = line_svg(&[Cell::new(0, 0), Cell::new(10, 0)], &style, &s);
+        parse(&m);
+        let (first, _, offset) = dash_pattern(&m);
+        assert_eq!((first, offset), (48.0, 12.0), "two solid cells from the start cap");
+        let style = LineStyle { kind: StrokeKind::InnerDashed, dash_start_offset: 2.0, ..LineStyle::default() };
+        let m = line_svg(&[Cell::new(0, 0), Cell::new(10, 0)], &style, &s);
+        assert!(m.contains(r#"stroke-dasharray="0 48 "#), "no inner dashes over the first two cells: {m}");
+    }
+
+    #[test]
+    fn right_to_left_text_keeps_its_visual_alignment() {
+        let t = TextBox { text: "שלום".into(), align: TextAlign::Start, direction: TextDirection::Rtl, ..TextBox::default() };
+        let m = text_svg(&t, &settings());
+        parse(&m);
+        assert!(m.contains(r#"direction="rtl""#) && m.contains(r#"text-anchor="end""#), "{m}");
+        let m = text_svg(&TextBox { align: TextAlign::Start, ..TextBox::default() }, &settings());
+        assert!(!m.contains("direction") && m.contains(r#"text-anchor="start""#), "{m}");
     }
 
     /// (dash, gap, offset) of the first dashed path in the markup.

@@ -1,7 +1,7 @@
 // Pointer and keyboard behavior of each canvas tool.
 import type { Cell, Id, Rect, Vec2 } from '../core/types'
 import { ancestorsOf, findItem, leafIds } from '../core/tree'
-import { CELL_PX, brush, cellsBetween, rectFromPoints, rectsIntersect, snap } from '../core/viewport'
+import { CELL_PX, brush, cellsBetween, rectFromPoints, rectsIntersect } from '../core/viewport'
 import type { EditorStore, ToolId } from '../stores/editor'
 import { prefs } from '../stores/prefs'
 import { nudgeSelection } from '../stores/commands'
@@ -169,12 +169,9 @@ function selectTool(store: EditorStore, boundsOf: BoundsProvider): Tool {
         mode = 'moving'
       }
       if (mode === 'moving') {
+        // The engine snaps the move to the cells (Alt: free, in tenths of a cell).
         let dx = (p.world.x - start.world.x) / g
         let dy = (p.world.y - start.world.y) / g
-        if (!p.alt) {
-          dx = snap(dx, prefs.textSnap)
-          dy = snap(dy, prefs.textSnap)
-        }
         if (p.shift) {
           if (Math.abs(dx) > Math.abs(dy)) dy = 0
           else dx = 0
@@ -492,9 +489,7 @@ function textTool(store: EditorStore): Tool {
         store.startTextEdit(p.hitId)
         return
       }
-      const pos = p.alt
-        ? p.cells
-        : { x: snap(p.cells.x, prefs.textSnap), y: snap(p.cells.y, prefs.textSnap) }
+      const pos = placeAt(p)
       const e = store.engine.value
       e.begin()
       const id = store.run((en) => en.addText({ ...prefs.text, pos, text: 'Text' }))
@@ -509,43 +504,30 @@ function textTool(store: EditorStore): Tool {
 
 // ----------------------------------------------------------------- icon
 
-/** Where a pictogram dropped at `p` goes: its cell center, or exactly under the pointer with Alt. */
-export function iconPlace(p: Pick<PointerInfo, 'alt' | 'cells' | 'cell'>): Vec2 {
+/** Where text or a pictogram placed at `p` goes: its cell center, or exactly under the pointer with Alt. */
+export function placeAt(p: Pick<PointerInfo, 'alt' | 'cells' | 'cell'>): Vec2 {
   return p.alt ? p.cells : { x: p.cell.x + 0.5, y: p.cell.y + 0.5 }
 }
 
-/** Add a pictogram with the icon tool's colors and size, and select it. */
+/** Size of new pictograms, in cells. */
+export function newIconSize(store: EditorStore): number {
+  const s = store.state.settings
+  return prefs.icon.size ?? s.icon_size ?? s.station_outer_radius * 2
+}
+
+/** Add a pictogram with the Icons panel's colors and size, and select it. */
 export function placeIcon(store: EditorStore, icon: string, pos: Vec2): void {
-  const s = store.state
-  const size = prefs.icon.size ?? s.settings.icon_size ?? s.settings.station_outer_radius * 2
-  const id = store.run((e) => e.addIcon({ icon, color: prefs.icon.color, background: prefs.icon.background, size, pos }))
+  const id = store.run((e) => e.addIcon({ icon, color: prefs.icon.color, background: prefs.icon.background, size: newIconSize(store), pos }))
   if (id !== undefined) store.select([id])
 }
 
-function iconTool(store: EditorStore): Tool {
-  const s = store.state
-  const place = iconPlace
-  return {
-    cursor: () => 'copy',
-    move(p) {
-      const g = CELL_PX
-      const size = (prefs.icon.size ?? s.settings.icon_size ?? s.settings.station_outer_radius * 2) * g
-      const c = place(p)
-      const x = c.x * g - size / 2
-      const y = c.y * g - size / 2
-      s.overlay = {
-        ...s.overlay,
-        preview: `<rect x="${x}" y="${y}" width="${size}" height="${size}" rx="${size * 0.2}" fill="${prefs.icon.background}" opacity="0.45"/>`,
-        cells: [],
-      }
-    },
-    down(p) {
-      if (p.button === 0) placeIcon(store, prefs.icon.icon, place(p))
-    },
-    reset() {
-      clearOverlay(store)
-    },
-  }
+/** Outline shown where a pictogram dragged from the Icons panel would land. */
+export function iconPreview(store: EditorStore, pos: Vec2): string {
+  const g = CELL_PX
+  const size = newIconSize(store) * g
+  const x = pos.x * g - size / 2
+  const y = pos.y * g - size / 2
+  return `<rect x="${x}" y="${y}" width="${size}" height="${size}" rx="${size * 0.2}" fill="${prefs.icon.background}" opacity="0.45"/>`
 }
 
 export function createTools(store: EditorStore, boundsOf: BoundsProvider): Record<ToolId, Tool> {
@@ -556,6 +538,5 @@ export function createTools(store: EditorStore, boundsOf: BoundsProvider): Recor
     eraser: eraserTool(store),
     station: stationTool(store),
     text: textTool(store),
-    icon: iconTool(store),
   }
 }

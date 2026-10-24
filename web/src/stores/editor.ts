@@ -10,7 +10,7 @@ import { fitRect, unionRects, zoomAt, type View } from '../core/viewport'
 import { prefs } from './prefs'
 import { docNameOf, type FileHandle } from '../core/files'
 
-export type ToolId = 'select' | 'hand' | 'pen' | 'eraser' | 'station' | 'text' | 'icon'
+export type ToolId = 'select' | 'hand' | 'pen' | 'eraser' | 'station' | 'text'
 
 export interface Overlay {
   /** Markup drawn in world space above the document (pen / pill previews). */
@@ -39,7 +39,6 @@ export function createEditor(engine = new Engine()) {
     assets: engine.assetList() as AssetList,
     selection: [] as Id[],
     tool: 'select' as ToolId,
-    penSlot: 'pen' as 'pen' | 'eraser',
     /** Line the pen adds segments to (its line id), or null to start a new line. */
     penTarget: null as Id | null,
     transformMode: 'move' as 'move' | 'rotate',
@@ -209,7 +208,6 @@ export function createEditor(engine = new Engine()) {
       state.penTarget = state.selection.length === 1 ? lineIdOf(state.selection[0]) : null
     }
     state.tool = tool
-    if (tool === 'pen' || tool === 'eraser') state.penSlot = tool
     state.overlay = { preview: '', marquee: null, cells: [], cellsColor: prefs.selectionColor }
     state.transformMode = 'move'
   }

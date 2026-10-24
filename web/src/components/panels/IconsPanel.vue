@@ -1,17 +1,22 @@
 <script setup lang="ts">
 // Every pictogram in a grid: the built-in library, the icons uploaded into
-// the document and a tile to upload another SVG. Clicking a pictogram picks
-// it (for the Icon tool, and for the selected pictograms); dragging one onto
-// the canvas places it there.
+// the document and a tile to upload another SVG. Clicking a pictogram changes
+// the selected pictograms to it, or adds it in the middle of the view;
+// dragging one onto the canvas places it there. This panel is the only way to
+// add pictograms, so it also holds the colors and size new ones get.
 import { computed } from 'vue'
 import HelpTip from '../ui/HelpTip.vue'
+import ColorField from '../ui/ColorField.vue'
+import NumberField from '../ui/NumberField.vue'
 import { Engine } from '../../core/engine'
 import { HELP } from '../../core/help'
 import type { IconInfo, Id } from '../../core/types'
 import { leafIds } from '../../core/tree'
+import { CELL_PX, cellAt, screenToWorld } from '../../core/viewport'
 import { useEditor } from '../../stores/editor'
 import { prefs } from '../../stores/prefs'
 import { uploadIcon } from '../../stores/commands'
+import { placeAt, placeIcon } from '../../tools'
 
 const store = useEditor()
 const s = store.state
@@ -26,7 +31,7 @@ const selectedIcons = computed<Id[]>(() => {
   })
 })
 
-/** The highlighted symbol: the selected pictogram's, or the Icon tool's. */
+/** The highlighted symbol: the selected pictogram's, or the last one used. */
 const current = computed(() => {
   const ids = selectedIcons.value
   const n = ids.length ? store.node(ids[0]) : null
@@ -36,8 +41,14 @@ const current = computed(() => {
 function choose(icon: IconInfo): void {
   prefs.icon.icon = icon.name
   const ids = selectedIcons.value
-  if (ids.length) store.run((e) => ids.forEach((id) => e.updateContent(id, { icon: icon.name })))
-  else store.setTool('icon')
+  if (ids.length) {
+    store.run((e) => ids.forEach((id) => e.updateContent(id, { icon: icon.name })))
+    return
+  }
+  // Add it in the cell in the middle of the view.
+  const { width, height } = s.viewport
+  const cells = screenToWorld(s.view, width / 2, height / 2)
+  placeIcon(store, icon.name, placeAt({ alt: false, cells, cell: cellAt(cells, CELL_PX) }))
 }
 
 function onDragStart(icon: IconInfo, e: DragEvent): void {
@@ -54,9 +65,19 @@ async function upload(): Promise<void> {
 <template>
   <div class="icons" data-testid="icons-panel">
     <p class="dim hint">
-      Click a pictogram to use it{{ selectedIcons.length ? ' for the selection' : ' with the Icon tool' }}, or drag it onto the canvas.
+      Click a pictogram to {{ selectedIcons.length ? 'use it for the selection' : 'add it in the middle of the view' }}, or drag it onto the canvas.
       <HelpTip :text="HELP['icon.panel']" />
     </p>
+    <div class="section-title">New pictograms<HelpTip :text="HELP['icon.defaults']" /></div>
+    <div class="defaults">
+      <ColorField v-model="prefs.icon.color" label="Glyph" :help="HELP['icon.color']" />
+      <ColorField v-model="prefs.icon.background" label="Tile" :help="HELP['icon.background']" />
+      <label class="opt">
+        <input type="checkbox" :checked="prefs.icon.size === null" @change="prefs.icon.size = ($event.target as HTMLInputElement).checked ? null : 1.24" />
+        <span class="dim">Match station size<HelpTip :text="HELP['icon.size_default']" /></span>
+      </label>
+      <NumberField v-if="prefs.icon.size !== null" v-model="prefs.icon.size" label="Size" :min="0.1" :step="0.1" :width="40" unit="cells" :help="HELP['icon.size']" />
+    </div>
     <div class="section-title">Library</div>
     <div class="grid">
       <button
@@ -122,6 +143,17 @@ async function upload(): Promise<void> {
   border-bottom: 1px solid var(--c-border-soft);
   font-weight: 600;
   color: var(--c-text-bright);
+}
+.defaults {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 .grid {
   display: grid;

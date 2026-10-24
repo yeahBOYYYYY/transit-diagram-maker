@@ -157,3 +157,9 @@ select {
 ::-webkit-scrollbar-thumb:hover {
   background: #666;
 }
+
+/* Picking a color with the eyedropper of a color field. */
+body.picking-color,
+body.picking-color * {
+  cursor: crosshair !important;
+}

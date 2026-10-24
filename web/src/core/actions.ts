@@ -44,7 +44,6 @@ export const ACTIONS = {
   'tool.eraser': { label: 'Erase Tool', category: 'Tools', key: 'E' },
   'tool.station': { label: 'Station Tool', category: 'Tools', key: 'S' },
   'tool.text': { label: 'Text Tool', category: 'Tools', key: 'T' },
-  'tool.icon': { label: 'Icon Tool', category: 'Tools', key: 'I' },
 
   'help.shortcuts': { label: 'Shortcut Reference', category: 'Help', key: 'F1' },
   'help.about': { label: 'About Transit Diagram Maker', category: 'Help', key: '' },

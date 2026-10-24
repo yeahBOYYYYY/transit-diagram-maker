@@ -21,9 +21,10 @@ export interface Rect {
 
 export type RouteMode = 'straight_first' | 'diagonal_first'
 export type Cap = 'butt' | 'round'
-export type StrokeKind = 'plain' | 'hollow' | 'dashed' | 'hollow_dashed'
+export type StrokeKind = 'plain' | 'hollow' | 'dashed' | 'inner_dashed'
 export type StationKind = 'dot' | 'tick' | 'pill'
 export type TextAlign = 'start' | 'middle' | 'end'
+export type TextDirection = 'ltr' | 'rtl'
 
 export interface DocSettings {
   line_width: number
@@ -58,6 +59,10 @@ export interface LineStyle {
   dash_length: number
   dash_gap: number
   dash_width_pct: number
+  /** Cells at the start of the line left solid before the dashes begin. */
+  dash_start_offset: number
+  /** Cells at the end of the line left solid after the dashes stop. */
+  dash_end_offset: number
   start_cap: Cap
   end_cap: Cap
 }
@@ -87,6 +92,7 @@ export interface TextBox {
   bold: boolean
   italic: boolean
   align: TextAlign
+  direction: TextDirection
   rotation: number
   station_id: Id | null
 }

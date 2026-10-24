@@ -69,6 +69,17 @@ export async function layerRow(page: Page, name: string) {
 }
 
 /** Build a small but complete map used by several tests. */
+/** Drag a pictogram from the Icons panel onto a cell, then show the Properties tab again. */
+export async function dropIcon(page: Page, icon: string, x: number, y: number) {
+  await page.click('[data-testid=dock] [data-tab=Icons]')
+  const target = await cellPos(page, x, y)
+  const canvas = (await page.getByTestId('canvas').boundingBox())!
+  await page.locator(`[data-testid=icons-panel] [data-icon=${icon}]`).dragTo(page.getByTestId('canvas'), {
+    targetPosition: { x: target.x - canvas.x, y: target.y - canvas.y },
+  })
+  await page.click('[data-testid=dock] [data-tab=Properties]')
+}
+
 export async function buildSampleMap(page: Page) {
   await drawLine(page, [[-16, -4], [-6, -4], [0, 2], [12, 2]])
   await page.selectOption('[data-testid=line-style]', 'dashed')
@@ -86,8 +97,7 @@ export async function buildSampleMap(page: Page) {
   await page.click('[data-testid=options-bar] button[role=radio]:has-text("Tick")')
   await clickCell(page, -2, -7)
   await clickCell(page, 6, -3)
-  await page.keyboard.press('i')
-  await clickCell(page, 14, 2)
+  await dropIcon(page, 'wheelchair', 14, 2)
   await page.keyboard.press('t')
   await clickCell(page, 0, -12)
   await page.keyboard.type('Metro Network')

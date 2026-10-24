@@ -130,6 +130,8 @@ fn style_attrs(t: Tag, s: &LineStyle) -> Tag {
         .attr("dash-length", num(s.dash_length))
         .attr("dash-gap", num(s.dash_gap))
         .attr("dash-width", num(s.dash_width_pct))
+        .attr("dash-start", num(s.dash_start_offset))
+        .attr("dash-end", num(s.dash_end_offset))
         .attr("start-cap", enum_name(&s.start_cap))
         .attr("end-cap", enum_name(&s.end_cap))
 }
@@ -169,6 +171,7 @@ fn layer_tag(l: &Layer) -> String {
                 .flag("bold", t.bold, false)
                 .flag("italic", t.italic, false)
                 .attr("align", enum_name(&t.align))
+                .attr("direction", enum_name(&t.direction))
                 .attr("rotation", num(t.rotation));
             if let Some(id) = t.station_id {
                 tag = tag.attr("station", id);
@@ -363,6 +366,8 @@ fn read_style(e: &El) -> Result<LineStyle> {
         dash_length: e.num("dash-length", d.dash_length)?,
         dash_gap: e.num("dash-gap", d.dash_gap)?,
         dash_width_pct: e.num("dash-width", d.dash_width_pct)?,
+        dash_start_offset: e.num("dash-start", d.dash_start_offset)?,
+        dash_end_offset: e.num("dash-end", d.dash_end_offset)?,
         start_cap: e.enumeration("start-cap")?,
         end_cap: e.enumeration("end-cap")?,
     })
@@ -403,6 +408,7 @@ fn read_text(e: &El) -> Result<TextBox> {
         bold: e.bool("bold", false)?,
         italic: e.bool("italic", false)?,
         align: e.enumeration("align")?,
+        direction: e.enumeration("direction")?,
         rotation: e.num("rotation", 0.0)?,
         station_id: e.get("station").map(|_| e.id("station")).transpose()?,
     })

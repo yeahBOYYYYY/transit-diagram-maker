@@ -54,6 +54,12 @@ const PATHS: Record<string, string> = {
     '<path d="M3.5 3.5h10l3 3v10h-13z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M6.5 3.5v4h6v-4M6 16.5v-5h8v5" fill="none" stroke="currentColor" stroke-width="1.3"/>',
   github:
     '<path transform="translate(2 2)" fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/>',
+  eyedropper:
+    '<path d="M12.6 3.4a2.3 2.3 0 0 1 3.3 3.3l-1.8 1.8.9.9-1.4 1.4-4.5-4.5 1.4-1.4.9.9z" fill="currentColor"/><path d="M9.8 7.6l-5.6 5.6-.5 2.4-.9.9 1 1 .9-.9 2.4-.5 5.6-5.6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>',
+  'dir-ltr':
+    '<path d="M4 4.5h12M4 8.5h8" stroke="currentColor" stroke-width="1.5"/><path d="M4 14.5h11M12 11.5l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
+  'dir-rtl':
+    '<path d="M4 4.5h12M8 8.5h8" stroke="currentColor" stroke-width="1.5"/><path d="M16 14.5H5M8 11.5l-3 3 3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
   zoom: '<circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12.5 12.5l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
 }
 </script>

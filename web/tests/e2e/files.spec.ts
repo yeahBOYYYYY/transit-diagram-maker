@@ -118,15 +118,13 @@ test.describe('saving, opening and exporting', () => {
     await page.keyboard.type('Central')
     await page.keyboard.press('Enter')
 
-    // An icon: upload it from the Icons panel (the pictogram picker opens it).
-    await page.keyboard.press('i')
-    await page.getByTestId('icon-picker').click()
+    // An icon: upload it in the Icons panel.
+    await page.click('[data-testid=dock] [data-tab=Icons]')
     await expect(page.getByTestId('icons-panel')).toBeVisible()
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M5 0L10 10H0Z" fill="currentColor" onclick="alert(1)"/><script>alert(1)</script></svg>'
     const [iconChooser] = await Promise.all([page.waitForEvent('filechooser'), page.getByTestId('upload-icon').click()])
     await iconChooser.setFiles({ name: 'star.svg', mimeType: 'image/svg+xml', buffer: Buffer.from(svg) })
-    await expect(page.getByTestId('icon-picker')).toContainText('star')
-    await page.mouse.click(700, 450)
+    await page.locator('[data-testid=icons-panel] .cell[title=star]').click()
     const iconSvg = await state(page, (s) => s.fragments.find((f: any) => f.kind === 'icon').svg)
     expect(iconSvg).toContain('M5 0L10 10H0Z')
     expect(iconSvg).not.toContain('onclick')

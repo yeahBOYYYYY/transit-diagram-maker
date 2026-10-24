@@ -134,8 +134,9 @@ pub enum StrokeKind {
     Hollow,
     /// A broken line: full-width dashes of the line color with empty gaps.
     Dashed,
-    /// A hollow line with dashes of the line color running down its channel.
-    HollowDashed,
+    /// A solid line with dashes of `inner_color` running down its middle.
+    #[serde(alias = "hollow_dashed")]
+    InnerDashed,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -143,7 +144,7 @@ pub enum StrokeKind {
 pub struct LineStyle {
     pub color: String,
     pub kind: StrokeKind,
-    /// Inner channel color for hollow lines.
+    /// Inner channel color for hollow lines and dash color for inner dashed lines.
     pub inner_color: String,
     /// Inner channel width as a percentage of the line width.
     pub inner_width_pct: f64,
@@ -152,8 +153,12 @@ pub struct LineStyle {
     pub dash_length: f64,
     /// Requested gap between dashes in cells.
     pub dash_gap: f64,
-    /// Width of the dashes inside a hollow dashed line, as a percentage of the line width.
+    /// Width of the dashes inside an inner dashed line, as a percentage of the line width.
     pub dash_width_pct: f64,
+    /// Length in cells at the start of the line left solid before the dashes begin.
+    pub dash_start_offset: f64,
+    /// Length in cells at the end of the line left solid after the dashes stop.
+    pub dash_end_offset: f64,
     pub start_cap: Cap,
     pub end_cap: Cap,
 }
@@ -168,6 +173,8 @@ impl Default for LineStyle {
             dash_length: 1.0,
             dash_gap: 0.5,
             dash_width_pct: 30.0,
+            dash_start_offset: 0.0,
+            dash_end_offset: 0.0,
             start_cap: Cap::Round,
             end_cap: Cap::Round,
         }
@@ -281,6 +288,16 @@ pub enum TextAlign {
     End,
 }
 
+/// Writing direction of a text. It orders mixed right-to-left and
+/// left-to-right runs; the alignment stays visual (left is always left).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TextDirection {
+    #[default]
+    Ltr,
+    Rtl,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct TextBox {
@@ -294,6 +311,7 @@ pub struct TextBox {
     pub bold: bool,
     pub italic: bool,
     pub align: TextAlign,
+    pub direction: TextDirection,
     /// Rotation in degrees (clockwise).
     pub rotation: f64,
     /// Station this text names, if any.
@@ -311,6 +329,7 @@ impl Default for TextBox {
             bold: false,
             italic: false,
             align: TextAlign::Middle,
+            direction: TextDirection::Ltr,
             rotation: 0.0,
             station_id: None,
         }

@@ -8,7 +8,6 @@ import { HELP } from '../core/help'
 import NumberField from './ui/NumberField.vue'
 import ColorField from './ui/ColorField.vue'
 import Segmented from './ui/Segmented.vue'
-import IconPicker from './ui/IconPicker.vue'
 import { useEditor } from '../stores/editor'
 import { prefs } from '../stores/prefs'
 import FontSelect from './ui/FontSelect.vue'
@@ -57,7 +56,7 @@ const pillSelected = computed(() => {
         <UiIcon name="rotate-cw" :size="16" />
       </button>
       <span v-if="pillSelected" class="hint dim">Double-click an arrow to extend the pill · double-click one of its cells to remove it</span>
-      <span v-else class="hint dim">Click a selected object to toggle rotate handles · Shift: add to selection · Alt+drag: free move (stations leave their line)</span>
+      <span v-else class="hint dim">Click a selected object to toggle rotate handles · Shift: add to selection · Dragged objects snap to the cells · Alt+drag: free move (stations leave their line)</span>
     </template>
 
     <template v-else-if="tool === 'hand'">
@@ -83,16 +82,6 @@ const pillSelected = computed(() => {
             <option v-for="k in STROKE_KINDS" :key="k.value" :value="k.value">{{ k.label }}</option>
           </select>
         </label>
-        <template v-if="hasChannel(prefs.line.kind)">
-          <ColorField v-model="prefs.line.inner_color" label="Channel" :help="HELP['line.channel']" />
-          <NumberField v-model="prefs.line.inner_width_pct" label="Width" :min="0" :max="100" :precision="0" unit="%" :width="36" :help="HELP['line.channel_width']" />
-        </template>
-        <template v-if="hasDashes(prefs.line.kind)">
-          <NumberField v-model="prefs.line.dash_length" label="Dash" :min="0.1" :step="0.1" :precision="1" unit="cells" :width="36" :help="HELP['line.dash_length']" />
-          <NumberField v-model="prefs.line.dash_gap" label="Gap" :min="0" :step="0.1" :precision="1" unit="cells" :width="36" :help="HELP['line.dash_gap']" />
-          <NumberField v-if="prefs.line.kind === 'hollow_dashed'" v-model="prefs.line.dash_width_pct" label="Dash width" :min="0" :max="100" :precision="0" unit="%" :width="36" :help="HELP['line.dash_width']" />
-        </template>
-        <div class="sep-v" />
         <label class="opt">
           <span class="dim">Caps<HelpTip :text="HELP['line.caps']" /> Start</span>
           <select v-model="prefs.line.start_cap">
@@ -107,6 +96,21 @@ const pillSelected = computed(() => {
             <option value="butt">Butt</option>
           </select>
         </label>
+        <div v-if="prefs.line.kind !== 'plain'" class="sep-v" />
+        <template v-if="hasChannel(prefs.line.kind)">
+          <ColorField v-model="prefs.line.inner_color" label="Channel" :help="HELP['line.channel']" />
+          <NumberField v-model="prefs.line.inner_width_pct" label="Width" :min="0" :max="100" :precision="0" unit="%" :width="36" :help="HELP['line.channel_width']" />
+        </template>
+        <template v-if="hasDashes(prefs.line.kind)">
+          <template v-if="prefs.line.kind === 'inner_dashed'">
+            <ColorField v-model="prefs.line.inner_color" label="Dashes" :help="HELP['line.dash_color']" />
+            <NumberField v-model="prefs.line.dash_width_pct" label="Width" :min="0" :max="100" :precision="0" unit="%" :width="36" :help="HELP['line.dash_width']" />
+          </template>
+          <NumberField v-model="prefs.line.dash_length" label="Dash" :min="0.1" :step="0.1" :precision="1" unit="cells" :width="36" :help="HELP['line.dash_length']" />
+          <NumberField v-model="prefs.line.dash_gap" label="Gap" :min="0" :step="0.1" :precision="1" unit="cells" :width="36" :help="HELP['line.dash_gap']" />
+          <NumberField v-model="prefs.line.dash_start_offset" label="Start offset" :min="0" :step="0.5" :precision="1" unit="cells" :width="36" :help="HELP['line.dash_start_offset']" />
+          <NumberField v-model="prefs.line.dash_end_offset" label="End offset" :min="0" :step="0.5" :precision="1" unit="cells" :width="36" :help="HELP['line.dash_end_offset']" />
+        </template>
       </template>
       <span v-else class="dim">Uses the line's style</span>
       <span class="hint dim">Click to add points · click last point / Enter to finish · Backspace removes</span>
@@ -173,21 +177,17 @@ const pillSelected = computed(() => {
           { value: 'end', icon: 'align-end', title: 'Right' },
         ]"
       />
-      <span class="hint dim">Click to place text · Enter commits · Shift+Enter new line</span>
+      <span class="dim opt">Direction<HelpTip :text="HELP['text.direction']" /></span>
+      <Segmented
+        v-model="prefs.text.direction"
+        :options="[
+          { value: 'ltr', icon: 'dir-ltr', title: 'Left to right' },
+          { value: 'rtl', icon: 'dir-rtl', title: 'Right to left' },
+        ]"
+      />
+      <span class="hint dim">Click to place text in a cell · Alt: place off the grid · Enter commits · Shift+Enter new line</span>
     </template>
 
-    <template v-else-if="tool === 'icon'">
-      <span class="dim opt">Symbol<HelpTip :text="HELP['icon.icon']" /></span>
-      <IconPicker :model-value="prefs.icon.icon" />
-      <ColorField v-model="prefs.icon.color" label="Glyph" :help="HELP['icon.color']" />
-      <ColorField v-model="prefs.icon.background" label="Tile" :help="HELP['icon.background']" />
-      <label class="opt">
-        <input type="checkbox" :checked="prefs.icon.size === null" @change="prefs.icon.size = ($event.target as HTMLInputElement).checked ? null : 1.24" />
-        <span class="dim">Match station size<HelpTip :text="HELP['icon.size_default']" /></span>
-      </label>
-      <NumberField v-if="prefs.icon.size !== null" v-model="prefs.icon.size" label="Size" :min="0.1" :step="0.1" :width="40" unit="cells" :help="HELP['icon.size']" />
-      <span class="hint dim">Click to place · Alt: place off-grid · or drag a pictogram from the Icons panel</span>
-    </template>
   </div>
 </template>
 
@@ -201,9 +201,20 @@ const pillSelected = computed(() => {
   background: var(--c-panel);
   border-bottom: 1px solid var(--c-border);
   white-space: nowrap;
-  overflow: visible;
+  /* Long tool options (a dashed pen) scroll sideways in narrow windows. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
   position: relative;
   z-index: 30;
+}
+.options > * {
+  flex: none;
+}
+/* Hints give way first: they shorten with an ellipsis before the bar scrolls. */
+.options > .hint {
+  flex: 0 1 auto;
+  min-width: 60px;
 }
 .tool-badge {
   width: 30px;

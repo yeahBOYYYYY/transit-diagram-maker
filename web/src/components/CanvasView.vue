@@ -8,7 +8,7 @@ import { CELL_PX, cellAt, screenToWorld, unionRects, worldToScreen } from '../co
 import { useEditor } from '../stores/editor'
 import { prefs } from '../stores/prefs'
 import { actionForEvent, runAction } from '../stores/commands'
-import { createTools, iconPlace, pillGrowTargets, placeIcon, selectedPill, type PointerInfo, type Tool } from '../tools'
+import { createTools, iconPreview, pillGrowTargets, placeAt, placeIcon, selectedPill, type PointerInfo, type Tool } from '../tools'
 
 const store = useEditor()
 const s = store.state
@@ -246,7 +246,7 @@ function onDragOver(e: DragEvent): void {
   e.dataTransfer.dropEffect = 'copy'
   const p = info(e)
   s.cursor = p.cells
-  tools.icon.move?.(p, false)
+  s.overlay = { ...s.overlay, preview: iconPreview(store, placeAt(p)), cells: [] }
 }
 function onDrop(e: DragEvent): void {
   const name = e.dataTransfer?.getData(ICON_MIME)
@@ -254,11 +254,11 @@ function onDrop(e: DragEvent): void {
   e.preventDefault()
   clearDropPreview()
   if (s.textEdit) store.finishTextEdit(true)
-  placeIcon(store, name, iconPlace(info(e)))
+  placeIcon(store, name, placeAt(info(e)))
   host.value?.focus({ preventScroll: true })
 }
 function clearDropPreview(): void {
-  if (s.tool !== 'icon') s.overlay = { ...s.overlay, preview: '' }
+  s.overlay = { ...s.overlay, preview: '' }
 }
 
 function onLeave(): void {
@@ -340,6 +340,7 @@ const editorStyle = computed(() => {
     fontStyle: t.italic ? 'italic' : 'normal',
     color: t.color,
     textAlign: (t.align === 'middle' ? 'center' : t.align === 'end' ? 'right' : 'left') as 'center' | 'right' | 'left',
+    direction: t.direction,
     width: `${cols * 0.62 + 1}em`,
     height: `${lines.length * 1.2 + 0.4}em`,
     transform: `translate(${shift}, -50%) rotate(${t.rotation}deg)`,
@@ -428,7 +429,7 @@ defineExpose({ boundsOf })
           <path :d="`M${grid.major} 0H0V${grid.major}`" fill="none" :stroke="prefs.gridMajorColor" stroke-width="1" shape-rendering="crispEdges" />
         </pattern>
       </defs>
-      <rect width="100%" height="100%" :fill="prefs.canvasBackground" />
+      <rect width="100%" height="100%" :fill="prefs.canvasBackground" data-paper />
       <rect v-if="grid.showMinor" width="100%" height="100%" fill="url(#grid-minor)" />
       <rect v-if="grid.showMajor" width="100%" height="100%" fill="url(#grid-major)" />
 

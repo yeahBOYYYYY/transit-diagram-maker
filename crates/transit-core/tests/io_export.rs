@@ -11,6 +11,8 @@ fn sample() -> Editor {
         color: "#0098d4".into(),
         kind: StrokeKind::Dashed,
         start_cap: Cap::Butt,
+        dash_start_offset: 1.5,
+        dash_end_offset: 0.5,
         ..LineStyle::default()
     };
     ed.create_line(&[c(3, -4), c(3, 6)], blue).unwrap();
@@ -19,6 +21,7 @@ fn sample() -> Editor {
     ed.add_station(StationKind::Tick, c(3, -2), &StationOptions::default()).unwrap();
     ed.add_pill(&[c(3, 0), c(3, 1)], &StationOptions::default()).unwrap();
     ed.add_text(TextBox { text: "Metro \"Map\" & <Co>".into(), rotation: 45.0, ..TextBox::default() }).unwrap();
+    ed.add_text(TextBox { text: "תחנה מרכזית".into(), direction: TextDirection::Rtl, ..TextBox::default() }).unwrap();
     ed.add_icon(Icon { icon: "ferry".into(), pos: Vec2::new(10.0, 5.0), ..Icon::default() }).unwrap();
     let g = ed.new_group(Some("Empty folder")).unwrap();
     ed.set_locked(g, true).unwrap();
@@ -107,6 +110,14 @@ fn rejects_duplicate_ids_and_bad_values() {
     assert!(bad.to_string().contains(r#"invalid size "big""#), "{bad}");
     assert!(io::from_transit(&file(r#"<g><transit:segment id="1" points="0,0 1,0"/></g>"#)).unwrap_err().to_string().contains("missing attribute line"));
     assert!(io::from_transit(&file(r#"<g><transit:station id="1" shape="star" cell="0,0"/></g>"#)).is_err());
+}
+
+#[test]
+fn hollow_dashed_lines_from_older_files_load_as_inner_dashed() {
+    let doc = io::from_transit(&file(r#"<g><transit:segment id="1" name="a" line="2" points="0,0 3,0" kind="hollow_dashed"/></g>"#)).unwrap();
+    let Node::Layer(l) = &doc.root[0] else { panic!() };
+    let Content::Line(seg) = &l.content else { panic!() };
+    assert_eq!(seg.style.kind, StrokeKind::InnerDashed);
 }
 
 #[test]

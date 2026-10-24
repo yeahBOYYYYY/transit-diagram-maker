@@ -5,8 +5,8 @@ export const STROKE_KINDS: { value: StrokeKind; label: string }[] = [
   { value: 'plain', label: 'Plain' },
   { value: 'hollow', label: 'Hollow' },
   { value: 'dashed', label: 'Dashed' },
-  { value: 'hollow_dashed', label: 'Hollow dashed' },
+  { value: 'inner_dashed', label: 'Inner dashed' },
 ]
 
-export const hasChannel = (k: StrokeKind) => k === 'hollow' || k === 'hollow_dashed'
-export const hasDashes = (k: StrokeKind) => k === 'dashed' || k === 'hollow_dashed'
+export const hasChannel = (k: StrokeKind) => k === 'hollow'
+export const hasDashes = (k: StrokeKind) => k === 'dashed' || k === 'inner_dashed'

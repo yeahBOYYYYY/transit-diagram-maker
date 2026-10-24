@@ -237,10 +237,18 @@ const childCount = computed(() => (group.value ? (findItem(s.tree, group.value.i
             </div>
           </template>
           <template v-if="hasDashes(lineSeg.seg.style.kind)">
+            <div v-if="lineSeg.seg.style.kind === 'inner_dashed'" class="field">
+              <span class="lbl">Dashes<HelpTip :text="HELP['line.dash_color']" /></span>
+              <ColorField :model-value="lineSeg.seg.style.inner_color" @update:model-value="(v) => setStyle('inner_color', v)" />
+              <NumberField :model-value="lineSeg.seg.style.dash_width_pct" label="Width" :min="0" :max="100" :precision="0" unit="%" :help="HELP['line.dash_width']" @update:model-value="(v) => setStyle('dash_width_pct', v)" @commit="done" />
+            </div>
             <div class="grid2">
               <NumberField :model-value="lineSeg.seg.style.dash_length" label="Dash" :min="0.1" :step="0.1" :precision="1" unit="cells" :help="HELP['line.dash_length']" @update:model-value="(v) => setStyle('dash_length', v)" @commit="done" />
               <NumberField :model-value="lineSeg.seg.style.dash_gap" label="Gap" :min="0" :step="0.1" :precision="1" unit="cells" :help="HELP['line.dash_gap']" @update:model-value="(v) => setStyle('dash_gap', v)" @commit="done" />
-              <NumberField v-if="lineSeg.seg.style.kind === 'hollow_dashed'" :model-value="lineSeg.seg.style.dash_width_pct" label="Dash width" :min="0" :max="100" :precision="0" unit="%" :help="HELP['line.dash_width']" @update:model-value="(v) => setStyle('dash_width_pct', v)" @commit="done" />
+            </div>
+            <div class="stack">
+              <NumberField :model-value="lineSeg.seg.style.dash_start_offset" label="Start offset" :min="0" :step="0.5" :precision="1" unit="cells" :help="HELP['line.dash_start_offset']" data-testid="dash-start-offset" @update:model-value="(v) => setStyle('dash_start_offset', v)" @commit="done" />
+              <NumberField :model-value="lineSeg.seg.style.dash_end_offset" label="End offset" :min="0" :step="0.5" :precision="1" unit="cells" :help="HELP['line.dash_end_offset']" data-testid="dash-end-offset" @update:model-value="(v) => setStyle('dash_end_offset', v)" @commit="done" />
             </div>
           </template>
           <div class="field">
@@ -354,6 +362,18 @@ const childCount = computed(() => (group.value ? (findItem(s.tree, group.value.i
                 { value: 'end', icon: 'align-end', title: 'Right' },
               ]"
               @update:model-value="(v) => (patch({ align: v }), done())"
+            />
+          </div>
+          <div class="field">
+            <span class="lbl">Direction<HelpTip :text="HELP['text.direction']" /></span>
+            <Segmented
+              :model-value="layer.content.direction"
+              data-testid="prop-text-direction"
+              :options="[
+                { value: 'ltr', icon: 'dir-ltr', title: 'Left to right' },
+                { value: 'rtl', icon: 'dir-rtl', title: 'Right to left' },
+              ]"
+              @update:model-value="(v) => (patch({ direction: v }), done())"
             />
           </div>
           <div class="grid2">

@@ -155,15 +155,11 @@ describe('editor store', () => {
     vi.useRealTimers()
   })
 
-  it('setTool resets overlays and tracks the pen slot', () => {
+  it('setTool resets overlays', () => {
     const store = freshStore()
     store.state.overlay.preview = '<path/>'
     store.setTool('eraser')
-    expect(store.state.penSlot).toBe('eraser')
+    expect(store.state.tool).toBe('eraser')
     expect(store.state.overlay.preview).toBe('')
-    store.setTool('select')
-    expect(store.state.penSlot).toBe('eraser')
-    store.setTool('pen')
-    expect(store.state.penSlot).toBe('pen')
   })
 })

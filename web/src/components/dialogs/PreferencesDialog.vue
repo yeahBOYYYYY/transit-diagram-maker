@@ -33,7 +33,6 @@ function reset(): void {
       <fieldset>
         <legend>General</legend>
         <NumberField v-model="draft.historyLimit" :help="HELP['prefs.historyLimit']" label="History states" :min="1" :max="5000" :precision="0" />
-        <NumberField v-model="draft.longPressMs" :help="HELP['prefs.longPressMs']" label="Long press" :min="100" :max="3000" :step="50" :precision="0" unit="milliseconds" />
         <NumberField v-model="draft.dragThreshold" :help="HELP['prefs.dragThreshold']" label="Drag threshold" :min="0" :max="30" :precision="0" unit="pixels" />
         <label class="f">
           <span class="dim">Auto-select<HelpTip :text="HELP['prefs.autoSelect']" /></span>
@@ -53,7 +52,6 @@ function reset(): void {
         <legend>Editing</legend>
         <NumberField v-model="draft.nudge" :help="HELP['prefs.nudge']" label="Arrow nudge" :min="0.05" :max="50" :step="0.25" unit="cells" />
         <NumberField v-model="draft.bigNudge" :help="HELP['prefs.bigNudge']" label="Shift + arrow" :min="0.05" :max="100" :step="1" unit="cells" />
-        <NumberField v-model="draft.textSnap" :help="HELP['prefs.textSnap']" label="Text / icon snap" :min="0.1" :max="5" :step="0.1" :precision="1" unit="cells" />
         <NumberField v-model="draft.eraserSize" :help="HELP['prefs.eraserSize']" label="Eraser size" :min="1" :max="15" :precision="0" unit="cells" />
       </fieldset>
       <fieldset>

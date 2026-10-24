@@ -1066,10 +1066,12 @@ impl Editor {
 
     // -------------------------------------------------------- transforms
 
-    /// Move nodes by a delta in cell units. Lines move in whole cells, text and
-    /// icons in tenths of a cell. Stations normally move in whole cells and
-    /// re-snap onto their line; with `free` they leave the line and move in
-    /// tenths (their coupling to the line is kept).
+    /// Move nodes by a delta in cell units. Lines move in whole cells. Stations
+    /// normally move in whole cells and re-snap onto their line; with `free`
+    /// they leave the line and move in tenths (their coupling to the line is
+    /// kept). Text and icons snap to the cells too: along with grid content
+    /// they move in whole cells, and on their own the top-left anchor of the
+    /// group lands on a cell center. With `free` they move in tenths.
     pub fn translate(&mut self, ids: &[Id], dx: f64, dy: f64, free: bool) -> Result<()> {
         self.apply(|d| {
             let leaves = editable_leaves(d, ids);
@@ -1524,9 +1526,30 @@ fn snap_stations(d: &mut Document, leaves: &[Id]) {
     });
 }
 
+/// The delta text and icons move by in a non-free move: whole cells next to
+/// grid content, otherwise whatever puts their top-left anchor on a cell center.
+fn free_content_delta(d: &Document, leaves: &[Id], dx: f64, dy: f64) -> Vec2 {
+    let mut anchor: Option<Vec2> = None;
+    for id in leaves {
+        match tree::find_layer(&d.root, *id).map(|l| &l.content) {
+            Some(Content::Line(_) | Content::Station(_)) => return Vec2::new(dx.round(), dy.round()),
+            Some(c @ (Content::Text(_) | Content::Icon(_))) => {
+                if let Some(p) = content_anchor(c) {
+                    anchor = Some(anchor.map_or(p, |a| Vec2::new(a.x.min(p.x), a.y.min(p.y))));
+                }
+            }
+            None => {}
+        }
+    }
+    let Some(a) = anchor else { return Vec2::new(dx, dy) };
+    let target = Cell::containing(Vec2::new(a.x + dx, a.y + dy)).center();
+    target.sub(a)
+}
+
 fn translate_layers(d: &mut Document, leaves: &[Id], dx: f64, dy: f64, free: bool) {
     let (ix, iy) = (dx.round() as i32, dy.round() as i32);
     let delta = Vec2::new(dx, dy);
+    let content_delta = if free { delta } else { free_content_delta(d, leaves, dx, dy) };
     let old = station_anchors(d);
     // Stations whose lines move along keep their place relative to them.
     let mut moved_lines = HashSet::new();
@@ -1571,8 +1594,8 @@ fn translate_layers(d: &mut Document, leaves: &[Id], dx: f64, dy: f64, free: boo
                     snap.push(*id);
                 }
             }
-            Content::Text(t) => t.pos = t.pos.add(delta).snapped(),
-            Content::Icon(i) => i.pos = i.pos.add(delta).snapped(),
+            Content::Text(t) => t.pos = t.pos.add(content_delta).snapped(),
+            Content::Icon(i) => i.pos = i.pos.add(content_delta).snapped(),
         }
     }
     snap_stations(d, &snap);
