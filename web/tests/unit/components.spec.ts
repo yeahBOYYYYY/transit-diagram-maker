@@ -218,6 +218,61 @@ describe('PropertiesPanel', () => {
   })
 })
 
+describe('property help', () => {
+  /** Every labeled property row must carry exactly one info icon. */
+  function expectHelpEverywhere(w: VueWrapper) {
+    const rows = [...w.findAll('.num-field'), ...w.findAll('.color-field').filter((c) => c.find('.dim').exists()), ...w.findAll('.lbl')]
+    expect(rows.length).toBeGreaterThan(0)
+    for (const r of rows) {
+      const isInsideField = r.classes('lbl') && r.element.closest('.num-field, .color-field')
+      if (isInsideField) continue
+      expect(r.findAll('[data-testid=help-tip]').length, r.text()).toBe(1)
+    }
+  }
+
+  it('every property in the Properties panel has help, for every kind of object', async () => {
+    const store = freshStore()
+    const l = store.run((e) => e.createLine([{ x: 0, y: 0 }, { x: 9, y: 0 }], { kind: 'hollow_dashed' }))!
+    const dot = store.run((e) => e.addStation('dot', { x: 2, y: 0 }, { label: false }))!
+    const tick = store.run((e) => e.addStation('tick', { x: 5, y: 0 }, { label: false }))!
+    const t = store.run((e) => e.addText({}))!
+    const i = store.run((e) => e.addIcon({}))!
+    const w = mountIt(PropertiesPanel)
+    expectHelpEverywhere(w)
+    for (const id of [l.layer_id, l.group_id, dot.station_id, tick.station_id, t, i]) {
+      store.select([id])
+      await nextTick()
+      expectHelpEverywhere(w)
+    }
+    store.select([t, i])
+    await nextTick()
+    expectHelpEverywhere(w)
+  })
+
+  it('every setting in the dialogs and tool options has help', async () => {
+    const store = freshStore()
+    expectHelpEverywhere(mountIt(DocumentSettingsDialog))
+    for (const tool of ['pen', 'eraser', 'station', 'text', 'icon'] as const) {
+      store.setTool(tool)
+      // Mounted per tool: happy-dom can't patch the bar between some tools.
+      const w = mount(OptionsBar as never, { attachTo: document.body })
+      expectHelpEverywhere(w)
+      w.unmount()
+    }
+  })
+
+  it('shows the help text while hovering the info icon', async () => {
+    freshStore()
+    const w = mountIt(NumberField, { props: { modelValue: 1, label: 'Width', help: 'How wide it is.' } })
+    const tip = w.find('[data-testid=help-tip]')
+    expect(tip.attributes('aria-label')).toBe('How wide it is.')
+    await tip.trigger('mouseenter')
+    expect(document.body.querySelector('[role=tooltip]')?.textContent).toBe('How wide it is.')
+    await tip.trigger('mouseleave')
+    expect(document.body.querySelector('[role=tooltip]')).toBeNull()
+  })
+})
+
 describe('ToolsPanel', () => {
   it('activates tools and shows the pen / eraser flyout on long press', async () => {
     vi.useFakeTimers()

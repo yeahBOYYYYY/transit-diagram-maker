@@ -7,6 +7,8 @@ import ColorField from '../ui/ColorField.vue'
 import Segmented from '../ui/Segmented.vue'
 import IconPicker from '../ui/IconPicker.vue'
 import UiIcon from '../ui/UiIcon.vue'
+import HelpTip from '../ui/HelpTip.vue'
+import { HELP } from '../../core/help'
 import type { DocNode, DocSettings, GroupNode, Id, LayerNode, LineSegment, LineStyle, StationKind, StrokeKind } from '../../core/types'
 import { STROKE_KINDS, hasChannel, hasDashes } from '../../core/lineStyles'
 import type { Engine } from '../../core/engine'
@@ -159,11 +161,11 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
       <template v-if="s.selection.length === 0">
         <div class="section-title">Document</div>
         <div class="grid2">
-          <NumberField :model-value="s.settings.line_width" label="Line W" :min="0.05" :max="4" :step="0.05" unit="cells" @update:model-value="(v) => setSetting('line_width', v)" @commit="done" />
-          <NumberField :model-value="s.settings.corner_radius" label="Curve" :min="0" :max="50" :step="0.25" unit="cells" @update:model-value="(v) => setSetting('corner_radius', v)" @commit="done" />
-          <NumberField :model-value="s.settings.cap_roundness" label="Cap round" :min="0" :max="1" :step="0.05" @update:model-value="(v) => setSetting('cap_roundness', v)" @commit="done" />
-          <NumberField :model-value="s.settings.station_outer_radius" label="Stn outer" :min="0.05" :max="10" :step="0.02" unit="cells" @update:model-value="(v) => setSetting('station_outer_radius', v)" @commit="done" />
-          <NumberField :model-value="s.settings.station_inner_radius" label="Stn inner" :min="0" :max="10" :step="0.02" unit="cells" @update:model-value="(v) => setSetting('station_inner_radius', v)" @commit="done" />
+          <NumberField :model-value="s.settings.line_width" label="Line W" :min="0.05" :max="4" :step="0.05" unit="cells" :help="HELP['settings.line_width']" @update:model-value="(v) => setSetting('line_width', v)" @commit="done" />
+          <NumberField :model-value="s.settings.corner_radius" label="Curve" :min="0" :max="50" :step="0.25" unit="cells" :help="HELP['settings.corner_radius']" @update:model-value="(v) => setSetting('corner_radius', v)" @commit="done" />
+          <NumberField :model-value="s.settings.cap_roundness" label="Cap round" :min="0" :max="1" :step="0.05" :help="HELP['settings.cap_roundness']" @update:model-value="(v) => setSetting('cap_roundness', v)" @commit="done" />
+          <NumberField :model-value="s.settings.station_outer_radius" label="Stn outer" :min="0.05" :max="10" :step="0.02" unit="cells" :help="HELP['settings.station_outer_radius']" @update:model-value="(v) => setSetting('station_outer_radius', v)" @commit="done" />
+          <NumberField :model-value="s.settings.station_inner_radius" label="Stn inner" :min="0" :max="10" :step="0.02" unit="cells" :help="HELP['settings.station_inner_radius']" @update:model-value="(v) => setSetting('station_inner_radius', v)" @commit="done" />
         </div>
         <button class="ps-btn more" @click="s.dialog = 'document'">All document settings…</button>
         <p class="dim tip">Select a layer on the canvas or in the Layers panel to edit its properties.</p>
@@ -178,8 +180,8 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
           <button class="ps-btn" @click="store.run((e) => e.group(s.selection))">Group</button>
         </div>
         <div v-if="position" class="grid2" data-testid="prop-position">
-          <NumberField :model-value="position.x" label="X" :step="positionStep" :precision="1" unit="cells" title="Horizontal position in cells (an object's anchor; the top-left one for several)" @update:model-value="(v) => setPosition('x', v)" @commit="done" />
-          <NumberField :model-value="position.y" label="Y" :step="positionStep" :precision="1" unit="cells" title="Vertical position in cells (an object's anchor; the top-left one for several)" @update:model-value="(v) => setPosition('y', v)" @commit="done" />
+          <NumberField :model-value="position.x" label="X" :step="positionStep" :precision="1" unit="cells" :help="HELP.position" @update:model-value="(v) => setPosition('x', v)" @commit="done" />
+          <NumberField :model-value="position.y" label="Y" :step="positionStep" :precision="1" unit="cells" :help="HELP.position" @update:model-value="(v) => setPosition('y', v)" @commit="done" />
         </div>
       </template>
 
@@ -198,40 +200,39 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
 
         <div v-if="group" class="dim small">{{ childCount }} item{{ childCount === 1 ? '' : 's' }} in group</div>
         <div v-if="position" class="grid2" data-testid="prop-position">
-          <NumberField :model-value="position.x" label="X" :step="positionStep" :precision="1" unit="cells" title="Horizontal position in cells (an object's anchor; the top-left one for several)" @update:model-value="(v) => setPosition('x', v)" @commit="done" />
-          <NumberField :model-value="position.y" label="Y" :step="positionStep" :precision="1" unit="cells" title="Vertical position in cells (an object's anchor; the top-left one for several)" @update:model-value="(v) => setPosition('y', v)" @commit="done" />
+          <NumberField :model-value="position.x" label="X" :step="positionStep" :precision="1" unit="cells" :help="HELP.position" @update:model-value="(v) => setPosition('x', v)" @commit="done" />
+          <NumberField :model-value="position.y" label="Y" :step="positionStep" :precision="1" unit="cells" :help="HELP.position" @update:model-value="(v) => setPosition('y', v)" @commit="done" />
         </div>
 
         <!-- line style (segment or line group) -->
         <template v-if="lineSeg">
           <div class="section-title">Line appearance <span class="dim small">· {{ lineSegmentCount }} segment{{ lineSegmentCount === 1 ? '' : 's' }}</span></div>
           <div class="field">
-            <span class="lbl">Color</span>
+            <span class="lbl">Color<HelpTip :text="HELP['line.color']" /></span>
             <ColorField :model-value="lineSeg.seg.style.color" @update:model-value="(v) => setStyle('color', v)" />
           </div>
           <div class="field">
-            <span class="lbl">Style</span>
+            <span class="lbl">Style<HelpTip :text="HELP['line.kind']" /></span>
             <select :value="lineSeg.seg.style.kind" data-testid="prop-line-style" @change="setStyle('kind', ($event.target as HTMLSelectElement).value as StrokeKind); done()">
               <option v-for="k in STROKE_KINDS" :key="k.value" :value="k.value">{{ k.label }}</option>
             </select>
           </div>
           <template v-if="hasChannel(lineSeg.seg.style.kind)">
             <div class="field">
-              <span class="lbl">Channel</span>
+              <span class="lbl">Channel<HelpTip :text="HELP['line.channel']" /></span>
               <ColorField :model-value="lineSeg.seg.style.inner_color" @update:model-value="(v) => setStyle('inner_color', v)" />
-              <NumberField :model-value="lineSeg.seg.style.inner_width_pct" label="Width" :min="0" :max="100" :precision="0" unit="% of line" title="Channel width as a percentage of the line width" @update:model-value="(v) => setStyle('inner_width_pct', v)" @commit="done" />
+              <NumberField :model-value="lineSeg.seg.style.inner_width_pct" label="Width" :min="0" :max="100" :precision="0" unit="%" :help="HELP['line.channel_width']" @update:model-value="(v) => setStyle('inner_width_pct', v)" @commit="done" />
             </div>
           </template>
           <template v-if="hasDashes(lineSeg.seg.style.kind)">
             <div class="grid2">
-              <NumberField :model-value="lineSeg.seg.style.dash_length" label="Dash" :min="0.1" :step="0.1" :precision="1" unit="cells" title="Length of each dash" @update:model-value="(v) => setStyle('dash_length', v)" @commit="done" />
-              <NumberField :model-value="lineSeg.seg.style.dash_gap" label="Gap" :min="0" :step="0.1" :precision="1" unit="cells" title="Space between dashes" @update:model-value="(v) => setStyle('dash_gap', v)" @commit="done" />
-              <NumberField v-if="lineSeg.seg.style.kind === 'hollow_dashed'" :model-value="lineSeg.seg.style.dash_width_pct" label="Dash W" :min="0" :max="100" :precision="0" unit="%" title="Dash width as a percentage of the line width" @update:model-value="(v) => setStyle('dash_width_pct', v)" @commit="done" />
+              <NumberField :model-value="lineSeg.seg.style.dash_length" label="Dash" :min="0.1" :step="0.1" :precision="1" unit="cells" :help="HELP['line.dash_length']" @update:model-value="(v) => setStyle('dash_length', v)" @commit="done" />
+              <NumberField :model-value="lineSeg.seg.style.dash_gap" label="Gap" :min="0" :step="0.1" :precision="1" unit="cells" :help="HELP['line.dash_gap']" @update:model-value="(v) => setStyle('dash_gap', v)" @commit="done" />
+              <NumberField v-if="lineSeg.seg.style.kind === 'hollow_dashed'" :model-value="lineSeg.seg.style.dash_width_pct" label="Dash W" :min="0" :max="100" :precision="0" unit="%" :help="HELP['line.dash_width']" @update:model-value="(v) => setStyle('dash_width_pct', v)" @commit="done" />
             </div>
-            <div class="dim small">Dash and gap are stretched slightly so the line starts and ends with a full dash.</div>
           </template>
           <div class="field">
-            <span class="lbl">Caps</span>
+            <span class="lbl">Caps<HelpTip :text="HELP['line.caps']" /></span>
             <select :value="lineSeg.seg.style.start_cap" title="Start cap" data-testid="start-cap" @change="setStyle('start_cap', ($event.target as HTMLSelectElement).value as 'butt' | 'round')">
               <option value="round">Round start</option>
               <option value="butt">Butt start</option>
@@ -242,7 +243,7 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
             </select>
           </div>
           <div v-if="layer" class="dim small">
-            Points: {{ lineSeg.seg.points.map((p) => `(${p.x}, ${p.y})`).join(' → ') }}
+            Points<HelpTip :text="HELP['line.points']" />: {{ lineSeg.seg.points.map((p) => `(${p.x}, ${p.y})`).join(' → ') }}
           </div>
         </template>
 
@@ -250,7 +251,7 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
         <template v-if="layer && layer.content.kind === 'station'">
           <div class="section-title">Station</div>
           <div class="field">
-            <span class="lbl">Shape</span>
+            <span class="lbl">Shape<HelpTip :text="HELP['station.shape']" /></span>
             <Segmented
               :model-value="layer.content.shape"
               :options="[
@@ -263,25 +264,25 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
           </div>
           <template v-if="layer.content.shape === 'dot' || layer.content.shape === 'pill'">
             <div class="field">
-              <span class="lbl">Outer</span>
+              <span class="lbl">Outer<HelpTip :text="HELP['station.outer_color']" /></span>
               <ColorField :model-value="layer.content.outer_color" @update:model-value="(v) => patch({ outer_color: v })" />
             </div>
             <div class="field">
-              <span class="lbl">Inner</span>
+              <span class="lbl">Inner<HelpTip :text="HELP['station.inner_color']" /></span>
               <ColorField :model-value="layer.content.inner_color" @update:model-value="(v) => patch({ inner_color: v })" />
             </div>
           </template>
           <template v-else-if="layer.content.shape === 'tick'">
             <div class="field">
-              <span class="lbl">Color</span>
+              <span class="lbl">Color<HelpTip :text="HELP['station.tick_color']" /></span>
               <ColorField :model-value="layer.content.color" @update:model-value="(v) => patch({ color: v })" />
             </div>
             <div class="grid2">
-              <NumberField :model-value="layer.content.width" label="Width" :min="0.01" :step="0.05" unit="cells" @update:model-value="(v) => patch({ width: v })" @commit="done" />
-              <NumberField :model-value="layer.content.length" label="Height" :min="0.01" :step="0.05" unit="cells" @update:model-value="(v) => patch({ length: v })" @commit="done" />
+              <NumberField :model-value="layer.content.width" label="Width" :min="0.01" :step="0.05" unit="cells" :help="HELP['station.tick_width']" @update:model-value="(v) => patch({ width: v })" @commit="done" />
+              <NumberField :model-value="layer.content.length" label="Height" :min="0.01" :step="0.05" unit="cells" :help="HELP['station.tick_length']" @update:model-value="(v) => patch({ length: v })" @commit="done" />
             </div>
             <div class="field">
-              <span class="lbl">Side</span>
+              <span class="lbl">Side<HelpTip :text="HELP['station.tick_side']" /></span>
               <Segmented
                 :model-value="layer.content.side"
                 :options="[
@@ -292,12 +293,15 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
               />
             </div>
           </template>
-          <div class="dim small">Coupled to: {{ coupledLines }}</div>
+          <div class="dim small">Coupled to<HelpTip :text="HELP['station.coupled']" />: {{ coupledLines }}</div>
         </template>
 
         <!-- text -->
         <template v-if="layer && layer.content.kind === 'text'">
           <div class="section-title">Character</div>
+          <div class="field">
+            <span class="lbl">Text<HelpTip :text="HELP['text.text']" /></span>
+          </div>
           <textarea
             class="text-input"
             rows="2"
@@ -307,6 +311,7 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
             @change="patch({ text: ($event.target as HTMLTextAreaElement).value }); done()"
           />
           <div class="field">
+            <span class="lbl">Font<HelpTip :text="HELP['text.font']" /></span>
             <select :value="layer.content.font_family" @change="patch({ font_family: ($event.target as HTMLSelectElement).value }); done()">
               <option v-for="f in FONT_FAMILIES" :key="f" :value="f">{{ fontLabel(f) }}</option>
             </select>
@@ -318,7 +323,11 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
             </button>
           </div>
           <div class="field">
+            <span class="lbl">Color<HelpTip :text="HELP['text.color']" /></span>
             <ColorField :model-value="layer.content.color" @update:model-value="(v) => patch({ color: v })" />
+          </div>
+          <div class="field">
+            <span class="lbl">Align<HelpTip :text="HELP['text.align']" /></span>
             <Segmented
               :model-value="layer.content.align"
               :options="[
@@ -330,26 +339,29 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
             />
           </div>
           <div class="grid2">
-            <NumberField :model-value="layer.content.size" label="Size" :min="0.05" :step="0.05" unit="cells" @update:model-value="(v) => patch({ size: v })" @commit="done" />
-            <NumberField :model-value="layer.content.rotation" label="Angle" :min="-180" :max="180" :step="45" :precision="0" unit="°" @update:model-value="(v) => patch({ rotation: v })" @commit="done" />
+            <NumberField :model-value="layer.content.size" label="Size" :min="0.05" :step="0.05" unit="cells" :help="HELP['text.size']" @update:model-value="(v) => patch({ size: v })" @commit="done" />
+            <NumberField :model-value="layer.content.rotation" label="Angle" :min="-180" :max="180" :step="45" :precision="0" unit="°" :help="HELP['text.rotation']" @update:model-value="(v) => patch({ rotation: v })" @commit="done" />
           </div>
         </template>
 
         <!-- icon -->
         <template v-if="layer && layer.content.kind === 'icon'">
           <div class="section-title">Pictogram</div>
-          <IconPicker :model-value="layer.content.icon" @update:model-value="(v) => (patch({ icon: v }), done())" />
           <div class="field">
-            <span class="lbl">Glyph</span>
+            <span class="lbl">Symbol<HelpTip :text="HELP['icon.icon']" /></span>
+            <IconPicker :model-value="layer.content.icon" @update:model-value="(v) => (patch({ icon: v }), done())" />
+          </div>
+          <div class="field">
+            <span class="lbl">Glyph<HelpTip :text="HELP['icon.color']" /></span>
             <ColorField :model-value="layer.content.color" @update:model-value="(v) => patch({ color: v })" />
           </div>
           <div class="field">
-            <span class="lbl">Tile</span>
+            <span class="lbl">Tile<HelpTip :text="HELP['icon.background']" /></span>
             <ColorField :model-value="layer.content.background" @update:model-value="(v) => patch({ background: v })" />
           </div>
           <div class="grid2">
-            <NumberField :model-value="layer.content.size" label="Size" :min="0.1" :step="0.1" unit="cells" @update:model-value="(v) => patch({ size: v })" @commit="done" />
-            <NumberField :model-value="layer.content.rotation" label="Angle" :min="-180" :max="180" :step="45" :precision="0" unit="°" @update:model-value="(v) => patch({ rotation: v })" @commit="done" />
+            <NumberField :model-value="layer.content.size" label="Size" :min="0.1" :step="0.1" unit="cells" :help="HELP['icon.size']" @update:model-value="(v) => patch({ size: v })" @commit="done" />
+            <NumberField :model-value="layer.content.rotation" label="Angle" :min="-180" :max="180" :step="45" :precision="0" unit="°" :help="HELP['icon.rotation']" @update:model-value="(v) => patch({ rotation: v })" @commit="done" />
           </div>
         </template>
       </template>
@@ -399,7 +411,9 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
   flex-wrap: wrap;
 }
 .lbl {
-  width: 44px;
+  display: inline-flex;
+  align-items: center;
+  width: 64px;
   color: var(--c-text-dim);
   flex: none;
 }

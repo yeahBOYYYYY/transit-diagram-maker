@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // Swatch + hex input. The native picker opens when the swatch is clicked.
 import { ref, watch } from 'vue'
+import HelpTip from './HelpTip.vue'
 
-const props = defineProps<{ modelValue: string; label?: string; title?: string }>()
+const props = defineProps<{ modelValue: string; label?: string; title?: string; help?: string }>()
 const emit = defineEmits<{ 'update:modelValue': [string] }>()
 const text = ref(props.modelValue)
 watch(
@@ -32,8 +33,9 @@ const pickerValue = (v: string) => normalize(v) ?? '#000000'
 </script>
 
 <template>
-  <label class="color-field" :title="title">
+  <label class="color-field" :title="help ? undefined : title">
     <span v-if="label" class="dim">{{ label }}</span>
+    <HelpTip v-if="help" :text="help" />
     <span class="swatch" :style="{ background: modelValue }">
       <input
         type="color"
