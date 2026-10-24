@@ -2,6 +2,7 @@
 // Numeric input with a "scrubby" label: drag the label horizontally to change
 // the value, like in professional design tools.
 import { ref, watch } from 'vue'
+import HelpTip from './HelpTip.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -14,6 +15,8 @@ const props = withDefaults(
     width?: number
     precision?: number
     title?: string
+    /** Help text shown by an info icon beside the label. */
+    help?: string
   }>(),
   { step: 1, width: 52, precision: 2 },
 )
@@ -86,16 +89,19 @@ function onScrubEnd(): void {
 </script>
 
 <template>
-  <label class="num-field" :title="title">
-    <span
-      v-if="label"
-      class="scrub"
-      @pointerdown.prevent="onScrubStart"
-      @pointermove="onScrubMove"
-      @pointerup="onScrubEnd"
-      @pointercancel="onScrubEnd"
-      >{{ label }}</span
-    >
+  <label class="num-field" :title="help ? undefined : title">
+    <span v-if="label || help" class="lead">
+      <span
+        v-if="label"
+        class="scrub"
+        @pointerdown.prevent="onScrubStart"
+        @pointermove="onScrubMove"
+        @pointerup="onScrubEnd"
+        @pointercancel="onScrubEnd"
+        >{{ label }}</span
+      >
+      <HelpTip v-if="help" :text="help" />
+    </span>
     <input
       v-model="text"
       type="text"
@@ -114,6 +120,11 @@ function onScrubEnd(): void {
   align-items: center;
   gap: 4px;
   white-space: nowrap;
+}
+.lead {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
 }
 .scrub {
   cursor: ew-resize;

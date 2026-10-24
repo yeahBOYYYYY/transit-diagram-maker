@@ -3,6 +3,8 @@
 // used for newly created elements and are remembered between sessions.
 import { computed } from 'vue'
 import UiIcon from './ui/UiIcon.vue'
+import HelpTip from './ui/HelpTip.vue'
+import { HELP } from '../core/help'
 import NumberField from './ui/NumberField.vue'
 import ColorField from './ui/ColorField.vue'
 import Segmented from './ui/Segmented.vue'
@@ -29,7 +31,7 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
 
     <template v-if="tool === 'select'">
       <label class="opt">
-        <span class="dim">Auto-Select:</span>
+        <span class="dim">Auto-Select<HelpTip :text="HELP['prefs.autoSelect']" /></span>
         <select v-model="prefs.autoSelect" data-testid="auto-select">
           <option value="layer">Layer</option>
           <option value="group">Group</option>
@@ -59,8 +61,8 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
     </template>
 
     <template v-else-if="tool === 'pen'">
-      <label class="opt" title="Add the next segment to an existing line, or start a new one">
-        <span class="dim">Draw into:</span>
+      <label class="opt">
+        <span class="dim">Draw into<HelpTip :text="HELP['line.target']" /></span>
         <select v-model="s.penTarget" data-testid="pen-target">
           <option :value="null">New line</option>
           <option v-for="l in store.lines()" :key="l.lineId" :value="l.lineId">{{ l.name }}</option>
@@ -68,32 +70,32 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
       </label>
       <div class="sep-v" />
       <template v-if="s.penTarget === null">
-        <ColorField v-model="prefs.line.color" label="Color" />
+        <ColorField v-model="prefs.line.color" label="Color" :help="HELP['line.color']" />
         <label class="opt">
-          <span class="dim">Style:</span>
+          <span class="dim">Style<HelpTip :text="HELP['line.kind']" /></span>
           <select v-model="prefs.line.kind" data-testid="line-style">
             <option v-for="k in STROKE_KINDS" :key="k.value" :value="k.value">{{ k.label }}</option>
           </select>
         </label>
         <template v-if="hasChannel(prefs.line.kind)">
-          <ColorField v-model="prefs.line.inner_color" label="Channel" />
-          <NumberField v-model="prefs.line.inner_width_pct" label="W" :min="0" :max="100" :precision="0" unit="%" :width="36" title="Channel width as a percentage of the line width" />
+          <ColorField v-model="prefs.line.inner_color" label="Channel" :help="HELP['line.channel']" />
+          <NumberField v-model="prefs.line.inner_width_pct" label="W" :min="0" :max="100" :precision="0" unit="%" :width="36" :help="HELP['line.channel_width']" />
         </template>
         <template v-if="hasDashes(prefs.line.kind)">
-          <NumberField v-model="prefs.line.dash_length" label="Dash" :min="0.1" :step="0.1" :precision="1" unit="cells" :width="36" title="Length of each dash" />
-          <NumberField v-model="prefs.line.dash_gap" label="Gap" :min="0" :step="0.1" :precision="1" unit="cells" :width="36" title="Space between dashes" />
-          <NumberField v-if="prefs.line.kind === 'hollow_dashed'" v-model="prefs.line.dash_width_pct" label="Dash W" :min="0" :max="100" :precision="0" unit="%" :width="36" title="Dash width as a percentage of the line width" />
+          <NumberField v-model="prefs.line.dash_length" label="Dash" :min="0.1" :step="0.1" :precision="1" unit="cells" :width="36" :help="HELP['line.dash_length']" />
+          <NumberField v-model="prefs.line.dash_gap" label="Gap" :min="0" :step="0.1" :precision="1" unit="cells" :width="36" :help="HELP['line.dash_gap']" />
+          <NumberField v-if="prefs.line.kind === 'hollow_dashed'" v-model="prefs.line.dash_width_pct" label="Dash W" :min="0" :max="100" :precision="0" unit="%" :width="36" :help="HELP['line.dash_width']" />
         </template>
         <div class="sep-v" />
         <label class="opt">
-          <span class="dim">Start:</span>
+          <span class="dim">Caps<HelpTip :text="HELP['line.caps']" /> Start</span>
           <select v-model="prefs.line.start_cap">
             <option value="round">Round</option>
             <option value="butt">Butt</option>
           </select>
         </label>
         <label class="opt">
-          <span class="dim">End:</span>
+          <span class="dim">End</span>
           <select v-model="prefs.line.end_cap">
             <option value="round">Round</option>
             <option value="butt">Butt</option>
@@ -105,11 +107,12 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
     </template>
 
     <template v-else-if="tool === 'eraser'">
-      <NumberField v-model="prefs.eraserSize" label="Size" :min="1" :max="15" :step="1" :precision="0" unit="cells" :width="36" />
+      <NumberField v-model="prefs.eraserSize" label="Size" :min="1" :max="15" :step="1" :precision="0" unit="cells" :width="36" :help="HELP['eraser.size']" />
       <span class="hint dim">Drag across a line to cut it into separate segments</span>
     </template>
 
     <template v-else-if="tool === 'station'">
+      <span class="dim opt">Shape<HelpTip :text="HELP['station.shape']" /></span>
       <Segmented
         v-model="prefs.station.kind"
         :options="[
@@ -120,12 +123,12 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
       />
       <div class="sep-v" />
       <template v-if="prefs.station.kind !== 'tick'">
-        <ColorField v-model="prefs.station.outer_color" label="Outer" />
-        <ColorField v-model="prefs.station.inner_color" label="Inner" />
+        <ColorField v-model="prefs.station.outer_color" label="Outer" :help="HELP['station.outer_color']" />
+        <ColorField v-model="prefs.station.inner_color" label="Inner" :help="HELP['station.inner_color']" />
       </template>
       <template v-else>
         <label class="opt">
-          <span class="dim">Side:</span>
+          <span class="dim">Side<HelpTip :text="HELP['station.tick_side']" /></span>
           <select v-model.number="prefs.station.tick_side">
             <option :value="1">Left</option>
             <option :value="-1">Right</option>
@@ -133,29 +136,31 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
         </label>
         <label class="opt">
           <input type="checkbox" :checked="prefs.station.tick_color === null" @change="prefs.station.tick_color = ($event.target as HTMLInputElement).checked ? null : '#000000'" />
-          <span class="dim">Line color</span>
+          <span class="dim">Line color<HelpTip :text="HELP['station.tick_color']" /></span>
         </label>
         <ColorField v-if="prefs.station.tick_color !== null" v-model="prefs.station.tick_color" />
       </template>
       <label class="opt">
         <input v-model="prefs.station.label" type="checkbox" />
-        <span class="dim">Name label</span>
+        <span class="dim">Name label<HelpTip :text="HELP['station.label']" /></span>
       </label>
       <span class="hint dim">{{ prefs.station.kind === 'pill' ? 'Drag across lines to paint a pill station' : 'Click on a line to place a station' }}</span>
     </template>
 
     <template v-else-if="tool === 'text'">
-      <select v-model="prefs.text.font_family" title="Font family">
+      <span class="dim opt">Font<HelpTip :text="HELP['text.font']" /></span>
+      <select v-model="prefs.text.font_family">
         <option v-for="f in FONT_FAMILIES" :key="f" :value="f">{{ fontLabel(f) }}</option>
       </select>
-      <NumberField v-model="prefs.text.size" label="Size" :min="0.1" :step="0.05" :width="40" unit="cells" />
-      <ColorField v-model="prefs.text.color" />
+      <NumberField v-model="prefs.text.size" label="Size" :min="0.1" :step="0.05" :width="40" unit="cells" :help="HELP['text.size']" />
+      <ColorField v-model="prefs.text.color" label="Color" :help="HELP['text.color']" />
       <button class="icon-btn" :class="{ on: prefs.text.bold }" title="Bold" @click="prefs.text.bold = !prefs.text.bold">
         <UiIcon name="bold" :size="16" />
       </button>
       <button class="icon-btn" :class="{ on: prefs.text.italic }" title="Italic" @click="prefs.text.italic = !prefs.text.italic">
         <UiIcon name="italic" :size="16" />
       </button>
+      <span class="dim opt">Align<HelpTip :text="HELP['text.align']" /></span>
       <Segmented
         v-model="prefs.text.align"
         :options="[
@@ -168,14 +173,15 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
     </template>
 
     <template v-else-if="tool === 'icon'">
+      <span class="dim opt">Symbol<HelpTip :text="HELP['icon.icon']" /></span>
       <IconPicker v-model="prefs.icon.icon" />
-      <ColorField v-model="prefs.icon.color" label="Glyph" />
-      <ColorField v-model="prefs.icon.background" label="Tile" />
+      <ColorField v-model="prefs.icon.color" label="Glyph" :help="HELP['icon.color']" />
+      <ColorField v-model="prefs.icon.background" label="Tile" :help="HELP['icon.background']" />
       <label class="opt">
         <input type="checkbox" :checked="prefs.icon.size === null" @change="prefs.icon.size = ($event.target as HTMLInputElement).checked ? null : 1.24" />
-        <span class="dim">Match station size</span>
+        <span class="dim">Match station size<HelpTip :text="HELP['icon.size_default']" /></span>
       </label>
-      <NumberField v-if="prefs.icon.size !== null" v-model="prefs.icon.size" label="Size" :min="0.1" :step="0.1" :width="40" unit="cells" />
+      <NumberField v-if="prefs.icon.size !== null" v-model="prefs.icon.size" label="Size" :min="0.1" :step="0.1" :width="40" unit="cells" :help="HELP['icon.size']" />
       <span class="hint dim">Click to drop · Alt: place off-grid</span>
     </template>
   </div>

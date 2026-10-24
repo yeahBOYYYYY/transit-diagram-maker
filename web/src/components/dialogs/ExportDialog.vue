@@ -9,6 +9,7 @@ import type { DocSettings } from '../../core/types'
 import { useEditor } from '../../stores/editor'
 import { prefs } from '../../stores/prefs'
 import { exportSvg } from '../../stores/commands'
+import { HELP } from '../../core/help'
 
 const store = useEditor()
 const draft = reactive<DocSettings>({ ...store.state.settings })
@@ -35,7 +36,7 @@ function reset(): void {
           :max="512"
           :precision="1"
           unit="px"
-          title="Scale of the exported drawing: how many pixels one grid cell becomes"
+          :help="HELP['export.cell_px']"
           data-testid="export-cell-px"
         />
       </template>
