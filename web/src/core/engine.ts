@@ -2,6 +2,7 @@
 // the boundary as JSON.
 import { TransitEditor } from '../wasm/pkg/transit_wasm.js'
 import type {
+  AssetList,
   Cell,
   CreatedLine,
   CreatedStation,
@@ -84,6 +85,12 @@ export class Engine {
   route(a: Cell, b: Cell, mode: RouteMode): Cell[] {
     return JSON.parse(this.ed.route(a.x, a.y, b.x, b.y, mode))
   }
+  assetList(): AssetList {
+    return JSON.parse(this.ed.assetList())
+  }
+  fontData(family: string): string {
+    return this.ed.fontData(family)
+  }
   static iconLibrary(): IconInfo[] {
     return JSON.parse(TransitEditor.iconLibrary())
   }
@@ -115,6 +122,22 @@ export class Engine {
   }
   cancel(): void {
     this.ed.cancel()
+  }
+
+  // uploaded assets
+  /** Store a font (a base64 data URL); returns the CSS font-family value to use. */
+  addFont(family: string, dataUrl: string): string {
+    return this.ed.addFont(family, dataUrl)
+  }
+  removeFont(family: string): void {
+    this.ed.removeFont(family)
+  }
+  /** Store an SVG icon (sanitized by the engine); returns its pictogram name. */
+  addIconAsset(label: string, svg: string): string {
+    return this.ed.addIconAsset(label, svg)
+  }
+  removeIconAsset(name: string): void {
+    this.ed.removeIconAsset(name)
   }
 
   // mutations

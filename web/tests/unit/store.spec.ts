@@ -1,6 +1,26 @@
 import { describe, expect, it, vi } from 'vitest'
 import { freshStore } from './helpers'
 import { prefs } from '../../src/stores/prefs'
+import { fontChoices } from '../../src/core/fonts'
+
+describe('uploaded assets', () => {
+  it('mirrors uploaded fonts and icons and offers them in the pickers', () => {
+    const store = freshStore()
+    const family = store.run((e) => e.addFont('City Sans', 'data:font/woff2;base64,d09GMgAB'))!
+    expect(family).toBe('"City Sans", sans-serif')
+    const name = store.run((e) => e.addIconAsset('Star', '<svg viewBox="0 0 10 10"><path d="M0 0H10V10Z"/></svg>'))!
+    expect(store.state.assets.fonts).toEqual(['City Sans'])
+    expect(store.state.assets.icons.map((i) => [i.name, i.label])).toEqual([[name, 'Star']])
+    expect(fontChoices(store.state.assets.fonts)).toContain(family)
+    // Invalid uploads are reported, not stored.
+    store.run((e) => e.addIconAsset('bad', '<html/>'))
+    expect(store.state.messageKind).toBe('error')
+    expect(store.state.assets.icons).toHaveLength(1)
+    // Undo removes the upload again.
+    store.undo()
+    expect(store.state.assets.icons).toHaveLength(0)
+  })
+})
 
 describe('editor store', () => {
   it('mirrors engine state after mutations', () => {

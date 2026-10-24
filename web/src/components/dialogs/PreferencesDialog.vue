@@ -89,13 +89,14 @@ fieldset {
   gap: 7px;
   margin: 0;
 }
-fieldset :deep(.num-field),
 fieldset :deep(.color-field) {
   justify-content: space-between;
 }
-/* Line the inputs up: every unit column has the same width. */
-fieldset :deep(.unit) {
-  min-width: 30px;
+/* label | input | unit columns, so inputs line up with or without a unit */
+fieldset :deep(.num-field) {
+  display: grid;
+  grid-template-columns: 1fr auto 34px;
+  column-gap: 4px;
 }
 legend {
   padding: 0 4px;

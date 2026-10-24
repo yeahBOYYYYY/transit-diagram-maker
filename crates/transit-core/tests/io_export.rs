@@ -177,3 +177,57 @@ fn fragments_follow_paint_order() {
     let ids: Vec<_> = render::render_fragments(ed.document()).iter().map(|f| f.id).collect();
     assert_eq!(ids, vec![b, a]);
 }
+
+const FONT: &str = "data:font/woff2;base64,d09GMgABAAAAAA==";
+const STAR: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M5 0L10 10H0Z" fill="currentColor"/><script>alert(1)</script></svg>"#;
+
+#[test]
+fn uploaded_assets_are_saved_in_the_file_and_exported() {
+    let mut ed = Editor::new();
+    let family = ed.add_font("City Sans", FONT).unwrap();
+    assert_eq!(family, "\"City Sans\", sans-serif");
+    let name = ed.add_icon_asset("Star", STAR).unwrap();
+    assert_eq!(name, "custom-1");
+    ed.add_text(TextBox { text: "Hi".into(), font_family: family.clone(), ..TextBox::default() }).unwrap();
+    let icon = ed.add_icon(Icon { icon: name.clone(), color: "#ff0000".into(), ..Icon::default() }).unwrap();
+    assert_eq!(ed.layer(icon).unwrap().name, "Star");
+
+    let text = io::to_transit(ed.document());
+    let back = io::from_transit(&text).unwrap();
+    assert_eq!(&back, ed.document(), "assets survive a save and load");
+
+    let svg = render::export_svg(ed.document());
+    roxmltree::Document::parse(&svg).unwrap();
+    assert!(svg.contains(r#"@font-face{font-family:"City Sans";src:url(data:font/woff2;base64,"#), "{svg}");
+    assert!(svg.contains(r##"viewBox="0 0 10 10" color="#ff0000""##), "{svg}");
+    assert!(svg.contains("M5 0L10 10H0Z"));
+    assert!(!svg.contains("script"));
+}
+
+#[test]
+fn unused_fonts_are_not_embedded_in_exports() {
+    let mut ed = Editor::new();
+    ed.add_font("Unused", FONT).unwrap();
+    ed.add_text(TextBox::default()).unwrap();
+    assert!(!render::export_svg(ed.document()).contains("@font-face"));
+}
+
+#[test]
+fn assets_can_be_removed_only_when_unused_and_changes_are_undoable() {
+    let mut ed = Editor::new();
+    let family = ed.add_font("Body", FONT).unwrap();
+    let name = ed.add_icon_asset("", STAR).unwrap();
+    assert_eq!(ed.assets().icons[0].label, "Custom icon");
+    let t = ed.add_text(TextBox { font_family: family, ..TextBox::default() }).unwrap();
+    let i = ed.add_icon(Icon { icon: name.clone(), ..Icon::default() }).unwrap();
+    assert!(ed.remove_font("Body").unwrap_err().to_string().contains("1 text layer"));
+    assert!(ed.remove_icon_asset(&name).unwrap_err().to_string().contains("1 pictogram"));
+    ed.delete(&[t, i]).unwrap();
+    ed.remove_font("Body").unwrap();
+    ed.remove_icon_asset(&name).unwrap();
+    assert!(ed.assets().fonts.is_empty() && ed.assets().icons.is_empty());
+    ed.undo();
+    assert_eq!(ed.assets().icons.len(), 1);
+    assert!(ed.add_font("Bad", "data:text/html;base64,AAAA").is_err());
+    assert!(ed.add_icon_asset("x", "<html/>").is_err());
+}

@@ -135,6 +135,45 @@ impl TransitEditor {
         Ok(render::station_svg(&st, self.inner.settings()))
     }
 
+    /// Uploaded fonts (family names) and icons (with preview markup).
+    #[wasm_bindgen(js_name = assetList)]
+    pub fn asset_list(&self) -> String {
+        let a = self.inner.assets();
+        let icons: Vec<Value> = a
+            .icons
+            .iter()
+            .map(|i| serde_json::json!({"name": i.name, "label": i.label, "svg": transit_core::assets::icon_markup(i, "#ffffff", "#1d4f91")}))
+            .collect();
+        let fonts: Vec<&str> = a.fonts.iter().map(|f| f.family.as_str()).collect();
+        json(&serde_json::json!({"fonts": fonts, "icons": icons}))
+    }
+
+    /// The data URL of an uploaded font, or "".
+    #[wasm_bindgen(js_name = fontData)]
+    pub fn font_data(&self, family: &str) -> String {
+        self.inner.assets().font(family).map(|f| f.data.to_string()).unwrap_or_default()
+    }
+
+    #[wasm_bindgen(js_name = addFont)]
+    pub fn add_font(&mut self, family: &str, data: &str) -> Result<String, JsError> {
+        self.inner.add_font(family, data).map_err(err)
+    }
+
+    #[wasm_bindgen(js_name = removeFont)]
+    pub fn remove_font(&mut self, family: &str) -> Result<(), JsError> {
+        self.inner.remove_font(family).map_err(err)
+    }
+
+    #[wasm_bindgen(js_name = addIconAsset)]
+    pub fn add_icon_asset(&mut self, label: &str, svg: &str) -> Result<String, JsError> {
+        self.inner.add_icon_asset(label, svg).map_err(err)
+    }
+
+    #[wasm_bindgen(js_name = removeIconAsset)]
+    pub fn remove_icon_asset(&mut self, name: &str) -> Result<(), JsError> {
+        self.inner.remove_icon_asset(name).map_err(err)
+    }
+
     #[wasm_bindgen(js_name = iconLibrary)]
     pub fn icon_library() -> String {
         let list: Vec<Value> = transit_core::icons::ICONS

@@ -447,6 +447,9 @@ impl Node {
 pub struct Document {
     #[serde(default)]
     pub settings: DocSettings,
+    /// Fonts and icons uploaded by the user.
+    #[serde(default)]
+    pub assets: crate::assets::Assets,
     /// Bottom-to-top.
     #[serde(default)]
     pub root: Vec<Node>,
@@ -460,7 +463,7 @@ fn first_id() -> Id {
 
 impl Default for Document {
     fn default() -> Self {
-        Document { settings: DocSettings::default(), root: Vec::new(), next_id: 1 }
+        Document { settings: DocSettings::default(), assets: Default::default(), root: Vec::new(), next_id: 1 }
     }
 }
 

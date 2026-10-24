@@ -2,6 +2,7 @@
 //! so what you see is exactly what gets exported. Output units are pixels
 //! (cell units × `DocSettings::cell_px`).
 
+use crate::assets::{Assets, FontAsset};
 use crate::geom::{fit_dashes, fmt_num, rounded_polyline, rounded_polyline_len, Cell, Rect, Vec2};
 use crate::icons;
 use crate::model::*;
@@ -281,7 +282,7 @@ pub fn text_svg(t: &TextBox, settings: &DocSettings) -> String {
     s
 }
 
-pub fn icon_svg(i: &Icon, settings: &DocSettings) -> String {
+pub fn icon_svg(i: &Icon, settings: &DocSettings, assets: &Assets) -> String {
     let g = settings.cell_px;
     let p = i.pos.scale(g);
     let size = i.size * g;
@@ -291,16 +292,19 @@ pub fn icon_svg(i: &Icon, settings: &DocSettings) -> String {
         n(p.y),
         n(i.rotation),
         n(size / 24.0),
-        icons::markup(&i.icon, &i.color, &i.background)
+        match assets.icon(&i.icon) {
+            Some(custom) => crate::assets::icon_markup(custom, &i.color, &i.background),
+            None => icons::markup(&i.icon, &i.color, &i.background),
+        }
     )
 }
 
-pub fn content_svg(c: &Content, settings: &DocSettings) -> String {
+pub fn content_svg(c: &Content, settings: &DocSettings, assets: &Assets) -> String {
     match c {
         Content::Line(seg) => line_svg(&seg.points, &seg.style, settings),
         Content::Station(st) => station_svg(st, settings),
         Content::Text(t) => text_svg(t, settings),
-        Content::Icon(i) => icon_svg(i, settings),
+        Content::Icon(i) => icon_svg(i, settings, assets),
     }
 }
 
@@ -366,7 +370,7 @@ pub fn render_fragments(doc: &Document) -> Vec<Fragment> {
             out.push(Fragment {
                 id: l.id,
                 kind: l.content.kind_name(),
-                svg: content_svg(&l.content, &doc.settings),
+                svg: content_svg(&l.content, &doc.settings, &doc.assets),
                 locked,
                 bounds: content_bounds(&l.content, &doc.settings),
             });
@@ -388,7 +392,7 @@ pub fn document_bounds(doc: &Document) -> Option<Rect> {
     acc
 }
 
-fn export_nodes(nodes: &[Node], settings: &DocSettings, out: &mut String, depth: usize) {
+fn export_nodes(nodes: &[Node], settings: &DocSettings, assets: &Assets, out: &mut String, depth: usize) {
     for node in nodes {
         if !node.visible() {
             continue;
@@ -397,7 +401,7 @@ fn export_nodes(nodes: &[Node], settings: &DocSettings, out: &mut String, depth:
         match node {
             Node::Group(g) => {
                 let _ = writeln!(out, r#"{pad}<g id="group-{}" data-name="{}">"#, g.id, esc(&g.name));
-                export_nodes(&g.children, settings, out, depth + 1);
+                export_nodes(&g.children, settings, assets, out, depth + 1);
                 let _ = writeln!(out, "{pad}</g>");
             }
             Node::Layer(l) => {
@@ -406,7 +410,7 @@ fn export_nodes(nodes: &[Node], settings: &DocSettings, out: &mut String, depth:
                     r#"{pad}<g id="layer-{}" data-name="{}">{}</g>"#,
                     l.id,
                     esc(&l.name),
-                    content_svg(&l.content, settings)
+                    content_svg(&l.content, settings, assets)
                 );
             }
         }
@@ -449,7 +453,21 @@ pub fn export_svg_with(doc: &Document, settings: &DocSettings) -> String {
             esc(&s.export_background)
         );
     }
-    export_nodes(&doc.root, s, &mut out, 1);
+    // Embed the uploaded fonts that visible text actually uses.
+    let mut used = Vec::new();
+    tree::walk_layers(&doc.root, &mut |l, vis, _| {
+        if let (true, Content::Text(t)) = (vis, &l.content) {
+            for f in &doc.assets.fonts {
+                if t.font_family.contains(&format!("\"{}\"", f.family)) && !used.iter().any(|u: &&FontAsset| u.family == f.family) {
+                    used.push(f);
+                }
+            }
+        }
+    });
+    if !used.is_empty() {
+        let _ = writeln!(out, "  <defs><style>{}</style></defs>", crate::assets::font_face_css(&used));
+    }
+    export_nodes(&doc.root, s, &doc.assets, &mut out, 1);
     out.push_str("</svg>\n");
     out
 }
@@ -671,7 +689,7 @@ mod tests {
     #[test]
     fn icon_renders_with_scale() {
         let i = Icon { pos: Vec2::new(1.0, 1.0), icon: "airport".into(), size: 1.0, ..Icon::default() };
-        let m = icon_svg(&i, &settings());
+        let m = icon_svg(&i, &settings(), &Assets::default());
         parse(&m);
         assert!(m.contains("scale(1)"));
         let b = content_bounds(&Content::Icon(i), &settings()).unwrap();
