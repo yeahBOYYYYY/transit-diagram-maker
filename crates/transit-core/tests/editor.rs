@@ -313,6 +313,37 @@ fn dragging_a_tick_hops_between_corners() {
 }
 
 #[test]
+fn pill_grows_into_neighbors_and_couples_to_new_lines() {
+    let mut ed = Editor::new();
+    let a = line(&mut ed, &[c(0, 0), c(9, 0)]);
+    let b = line(&mut ed, &[c(0, 2), c(9, 2)]);
+    let s = ed.add_pill(&[c(4, 0)], &StationOptions { label: false, ..StationOptions::default() }).unwrap();
+    assert_eq!(station(&ed, s.station_id).line_ids, vec![a.line_id]);
+    ed.set_pill_cells(s.station_id, &[c(4, 0), c(4, 1)]).unwrap();
+    ed.set_pill_cells(s.station_id, &[c(4, 0), c(4, 1), c(5, 2)]).unwrap();
+    let st = station(&ed, s.station_id);
+    assert_eq!(st.shape.cells(), vec![c(4, 0), c(4, 1), c(5, 2)]);
+    assert_eq!(st.line_ids, vec![a.line_id, b.line_id], "diagonal growth reaches the second line");
+    // Shrinking drops the coupling again.
+    ed.set_pill_cells(s.station_id, &[c(4, 0), c(4, 1)]).unwrap();
+    assert_eq!(station(&ed, s.station_id).line_ids, vec![a.line_id]);
+    assert_eq!(ed.undo_depth(), 6, "each change is one undo step");
+}
+
+#[test]
+fn pill_cells_must_stay_connected_on_a_line() {
+    let mut ed = Editor::new();
+    line(&mut ed, &[c(0, 0), c(9, 0)]);
+    let s = ed.add_pill(&[c(4, 0), c(4, 1)], &StationOptions::default()).unwrap();
+    assert!(ed.set_pill_cells(s.station_id, &[c(4, 0), c(6, 0)]).is_err(), "split in two");
+    assert!(ed.set_pill_cells(s.station_id, &[c(4, 1)]).is_err(), "off the line");
+    assert!(ed.set_pill_cells(s.station_id, &[]).is_err());
+    let dot = ed.add_station(StationKind::Dot, c(1, 0), &StationOptions::default()).unwrap();
+    assert!(ed.set_pill_cells(dot.station_id, &[c(1, 0), c(2, 0)]).is_err(), "only pills");
+    assert_eq!(station(&ed, s.station_id).shape.cells(), vec![c(4, 0), c(4, 1)]);
+}
+
+#[test]
 fn station_kind_can_change() {
     let mut ed = Editor::new();
     line(&mut ed, &[c(0, 0), c(9, 0)]);

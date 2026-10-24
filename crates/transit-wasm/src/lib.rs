@@ -237,6 +237,12 @@ impl TransitEditor {
         Ok(json(&self.inner.add_pill(&cells, &opts).map_err(err)?))
     }
 
+    #[wasm_bindgen(js_name = setPillCells)]
+    pub fn set_pill_cells(&mut self, id: f64, cells_json: &str) -> Result<(), JsError> {
+        let cells: Vec<Cell> = parse(cells_json)?;
+        self.inner.set_pill_cells(id as u64, &cells).map_err(err)
+    }
+
     #[wasm_bindgen(js_name = setStationKind)]
     pub fn set_station_kind(&mut self, id: f64, kind: &str) -> Result<(), JsError> {
         let kind: StationKind = parse(&format!("\"{kind}\""))?;

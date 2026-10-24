@@ -143,6 +143,10 @@ export class Engine {
   addPill(cells: Cell[], opts: Partial<StationOptions>): CreatedStation {
     return JSON.parse(this.ed.addPill(j(cells), j(opts)))
   }
+  /** Replace a pill station's cells (it must stay connected and touch a line). */
+  setPillCells(id: Id, cells: Cell[]): void {
+    this.ed.setPillCells(id, j(cells))
+  }
   setStationKind(id: Id, kind: StationKind): void {
     this.ed.setStationKind(id, kind)
   }

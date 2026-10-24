@@ -8,7 +8,7 @@ import { CELL_PX, cellAt, screenToWorld, unionRects, worldToScreen } from '../co
 import { useEditor } from '../stores/editor'
 import { prefs } from '../stores/prefs'
 import { actionForEvent, runAction } from '../stores/commands'
-import { createTools, type PointerInfo, type Tool } from '../tools'
+import { createTools, pillGrowTargets, selectedPill, type PointerInfo, type Tool } from '../tools'
 
 const store = useEditor()
 const s = store.state
@@ -27,6 +27,13 @@ function boundsOf(ids: Id[]): Map<Id, Rect> {
   const out = new Map<Id, Rect>()
   const frags = new Map(s.fragments.map((f) => [f.id, f]))
   for (const id of ids) {
+    // Stations are drawn as stroked skeletons, which getBBox measures without
+    // the stroke; the engine's bounds are exact for them.
+    const f = frags.get(id)
+    if (f?.kind === 'station' && f.bounds) {
+      out.set(id, f.bounds)
+      continue
+    }
     const el = docLayer.value?.querySelector<SVGGElement>(`g[data-id="${id}"]`)
     let r: Rect | null = null
     if (el && typeof el.getBBox === 'function') {
@@ -93,6 +100,18 @@ const handles = computed(() => {
   ]
 })
 
+// Arrows around a selected pill station: double click one to grow into that cell.
+const pillArrows = computed(() => {
+  void s.revision
+  if (s.tool !== 'select') return []
+  const pill = selectedPill(store)
+  if (!pill) return []
+  return pillGrowTargets(pill.cells).map(({ cell, dx, dy }) => {
+    const c = worldToScreen(s.view, (cell.x + 0.5 + pill.offset.x) * CELL_PX, (cell.y + 0.5 + pill.offset.y) * CELL_PX)
+    return { key: `${cell.x},${cell.y}`, x: c.x, y: c.y, angle: (Math.atan2(dy, dx) * 180) / Math.PI }
+  })
+})
+
 // ---------------------------------------------------------------- grid
 
 const grid = computed(() => {
@@ -137,6 +156,11 @@ function hitTest(clientX: number, clientY: number, world: { x: number; y: number
   return null
 }
 
+function parseCell(v: string | null | undefined): { x: number; y: number } | null {
+  const m = v?.match(/^(-?\d+),(-?\d+)$/)
+  return m ? { x: Number(m[1]), y: Number(m[2]) } : null
+}
+
 function info(e: PointerEvent | MouseEvent): PointerInfo {
   const rect = host.value!.getBoundingClientRect()
   const screen = { x: e.clientX - rect.left, y: e.clientY - rect.top }
@@ -155,14 +179,20 @@ function info(e: PointerEvent | MouseEvent): PointerInfo {
     ctrl: e.ctrlKey || e.metaKey,
     hitId: hitTest(e.clientX, e.clientY, world),
     handle: handleEl?.getAttribute('data-handle') ?? null,
+    handleCell: parseCell(handleEl?.getAttribute('data-cell')),
   }
 }
+
+// The canvas captures the pointer on press, so a following dblclick is
+// retargeted to the canvas itself; remember which handle was pressed.
+let lastDown: PointerInfo | null = null
 
 function onPointerDown(e: PointerEvent): void {
   if (s.textEdit && (e.target as Element).closest('textarea')) return
   if (s.textEdit) store.finishTextEdit(true)
   host.value?.focus({ preventScroll: true })
   const p = info(e)
+  lastDown = p
   if (e.button === 1 || (e.button === 0 && s.spaceHeld)) {
     panning.value = p.screen
     tools.hand.down?.(p)
@@ -200,7 +230,12 @@ function onPointerUp(e: PointerEvent): void {
 }
 
 function onDblClick(e: MouseEvent): void {
-  tool.value.dblclick?.(info(e))
+  let p = info(e)
+  const d = lastDown
+  if (!p.handle && d?.handle && Math.hypot(d.screen.x - p.screen.x, d.screen.y - p.screen.y) < 4) {
+    p = { ...p, handle: d.handle, handleCell: d.handleCell }
+  }
+  tool.value.dblclick?.(p)
 }
 
 function onLeave(): void {
@@ -448,6 +483,21 @@ defineExpose({ boundsOf })
               />
             </g>
           </template>
+          <template v-else-if="pillArrows.length">
+            <g
+              v-for="a in pillArrows"
+              :key="a.key"
+              class="grow-handle"
+              data-handle="grow"
+              :data-cell="a.key"
+              data-testid="pill-grow"
+              :transform="`translate(${a.x} ${a.y}) rotate(${a.angle})`"
+            >
+              <title>Double-click to extend the pill into this cell</title>
+              <circle r="11" fill="transparent" />
+              <path d="M-4.5 -6L5.5 0L-4.5 6Z" :fill="prefs.selectionColor" stroke="#fff" stroke-width="1.5" stroke-linejoin="round" />
+            </g>
+          </template>
           <template v-else>
             <rect
               v-for="(h, i) in handles"
@@ -522,6 +572,12 @@ defineExpose({ boundsOf })
 }
 .rotate-handle {
   cursor: alias;
+}
+.grow-handle {
+  cursor: copy;
+}
+.grow-handle:hover path {
+  transform: scale(1.3);
 }
 .text-editor {
   position: absolute;

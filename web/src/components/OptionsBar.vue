@@ -12,6 +12,7 @@ import IconPicker from './ui/IconPicker.vue'
 import { useEditor } from '../stores/editor'
 import { FONT_FAMILIES, prefs } from '../stores/prefs'
 import { rotateSelection } from '../stores/commands'
+import { selectedPill } from '../tools'
 import { STROKE_KINDS, hasChannel, hasDashes } from '../core/lineStyles'
 
 const store = useEditor()
@@ -19,6 +20,10 @@ const s = store.state
 const tool = computed(() => s.tool)
 
 const zoomPct = computed(() => Math.round(s.view.zoom * 100))
+const pillSelected = computed(() => {
+  void s.revision
+  return selectedPill(store) !== null
+})
 const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
 </script>
 
@@ -51,7 +56,8 @@ const fontLabel = (f: string) => f.split(',')[0].replace(/"/g, '')
       <button class="icon-btn" title="Rotate 45° clockwise" :disabled="!s.selection.length" @click="rotateSelection(store, 45)">
         <UiIcon name="rotate-cw" :size="16" />
       </button>
-      <span class="hint dim">Click a selected object to toggle rotate handles · Shift: add to selection · Alt+drag: free move (stations leave their line)</span>
+      <span v-if="pillSelected" class="hint dim">Double-click an arrow to extend the pill · double-click one of its cells to remove it</span>
+      <span v-else class="hint dim">Click a selected object to toggle rotate handles · Shift: add to selection · Alt+drag: free move (stations leave their line)</span>
     </template>
 
     <template v-else-if="tool === 'hand'">
