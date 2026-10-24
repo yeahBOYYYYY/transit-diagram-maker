@@ -40,19 +40,24 @@ npx playwright test     # browser tests (from web/, needs Google Chrome)
   panning, scroll panning and `Ctrl + Scroll` zoom around the cursor.
 - **Line pen** (`P`): click cells to add points; unaligned points are routed with
   one straight run and one 45° run, and every turn gets a smooth curve.
-  Plain, hollow and dashed styles; butt or round caps (roundness adjustable).
+  Plain, hollow, dashed and inner dashed styles, with optional plain lengths at
+  the ends of dashed lines; butt or round caps (roundness adjustable).
   Each segment has its own style (a line can turn dashed part of the way); the
   color is shared by the whole line.
-- **Erase tool** (`E`, shares the pen slot – long press to switch): cuts lines
-  into separate segment layers inside the same line group.
+- **Erase tool** (`E`): cuts lines into separate segment layers inside the same
+  line group.
 - **Stations** (`S`): dot stations that snap to the line center, tick stations
   aligned with the line border, and pill stations painted across several lines
   with a constant-radius outline. Each station gets a name label grouped with it.
-- **Text** (`T`) with inline editing and **pictograms** (`I`): wheelchair,
-  airport, ferry, national rail, metro, parking, bus, tram, bicycle, taxi,
-  information and interchange, plus uploaded SVG icons, all shown in the Icons
-  panel (click to pick, drag onto the canvas to place). Icons default to the dot
-  station size.
+- **Text** (`T`) with inline editing, left-to-right or right-to-left, and
+  **pictograms**: wheelchair, airport, ferry, national rail, metro, parking, bus,
+  tram, bicycle, taxi, information and interchange, plus uploaded SVG icons, all
+  shown in the Icons panel (click to add, drag onto the canvas to place). Icons
+  default to the dot station size.
+- **Snapping**: everything snaps to the cells while moved; hold Alt to move in
+  tenths of a cell.
+- **Eyedropper** next to every color field: click anything on the canvas to take
+  its color.
 - **Selection** (`V`): click, Shift+click, marquee, drag to move, click a
   selected object again to get rotate handles (grid content rotates in 45°
   steps), arrow-key nudging, duplicate, delete.
