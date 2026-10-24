@@ -756,8 +756,9 @@ impl Editor {
 
     // ------------------------------------------------------ generic editing
 
-    /// Merge a JSON patch into a layer's content. Style changes to a line
-    /// segment are applied to every segment of the same line.
+    /// Merge a JSON patch into a layer's content. A style change to a line
+    /// segment applies to that segment only, except its color, which is the
+    /// line's identity and is shared by every segment of the line.
     pub fn update_content(&mut self, id: Id, patch: &Value) -> Result<()> {
         let obj = patch.as_object().ok_or_else(|| EditError::Invalid("patch must be an object".into()))?;
         if obj.contains_key("kind") || obj.contains_key("shape") || obj.contains_key("line_id") {
@@ -785,8 +786,8 @@ impl Editor {
                 }
                 _ => None,
             };
-            let line_style = match &content {
-                Content::Line(seg) if obj.contains_key("style") => Some((seg.line_id, seg.style.clone())),
+            let line_color = match &content {
+                Content::Line(seg) if patch.pointer("/style/color").is_some() => Some((seg.line_id, seg.style.color.clone())),
                 _ => None,
             };
             if let Content::Line(seg) = &content {
@@ -799,14 +800,44 @@ impl Editor {
             if let Some(name) = rename {
                 layer.name = name;
             }
-            if let Some((line_id, style)) = line_style {
+            if let Some((line_id, color)) = line_color {
                 tree::walk_layers_mut(&mut d.root, &mut |l| {
                     if let Content::Line(s) = &mut l.content {
                         if s.line_id == line_id {
-                            s.style = style.clone();
+                            s.style.color = color.clone();
                         }
                     }
                 });
+            }
+            Ok(())
+        })
+    }
+
+    /// Merge a style patch into every segment of a line (editing the line
+    /// group, or "apply this segment's style to the whole line").
+    pub fn update_line_style(&mut self, line_id: Id, patch: &Value) -> Result<()> {
+        if !patch.is_object() {
+            return Err(EditError::Invalid("patch must be an object".into()));
+        }
+        self.apply(|d| {
+            let mut found = false;
+            let mut result = Ok(());
+            tree::walk_layers_mut(&mut d.root, &mut |l| {
+                if let Content::Line(s) = &mut l.content {
+                    if s.line_id == line_id && result.is_ok() {
+                        found = true;
+                        let mut v = serde_json::to_value(&s.style).expect("style serializes");
+                        merge(&mut v, patch);
+                        match serde_json::from_value(v) {
+                            Ok(style) => s.style = style,
+                            Err(e) => result = Err(EditError::Invalid(e.to_string())),
+                        }
+                    }
+                }
+            });
+            result?;
+            if !found {
+                return Err(EditError::NotFound(line_id));
             }
             Ok(())
         })
@@ -962,9 +993,9 @@ impl Editor {
             match (target_line, node) {
                 (Some(target), Node::Group(Group { kind: GroupKind::Line { line_id: source }, children, .. })) if source != target => {
                     // A whole line dropped onto another: merge it, keeping its stations.
-                    let style = line_style(&d.root, target).unwrap_or_default();
+                    let color = line_style(&d.root, target).unwrap_or_default().color;
                     let mut children = children;
-                    join_line(&mut children, source, target, &style);
+                    join_line(&mut children, source, target, &color);
                     tree::walk_layers_mut(&mut d.root, &mut |l| relink_station(l, source, target));
                     for (i, child) in children.into_iter().enumerate() {
                         tree::insert(&mut d.root, parent, index + i, child);
@@ -973,11 +1004,11 @@ impl Editor {
                 (target, n) => {
                     node = n;
                     if let Some(target) = target {
-                        let style = line_style(&d.root, target).unwrap_or_default();
+                        let color = line_style(&d.root, target).unwrap_or_default().color;
                         let mut list = vec![node];
                         let sources: HashSet<Id> = line_ids_in(&list).into_iter().filter(|l| *l != target).collect();
                         for source in sources {
-                            join_line(&mut list, source, target, &style);
+                            join_line(&mut list, source, target, &color);
                         }
                         node = list.pop().unwrap();
                     }
@@ -1252,13 +1283,14 @@ fn segments_end(nodes: &[Node], group_id: Id) -> usize {
         .unwrap_or(0)
 }
 
-/// Turn the segments of line `from` (within `nodes`) into segments of line `to`.
-fn join_line(nodes: &mut [Node], from: Id, to: Id, style: &LineStyle) {
+/// Turn the segments of line `from` (within `nodes`) into segments of line
+/// `to`. They keep their own style but take the line's color.
+fn join_line(nodes: &mut [Node], from: Id, to: Id, color: &str) {
     tree::walk_layers_mut(nodes, &mut |l| {
         if let Content::Line(s) = &mut l.content {
             if s.line_id == from {
                 s.line_id = to;
-                s.style = style.clone();
+                s.style.color = color.to_string();
             }
         }
         relink_station(l, from, to);

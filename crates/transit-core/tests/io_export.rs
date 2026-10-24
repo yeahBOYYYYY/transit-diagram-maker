@@ -37,53 +37,99 @@ fn transit_roundtrip_is_lossless() {
 }
 
 #[test]
-fn transit_has_envelope() {
-    let text = io::to_transit(sample().document());
-    let v: serde_json::Value = serde_json::from_str(&text).unwrap();
-    assert_eq!(v["format"], "transit-diagram");
-    assert_eq!(v["version"], 1);
-    assert!(v["document"]["root"].is_array());
+fn saved_file_is_an_svg_picture_with_editor_data() {
+    let ed = sample();
+    let text = io::to_transit(ed.document());
+    let xml = roxmltree::Document::parse(&text).expect("well-formed xml");
+    let root = xml.root_element();
+    assert_eq!(root.tag_name().name(), "svg");
+    assert_eq!(root.tag_name().namespace(), Some("http://www.w3.org/2000/svg"));
+    let data = |name: &str| xml.descendants().filter(|n| n.tag_name().namespace() == Some(io::NS) && n.tag_name().name() == name).count();
+    assert_eq!(data("document"), 1);
+    assert_eq!(data("settings"), 1);
+    assert_eq!(data("segment"), 3, "the blue line was erased into two segments");
+    assert_eq!(data("station"), 3);
+    // The picture is the regular export: same shapes as the SVG export.
+    assert!(text.contains("stroke-dasharray"));
+    assert!(text.contains(r##"fill="#ffffff""##), "background rect");
+    let seg = xml.descendants().find(|n| n.tag_name().name() == "segment").unwrap();
+    assert_eq!(seg.attribute("points"), Some("0,0 6,0 9,3"));
+    assert_eq!(seg.attribute("kind"), Some("plain"));
+    assert_eq!(seg.parent().unwrap().attribute("id").map(|i| i.starts_with("layer-")), Some(true));
+}
+
+#[test]
+fn hidden_layers_are_saved_but_not_painted() {
+    let mut ed = Editor::new();
+    let t = ed.add_text(TextBox { text: "Hidden".into(), ..TextBox::default() }).unwrap();
+    ed.set_visible(t, false).unwrap();
+    let text = io::to_transit(ed.document());
+    assert!(text.contains(&format!(r#"<g id="layer-{t}" data-name="Hidden" display="none">"#)), "{text}");
+    assert!(!io::from_transit(&text).unwrap().root.iter().any(|n| n.visible()));
+}
+
+#[test]
+fn multi_line_text_and_special_characters_survive() {
+    let mut ed = Editor::new();
+    let t = TextBox { text: "  Line one\nLine \"two\" & <three>\r\n\tend ".into(), font_family: "A \"B\" & C".into(), ..TextBox::default() };
+    ed.add_text(t).unwrap();
+    let back = io::from_transit(&io::to_transit(ed.document())).unwrap();
+    assert_eq!(&back, ed.document());
 }
 
 #[test]
 fn rejects_foreign_or_future_files() {
-    assert!(io::from_transit("not json").is_err());
-    assert!(io::from_transit(r#"{"format":"other","version":1,"document":{}}"#).is_err());
-    assert!(io::from_transit(r#"{"format":"transit-diagram","version":99,"document":{}}"#).is_err());
+    assert!(io::from_transit("not xml").is_err());
+    assert!(io::from_transit("<html/>").unwrap_err().to_string().contains("not an SVG"));
+    let plain = render::export_svg(sample().document());
+    assert!(io::from_transit(&plain).unwrap_err().to_string().contains("no Transit Diagram Maker data"), "a plain export cannot be opened");
+    let future = io::to_transit(&Document::default()).replace(r#"version="1""#, r#"version="99""#);
+    assert!(io::from_transit(&future).unwrap_err().to_string().contains("newer"));
+}
+
+fn file_with(settings: &str, body: &str) -> String {
+    format!(
+        r#"<svg xmlns="http://www.w3.org/2000/svg" xmlns:transit="{}"><metadata><transit:document version="1" next-id="1">{settings}</transit:document></metadata>{body}</svg>"#,
+        io::NS
+    )
+}
+
+fn file(body: &str) -> String {
+    file_with("", body)
 }
 
 #[test]
-fn rejects_duplicate_ids() {
-    let layer = r#"{"type":"layer","id":5,"name":"a","content":{"kind":"text","text":"x"}}"#;
-    let text = format!(r#"{{"format":"transit-diagram","version":1,"document":{{"root":[{layer},{layer}]}}}}"#);
-    let err = io::from_transit(&text).unwrap_err();
-    assert!(err.to_string().contains("duplicate id 5"));
+fn rejects_duplicate_ids_and_bad_values() {
+    let layer = r#"<g><transit:text id="5" name="a">x</transit:text></g>"#;
+    let err = io::from_transit(&file(&format!("{layer}{layer}"))).unwrap_err();
+    assert!(err.to_string().contains("two layers share the identifier 5"));
+    let bad = io::from_transit(&file(r#"<g><transit:icon id="1" size="big"/></g>"#)).unwrap_err();
+    assert!(bad.to_string().contains(r#"invalid size "big""#), "{bad}");
+    assert!(io::from_transit(&file(r#"<g><transit:segment id="1" points="0,0 1,0"/></g>"#)).unwrap_err().to_string().contains("missing attribute line"));
+    assert!(io::from_transit(&file(r#"<g><transit:station id="1" shape="star" cell="0,0"/></g>"#)).is_err());
 }
 
 #[test]
 fn repairs_id_counter_settings_and_bad_lines() {
-    let text = r#"{
-        "format": "transit-diagram", "version": 1,
-        "document": {
-            "next_id": 1,
-            "settings": {"grid_size": -4, "line_width": 0.8},
-            "root": [
-                {"type":"layer","id":40,"name":"a","content":{"kind":"line","line_id":41,
-                  "points":[{"x":0,"y":0},{"x":3,"y":1}],"style":{}}},
-                {"type":"layer","id":42,"name":"b","content":{"kind":"line","line_id":43,
-                  "points":[{"x":0,"y":0}],"style":{}}}
-            ]
-        }
-    }"#;
-    let doc = io::from_transit(text).unwrap();
-    assert_eq!(doc.next_id, 44);
-    assert_eq!(doc.settings.cell_px, CELL_PX, "a stored cell size from older files is ignored");
+    let text = file_with(
+        r#"<transit:settings line-width="0.8" tick-width="-3"/>"#,
+        r#"<g><transit:segment id="40" name="a" line="41" points="0,0 3,1"/></g>
+           <g><transit:segment id="42" name="b" line="43" points="0,0"/></g>
+           <g><transit:text id="44" pos="1.234,2" rotation="50">t</transit:text></g>
+           <rect width="5" height="5"/><g><path d="M0 0"/></g>"#,
+    );
+    let doc = io::from_transit(&text).unwrap();
+    assert_eq!(doc.next_id, 45);
     assert_eq!(doc.settings.line_width, 0.8);
-    assert_eq!(doc.root.len(), 1, "single-point line dropped");
+    assert_eq!(doc.settings.tick_width, 0.01, "out-of-range settings are clamped");
+    assert_eq!(doc.root.len(), 2, "single-point line dropped, foreign markup ignored");
     let Node::Layer(l) = &doc.root[0] else { panic!() };
     let Content::Line(seg) = &l.content else { panic!() };
     assert_eq!(seg.points, vec![c(0, 0), c(2, 0), c(3, 1)], "unaligned points are routed");
-    assert_eq!(seg.style, LineStyle::default(), "missing style fields get defaults");
+    assert_eq!(seg.style, LineStyle::default(), "missing style attributes get defaults");
+    let Node::Layer(t) = &doc.root[1] else { panic!() };
+    let Content::Text(t) = &t.content else { panic!() };
+    assert_eq!((t.pos, t.rotation), (Vec2::new(1.2, 2.0), 45.0));
 }
 
 #[test]
@@ -131,9 +177,8 @@ fn svg_export_preserves_group_structure() {
 fn svg_export_transparent_background_and_margin() {
     let mut ed = Editor::new();
     ed.create_line(&[c(0, 0), c(4, 0)], LineStyle::default()).unwrap();
-    let s = DocSettings { export_background: String::new(), export_margin: 2.0, ..DocSettings::default() };
-    ed.set_settings(s).unwrap();
-    let svg = render::export_svg(ed.document());
+    let opts = ExportOptions { background: String::new(), margin: 2.0, ..ExportOptions::default() };
+    let svg = render::export_svg_with(ed.document(), &opts);
     assert!(!svg.contains("<rect"));
     assert!(svg.contains(r#"viewBox="-48 -48 216 120""#), "{svg}");
 }
@@ -145,25 +190,23 @@ fn export_of_empty_document_is_valid() {
 }
 
 #[test]
-fn export_with_one_off_settings_scales_and_restyles() {
+fn export_options_scale_the_picture_only() {
     let mut ed = Editor::new();
     ed.create_line(&[c(0, 0), c(4, 0)], LineStyle::default()).unwrap();
     let normal = render::export_svg(ed.document());
     assert!(normal.contains(r#"width="168" height="72""#), "{normal}");
-    let custom = DocSettings { cell_px: 48.0, export_background: String::new(), ..ed.settings().clone() };
-    let big = render::export_svg_with(ed.document(), &custom);
+    let big = render::export_svg_with(ed.document(), &ExportOptions { cell_px: 48.0, ..ExportOptions::default() });
     assert!(big.contains(r#"width="336" height="144""#), "twice the pixels per cell: {big}");
-    assert!(!big.contains("<rect"), "transparent background");
-    let thin = render::export_svg_with(ed.document(), &DocSettings { line_width: 0.5, ..custom });
-    assert!(thin.contains(r#"stroke-width="24""#), "half-cell line at 48px per cell: {thin}");
+    assert!(big.contains(r#"stroke-width="48""#), "one-cell line at 48px per cell: {big}");
     assert_eq!(render::export_svg(ed.document()), normal, "the document is unchanged");
+    assert!(!render::export_svg(ed.document()).contains("transit:"), "an export has no editor data");
 }
 
 #[test]
 fn cell_size_is_not_saved() {
     let ed = Editor::new();
-    assert!(!io::to_transit(ed.document()).contains("cell_px"));
-    assert!(!io::to_transit(ed.document()).contains("grid_size"));
+    assert!(!io::to_transit(ed.document()).contains("cell-px"));
+    assert!(!io::to_transit(ed.document()).contains("export"));
 }
 
 #[test]

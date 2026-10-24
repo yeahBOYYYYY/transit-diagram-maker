@@ -1,15 +1,30 @@
 <script setup lang="ts">
-// Docked panel with a title header and a collapse toggle.
+// Docked panel with a title header (or several tabs) and a collapse toggle.
 import { ref } from 'vue'
 
-defineProps<{ title: string; grow?: boolean }>()
+defineProps<{ title: string; grow?: boolean; tabs?: string[]; active?: string }>()
+defineEmits<{ 'update:active': [string] }>()
 const collapsed = ref(false)
 </script>
 
 <template>
   <section class="panel" :class="{ collapsed, grow }" :data-panel="title">
     <header class="head" @dblclick="collapsed = !collapsed">
-      <div class="tab active">{{ title }}</div>
+      <template v-if="tabs">
+        <button
+          v-for="t in tabs"
+          :key="t"
+          type="button"
+          class="tab"
+          :class="{ active: t === active }"
+          :data-tab="t"
+          @click="$emit('update:active', t), (collapsed = false)"
+          @dblclick.stop
+        >
+          {{ t }}
+        </button>
+      </template>
+      <div v-else class="tab active">{{ title }}</div>
       <div class="spacer" />
       <button class="collapse" :title="collapsed ? 'Expand' : 'Collapse'" @click="collapsed = !collapsed">
         {{ collapsed ? '▸' : '▾' }}
@@ -51,7 +66,16 @@ const collapsed = ref(false)
   align-items: center;
   padding: 0 12px;
   color: var(--c-text-dim);
+  border: 0;
   border-right: 1px solid var(--c-border);
+  background: transparent;
+  font: inherit;
+}
+button.tab {
+  cursor: pointer;
+}
+button.tab:not(.active):hover {
+  color: var(--c-text);
 }
 .tab.active {
   background: var(--c-panel);

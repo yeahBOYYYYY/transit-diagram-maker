@@ -14,6 +14,9 @@ import ColorField from '../../src/components/ui/ColorField.vue'
 import ShortcutsDialog from '../../src/components/dialogs/ShortcutsDialog.vue'
 import DocumentSettingsDialog from '../../src/components/dialogs/DocumentSettingsDialog.vue'
 import AboutDialog from '../../src/components/dialogs/AboutDialog.vue'
+import ExportDialog from '../../src/components/dialogs/ExportDialog.vue'
+import IconsPanel from '../../src/components/panels/IconsPanel.vue'
+import * as files from '../../src/core/files'
 import { prefs } from '../../src/stores/prefs'
 
 let wrappers: VueWrapper[] = []
@@ -120,29 +123,41 @@ describe('PropertiesPanel', () => {
     expect(w.text()).toContain('All document settings')
   })
 
-  it('edits the style of a whole line from a segment', async () => {
+  it('edits one segment, or the whole line from its group', async () => {
     vi.useFakeTimers()
     const store = freshStore()
     const l = store.run((e) => e.createLine([{ x: 0, y: 0 }, { x: 9, y: 0 }], {}))!
     store.run((e) => e.erase([{ x: 4, y: 0 }]))
     store.select([l.layer_id])
     const w = mountIt(PropertiesPanel)
-    expect(w.text()).toContain('Line segment')
-    expect(w.text()).toContain('2 segments')
+    const dashed = () => store.state.fragments.filter((f) => f.svg.includes('stroke-dasharray')).length
+    expect(w.text()).toContain('Segment appearance')
+    expect(w.text()).toContain('1 of 2 segments')
     await w.find('[data-testid=prop-line-style]').setValue('dashed')
     vi.advanceTimersByTime(1000)
     await nextTick()
-    expect(store.state.fragments.filter((f) => f.svg.includes('stroke-dasharray'))).toHaveLength(2)
+    expect(dashed()).toBe(1)
     expect(w.text()).toContain('Gap')
-    expect(w.text()).not.toContain('Dash W')
+    expect(w.text()).not.toContain('Dash width')
     await w.find('[data-testid=prop-line-style]').setValue('hollow_dashed')
     await nextTick()
     expect(w.text()).toContain('Channel')
-    expect(w.text()).toContain('Dash W')
+    expect(w.text()).toContain('Dash width')
     await w.find('[data-testid=end-cap]').setValue('butt')
     vi.advanceTimersByTime(1000)
     const n = store.node(l.layer_id)
     expect(n?.type === 'layer' && n.content.kind === 'line' && n.content.style.end_cap).toBe('butt')
+    // Copy the segment's style to the rest of the line.
+    await w.find('[data-testid=apply-style-to-line]').trigger('click')
+    expect(dashed()).toBe(2)
+    // The line group edits every segment.
+    store.select([l.group_id])
+    await nextTick()
+    expect(w.text()).toContain('Line appearance')
+    expect(w.find('[data-testid=apply-style-to-line]').exists()).toBe(false)
+    await w.find('[data-testid=prop-line-style]').setValue('plain')
+    vi.advanceTimersByTime(1000)
+    expect(dashed()).toBe(0)
     vi.useRealTimers()
   })
 
@@ -252,6 +267,7 @@ describe('property help', () => {
   it('every setting in the dialogs and tool options has help', async () => {
     const store = freshStore()
     expectHelpEverywhere(mountIt(DocumentSettingsDialog))
+    expectHelpEverywhere(mountIt(ExportDialog))
     for (const tool of ['pen', 'eraser', 'station', 'text', 'icon'] as const) {
       store.setTool(tool)
       // Mounted per tool: happy-dom can't patch the bar between some tools.
@@ -359,6 +375,54 @@ describe('OptionsBar', () => {
     store.setTool('station')
     await nextTick()
     expect(w.text()).toContain('Pill')
+  })
+})
+
+describe('IconsPanel', () => {
+  it('picks a pictogram for the Icon tool, or for the selected pictograms', async () => {
+    const store = freshStore()
+    const w = mountIt(IconsPanel)
+    await w.find('[data-icon=ferry]').trigger('click')
+    expect(prefs.icon.icon).toBe('ferry')
+    expect(store.state.tool).toBe('icon')
+    const id = store.run((e) => e.addIcon({ icon: 'wheelchair' }))!
+    store.select([id])
+    await nextTick()
+    expect(w.find('.cell.on').attributes('data-icon')).toBe('wheelchair')
+    await w.find('[data-icon=bus]').trigger('click')
+    const n = store.node(id)
+    expect(n?.type === 'layer' && n.content.kind === 'icon' && n.content.icon).toBe('bus')
+  })
+
+  it('pictograms can be dragged', () => {
+    freshStore()
+    const w = mountIt(IconsPanel)
+    const cell = w.find('[data-icon=ferry]')
+    expect(cell.attributes('draggable')).toBe('true')
+    const data = new Map<string, string>()
+    const dataTransfer = { setData: (k: string, v: string) => data.set(k, v), effectAllowed: '' }
+    cell.element.dispatchEvent(Object.assign(new Event('dragstart'), { dataTransfer }))
+    expect(data.get('application/x-transit-icon')).toBe('ferry')
+  })
+})
+
+describe('ExportDialog', () => {
+  it('shows only export options and remembers them', async () => {
+    const store = freshStore()
+    store.run((e) => e.createLine([{ x: 0, y: 0 }, { x: 4, y: 0 }], {}))
+    const download = vi.spyOn(files, 'downloadText').mockImplementation(() => {})
+    const w = mountIt(ExportDialog)
+    expect(w.findAll('.num-field').map((f) => f.text())).toEqual(['Pixels per cellpixels', 'Margincells'])
+    await w.find('[data-testid=export-transparent]').setValue(true)
+    await w.find('[data-testid=export-cell-px] input').setValue('48')
+    await w.find('[data-testid=export-cell-px] input').trigger('blur')
+    await w.find('[data-testid=dialog-ok]').trigger('click')
+    expect(prefs.export).toEqual({ cell_px: 48, margin: 1, background: '' })
+    const svg = download.mock.calls[0][1]
+    expect(svg).toContain('width="336" height="144"')
+    expect(svg).not.toContain('<rect')
+    expect(svg).not.toContain('transit:')
+    download.mockRestore()
   })
 })
 

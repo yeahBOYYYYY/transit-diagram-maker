@@ -1,15 +1,12 @@
 <script setup lang="ts">
-// Editable document settings, grouped in sections. Shared by the Document
-// Settings dialog and the SVG export dialog (which shows only the sections
-// that change how existing content renders).
+// Editable document settings, grouped in sections, for the Document Settings dialog.
 import NumberField from '../ui/NumberField.vue'
-import ColorField from '../ui/ColorField.vue'
 import type { DocSettings } from '../../core/types'
 import FontSelect from '../ui/FontSelect.vue'
 import { HELP } from '../../core/help'
 import HelpTip from '../ui/HelpTip.vue'
 
-export type SettingsSection = 'drawing' | 'lines' | 'stations' | 'ticks' | 'labels' | 'icons' | 'export'
+export type SettingsSection = 'drawing' | 'lines' | 'stations' | 'ticks' | 'labels' | 'icons'
 
 defineProps<{ draft: DocSettings; sections: SettingsSection[] }>()
 </script>
@@ -58,16 +55,6 @@ defineProps<{ draft: DocSettings; sections: SettingsSection[] }>()
       </label>
       <NumberField v-if="draft.icon_size !== null" v-model="draft.icon_size" label="Default size" :min="0.05" :max="50" :step="0.1" unit="cells" :help="HELP['settings.icon_size']" />
     </fieldset>
-    <fieldset v-if="sections.includes('export')">
-      <legend>SVG export</legend>
-      <NumberField v-model="draft.export_margin" :help="HELP['settings.export_margin']" label="Margin" :min="0" :max="100" :step="0.5" unit="cells" />
-      <label class="f">
-        <input type="checkbox" :checked="draft.export_background === ''" @change="draft.export_background = ($event.target as HTMLInputElement).checked ? '' : '#ffffff'" />
-        <span class="dim">Transparent background<HelpTip :text="HELP['settings.export_background']" /></span>
-      </label>
-      <ColorField v-if="draft.export_background !== ''" v-model="draft.export_background" label="Background" :help="HELP['settings.export_background']" />
-      <slot name="export" />
-    </fieldset>
   </div>
 </template>
 
@@ -85,9 +72,6 @@ fieldset {
   flex-direction: column;
   gap: 7px;
   margin: 0;
-}
-fieldset :deep(.color-field) {
-  justify-content: space-between;
 }
 /* label | input | unit columns, so inputs line up with or without a unit */
 fieldset :deep(.num-field) {

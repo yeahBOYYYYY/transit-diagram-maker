@@ -10,7 +10,7 @@ export const HELP = {
 
   // Lines
   'line.target': 'Draw a new line, or add a disconnected segment to an existing line. New segments take that line\'s style.',
-  'line.color': 'Main color of the line. Changing it recolors every segment of the line.',
+  'line.color': 'Main color of the line. It is shared by all segments of the line, so changing it recolors the whole line.',
   'line.kind':
     'Plain: a solid line. Hollow: a line with an inner channel. Dashed: the line is broken into dashes with empty gaps. Hollow dashed: dashes run down the channel of a hollow line.',
   'line.channel': 'Color of the inner channel of a hollow line.',
@@ -20,6 +20,9 @@ export const HELP = {
   'line.dash_width': 'Width of the dashes inside a hollow dashed line, as a percentage of the line width.',
   'line.caps': 'Shape of the line ends. Round ends follow the document\'s cap roundness; butt ends are square and fill the end cell.',
   'line.points': 'The cells where the segment starts, turns and ends.',
+  'line.style_scope':
+    'A selected segment has its own style, so a line can change style along its way (for example dashed where it is under construction). Select the line group to change all of its segments at once. The color is always shared by the whole line.',
+  'line.apply_to_line': 'Copy the style of this segment (stroke, channel, dashes and caps) to every segment of its line.',
 
   // Stations
   'station.shape':
@@ -42,7 +45,10 @@ export const HELP = {
   'text.rotation': 'Rotation in degrees, in steps of 45°.',
 
   // Pictograms
-  'icon.icon': 'Which pictogram to show.',
+  'icon.icon': 'Which pictogram to show. Pick another one in the Icons panel.',
+  'icon.panel':
+    'Clicking a pictogram picks it for the Icon tool, or changes the selected pictograms to it. Dragging a pictogram onto the canvas places it in the cell under the pointer (hold Alt to place it exactly under the pointer).',
+  'icon.upload': 'SVG files you uploaded into this document. They are saved inside the file. Remove them in Document ▸ Fonts & Icons.',
   'icon.color': 'Color of the pictogram symbol.',
   'icon.background': 'Color of the rounded tile behind the symbol.',
   'icon.size': 'Edge length of the tile, in cells.',
@@ -65,9 +71,11 @@ export const HELP = {
   'settings.label_font_size': 'Font size of new station labels, in cells.',
   'settings.label_font_family': 'Font of new station labels.',
   'settings.icon_size': 'Size of newly placed pictograms. By default they match the dot station diameter.',
-  'settings.export_margin': 'Empty space around the drawing in the exported SVG, in cells.',
-  'settings.export_background': 'Background color of the exported SVG. Leave transparent to export without a background.',
+
+  // SVG export
   'export.cell_px': 'Scale of the exported SVG: how many pixels one grid cell becomes. 24 matches the canvas at 100% zoom.',
+  'export.margin': 'Empty space around the drawing in the exported SVG, in cells.',
+  'export.background': 'Background color of the exported SVG. Choose transparent to export without a background.',
 
   // Preferences
   'prefs.historyLimit': 'How many steps Undo can go back.',

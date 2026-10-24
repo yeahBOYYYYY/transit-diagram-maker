@@ -1,10 +1,10 @@
 // Implementation of every catalogued action.
 import type { ActionId } from '../core/actions'
-import type { DocSettings } from '../core/types'
+import type { ExportOptions } from '../core/types'
 import { matches } from '../core/shortcuts'
 import { findItem, isEffectivelyLocked, leafIds } from '../core/tree'
 import type { Engine } from '../core/engine'
-import { baseName, canSaveInPlace, downloadText, fontDataUrl, pickFile, pickSaveHandle, pickTransitFile, writeHandle } from '../core/files'
+import { TRANSIT_EXT, baseName, canSaveInPlace, docNameOf, downloadText, fontDataUrl, pickFile, pickSaveHandle, pickTransitFile, writeHandle } from '../core/files'
 import type { EditorStore, ToolId } from './editor'
 import { prefs } from './prefs'
 import { CELL_PX } from '../core/viewport'
@@ -105,17 +105,17 @@ export async function saveTransit(store: EditorStore, saveAs = false): Promise<v
   const s = store.state
   const text = store.engine.value.saveTransit()
   if (!canSaveInPlace()) {
-    downloadText(`${s.docName}.transit`, text, 'application/json')
+    downloadText(`${s.docName}${TRANSIT_EXT}`, text, 'image/svg+xml')
     s.dirty = false
-    store.notify(`Saved ${s.docName}.transit`)
+    store.notify(`Saved ${s.docName}${TRANSIT_EXT}`)
     return
   }
   try {
-    const handle = (!saveAs && store.getFileHandle()) || (await pickSaveHandle(`${s.docName}.transit`))
+    const handle = (!saveAs && store.getFileHandle()) || (await pickSaveHandle(`${s.docName}${TRANSIT_EXT}`))
     if (!handle) return
     await writeHandle(handle, text)
     store.setFileHandle(handle)
-    s.docName = handle.name.replace(/\.transit$/i, '')
+    s.docName = docNameOf(handle.name)
     s.dirty = false
     store.notify(`Saved ${handle.name}`)
   } catch (err) {
@@ -123,9 +123,9 @@ export async function saveTransit(store: EditorStore, saveAs = false): Promise<v
   }
 }
 
-/** Download the drawing as SVG, optionally with one-off settings and scale (pixels per cell). */
-export function exportSvg(store: EditorStore, settings?: DocSettings, cellPx = CELL_PX): void {
-  const svg = settings ? store.engine.value.exportSvgWith(settings, cellPx) : store.engine.value.exportSvg()
+/** Download the drawing as a plain SVG picture (without editor data). */
+export function exportSvg(store: EditorStore, options?: ExportOptions): void {
+  const svg = options ? store.engine.value.exportSvgWith(options) : store.engine.value.exportSvg()
   downloadText(`${store.state.docName}.svg`, svg, 'image/svg+xml')
   store.notify(`Exported ${store.state.docName}.svg`)
 }

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 // Properties of the current selection (or the document when nothing is selected).
 import { computed } from 'vue'
-import PanelFrame from './PanelFrame.vue'
 import NumberField from '../ui/NumberField.vue'
 import ColorField from '../ui/ColorField.vue'
 import Segmented from '../ui/Segmented.vue'
@@ -92,9 +91,21 @@ const lineSegmentCount = computed(() => {
   return n
 })
 
+/**
+ * A selected segment changes on its own (its color is shared by the whole
+ * line); a selected line group changes every one of its segments.
+ */
 function setStyle<K extends keyof LineStyle>(key: K, value: LineStyle[K]): void {
   const ls = lineSeg.value
-  if (ls) live((e) => e.updateContent(ls.id, { style: { [key]: value } }))
+  if (!ls) return
+  if (layer.value) live((e) => e.updateContent(ls.id, { style: { [key]: value } }))
+  else live((e) => e.updateLineStyle(ls.seg.line_id, { [key]: value }))
+}
+
+/** Give every segment of the line the selected segment's style. */
+function applyStyleToLine(): void {
+  const ls = lineSeg.value
+  if (ls) store.run((e) => e.updateLineStyle(ls.seg.line_id, ls.seg.style))
 }
 
 function patch(obj: Record<string, unknown>): void {
@@ -154,17 +165,16 @@ const childCount = computed(() => (group.value ? (findItem(s.tree, group.value.i
 </script>
 
 <template>
-  <PanelFrame title="Properties">
-    <div class="props" data-testid="properties-panel">
+  <div class="props" data-testid="properties-panel">
       <!-- nothing selected: document -->
       <template v-if="s.selection.length === 0">
         <div class="section-title">Document</div>
         <div class="stack">
-          <NumberField :model-value="s.settings.line_width" label="Line W" :min="0.05" :max="4" :step="0.05" unit="cells" :help="HELP['settings.line_width']" @update:model-value="(v) => setSetting('line_width', v)" @commit="done" />
+          <NumberField :model-value="s.settings.line_width" label="Line width" :min="0.05" :max="4" :step="0.05" unit="cells" :help="HELP['settings.line_width']" @update:model-value="(v) => setSetting('line_width', v)" @commit="done" />
           <NumberField :model-value="s.settings.corner_radius" label="Curve" :min="0" :max="50" :step="0.25" unit="cells" :help="HELP['settings.corner_radius']" @update:model-value="(v) => setSetting('corner_radius', v)" @commit="done" />
-          <NumberField :model-value="s.settings.cap_roundness" label="Cap round" :min="0" :max="1" :step="0.05" :help="HELP['settings.cap_roundness']" @update:model-value="(v) => setSetting('cap_roundness', v)" @commit="done" />
-          <NumberField :model-value="s.settings.station_outer_radius" label="Stn outer" :min="0.05" :max="10" :step="0.02" unit="cells" :help="HELP['settings.station_outer_radius']" @update:model-value="(v) => setSetting('station_outer_radius', v)" @commit="done" />
-          <NumberField :model-value="s.settings.station_inner_radius" label="Stn inner" :min="0" :max="10" :step="0.02" unit="cells" :help="HELP['settings.station_inner_radius']" @update:model-value="(v) => setSetting('station_inner_radius', v)" @commit="done" />
+          <NumberField :model-value="s.settings.cap_roundness" label="Cap roundness" :min="0" :max="1" :step="0.05" :help="HELP['settings.cap_roundness']" @update:model-value="(v) => setSetting('cap_roundness', v)" @commit="done" />
+          <NumberField :model-value="s.settings.station_outer_radius" label="Station outer" :min="0.05" :max="10" :step="0.02" unit="cells" :help="HELP['settings.station_outer_radius']" @update:model-value="(v) => setSetting('station_outer_radius', v)" @commit="done" />
+          <NumberField :model-value="s.settings.station_inner_radius" label="Station inner" :min="0" :max="10" :step="0.02" unit="cells" :help="HELP['settings.station_inner_radius']" @update:model-value="(v) => setSetting('station_inner_radius', v)" @commit="done" />
         </div>
         <button class="ps-btn more" @click="s.dialog = 'document'">All document settings…</button>
         <p class="dim tip">Select a layer on the canvas or in the Layers panel to edit its properties.</p>
@@ -205,7 +215,10 @@ const childCount = computed(() => (group.value ? (findItem(s.tree, group.value.i
 
         <!-- line style (segment or line group) -->
         <template v-if="lineSeg">
-          <div class="section-title">Line appearance <span class="dim small">· {{ lineSegmentCount }} segment{{ lineSegmentCount === 1 ? '' : 's' }}</span></div>
+          <div class="section-title">
+            {{ layer ? 'Segment appearance' : 'Line appearance' }}<HelpTip :text="HELP['line.style_scope']" />
+            <span class="dim small">· {{ layer ? `1 of ${lineSegmentCount}` : lineSegmentCount }} segment{{ lineSegmentCount === 1 ? '' : 's' }}</span>
+          </div>
           <div class="field">
             <span class="lbl">Color<HelpTip :text="HELP['line.color']" /></span>
             <ColorField :model-value="lineSeg.seg.style.color" @update:model-value="(v) => setStyle('color', v)" />
@@ -227,7 +240,7 @@ const childCount = computed(() => (group.value ? (findItem(s.tree, group.value.i
             <div class="grid2">
               <NumberField :model-value="lineSeg.seg.style.dash_length" label="Dash" :min="0.1" :step="0.1" :precision="1" unit="cells" :help="HELP['line.dash_length']" @update:model-value="(v) => setStyle('dash_length', v)" @commit="done" />
               <NumberField :model-value="lineSeg.seg.style.dash_gap" label="Gap" :min="0" :step="0.1" :precision="1" unit="cells" :help="HELP['line.dash_gap']" @update:model-value="(v) => setStyle('dash_gap', v)" @commit="done" />
-              <NumberField v-if="lineSeg.seg.style.kind === 'hollow_dashed'" :model-value="lineSeg.seg.style.dash_width_pct" label="Dash W" :min="0" :max="100" :precision="0" unit="%" :help="HELP['line.dash_width']" @update:model-value="(v) => setStyle('dash_width_pct', v)" @commit="done" />
+              <NumberField v-if="lineSeg.seg.style.kind === 'hollow_dashed'" :model-value="lineSeg.seg.style.dash_width_pct" label="Dash width" :min="0" :max="100" :precision="0" unit="%" :help="HELP['line.dash_width']" @update:model-value="(v) => setStyle('dash_width_pct', v)" @commit="done" />
             </div>
           </template>
           <div class="field">
@@ -241,6 +254,14 @@ const childCount = computed(() => (group.value ? (findItem(s.tree, group.value.i
               <option value="butt">Butt end</option>
             </select>
           </div>
+          <button
+            v-if="layer && lineSegmentCount > 1"
+            class="ps-btn apply-line"
+            data-testid="apply-style-to-line"
+            @click="applyStyleToLine"
+          >
+            Apply this style to the whole line<HelpTip :text="HELP['line.apply_to_line']" />
+          </button>
           <div v-if="layer" class="dim small">
             Points<HelpTip :text="HELP['line.points']" />: {{ lineSeg.seg.points.map((p) => `(${p.x}, ${p.y})`).join(' → ') }}
           </div>
@@ -346,7 +367,7 @@ const childCount = computed(() => (group.value ? (findItem(s.tree, group.value.i
           <div class="section-title">Pictogram</div>
           <div class="field">
             <span class="lbl">Symbol<HelpTip :text="HELP['icon.icon']" /></span>
-            <IconPicker :model-value="layer.content.icon" @update:model-value="(v) => (patch({ icon: v }), done())" />
+            <IconPicker :model-value="layer.content.icon" />
           </div>
           <div class="field">
             <span class="lbl">Glyph<HelpTip :text="HELP['icon.color']" /></span>
@@ -362,8 +383,7 @@ const childCount = computed(() => (group.value ? (findItem(s.tree, group.value.i
           </div>
         </template>
       </template>
-    </div>
-  </PanelFrame>
+  </div>
 </template>
 
 <style scoped>
@@ -451,8 +471,13 @@ const childCount = computed(() => (group.value ? (findItem(s.tree, group.value.i
   resize: vertical;
   padding: 4px 6px;
 }
-.more {
+.more,
+.apply-line {
   align-self: flex-start;
+}
+.apply-line {
+  display: inline-flex;
+  align-items: center;
 }
 .tip {
   margin: 4px 0 0;

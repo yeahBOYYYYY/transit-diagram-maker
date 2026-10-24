@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useEditor } from '../stores/editor'
+import { APP } from '../core/about'
+import UiIcon from './ui/UiIcon.vue'
 
 const store = useEditor()
 const s = store.state
@@ -35,6 +37,10 @@ const layerCount = computed(() => s.fragments.length)
     <span class="dim">{{ layerCount }} visible layer{{ layerCount === 1 ? '' : 's' }}</span>
     <span class="msg" :class="s.messageKind" data-testid="status-message">{{ s.message }}</span>
     <span class="dim hist">{{ s.canUndo ? 'Undo available' : '' }}</span>
+    <span class="sep" />
+    <a class="github" :href="APP.repoUrl" target="_blank" rel="noopener" title="Transit Diagram Maker on GitHub" data-testid="github-link">
+      <UiIcon name="github" :size="14" />
+    </a>
   </footer>
 </template>
 
@@ -75,5 +81,13 @@ const layerCount = computed(() => s.fragments.length)
 .hist {
   min-width: 90px;
   text-align: right;
+}
+.github {
+  display: flex;
+  align-items: center;
+  color: var(--c-text-dim);
+}
+.github:hover {
+  color: #fff;
 }
 </style>

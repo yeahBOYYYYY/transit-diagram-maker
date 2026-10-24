@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Every document constant: drawing, line geometry, stations, labels, icons, export.
+// Every document constant: drawing, line geometry, stations, labels and icons.
 import { reactive } from 'vue'
 import ModalDialog from './ModalDialog.vue'
 import SettingsFields from '../settings/SettingsFields.vue'
@@ -20,8 +20,6 @@ const DEFAULTS: DocSettings = {
   label_font_size: 0.75,
   label_font_family: 'Helvetica, Arial, sans-serif',
   icon_size: null,
-  export_margin: 1,
-  export_background: '#ffffff',
   route_mode: 'straight_first',
 }
 
@@ -36,7 +34,7 @@ function reset(): void {
 
 <template>
   <ModalDialog title="Document Settings" :width="560" @ok="ok" @cancel="store.state.dialog = null">
-    <SettingsFields :draft="draft" :sections="['drawing', 'lines', 'stations', 'ticks', 'labels', 'icons', 'export']" />
+    <SettingsFields :draft="draft" :sections="['drawing', 'lines', 'stations', 'ticks', 'labels', 'icons']" />
     <template #extra>
       <button class="ps-btn" @click="reset">Reset to defaults</button>
     </template>

@@ -1,5 +1,15 @@
 # Bugs & Teaks
 
+## 24/10/2026 - Commit db38ed1
+
+1. All line segments of the same line must share a style, this is weird since there are lines in which the style will change along the line, in those cases we want to seperate the line into segments with different styles.
+2. When exporting to SVG it should show settings about the export and not all the project settings. Check what settings are actually relevant!
+3. Usage of shortening of words in any title is a bad habit! It makes the reader must have context, hence all strings must not contain shortcuts that aren't part of the English language (like "isn't").
+4. It might be better if the GitHub logo should be in the bottom bar on the right. And the save icon on the top bar on the left, right to the right of the "Td" logo.
+5. The logo of the page in the browser and the logo inside in the menu bar should be the same, I like the favicon more.
+6. Selecting icons is done quite bad, instead of a big dropdown menu, you can transform the entire tool into a separate panel tab next to "Properties", this panel will show all available icons in an ordered grid fashion and the same option to upload a new SVG like now. Then it will not feel cramped in the tiny layout of the app. Also it will be easier to also be able to drag and drop an icon from that panel directly (while also keeping the option to select it via clicking).
+7. I'm not sure `.transit` should be a JSON, won't it be better to be a flavour of XML (so that all the common keys would just be a part of a tag).
+
 ## 24/10/2026 - Commit 2c92670
 
 Those are the bugs needed to be fixed,

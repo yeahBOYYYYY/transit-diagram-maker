@@ -33,8 +33,8 @@ function reset(): void {
       <fieldset>
         <legend>General</legend>
         <NumberField v-model="draft.historyLimit" :help="HELP['prefs.historyLimit']" label="History states" :min="1" :max="5000" :precision="0" />
-        <NumberField v-model="draft.longPressMs" :help="HELP['prefs.longPressMs']" label="Long press" :min="100" :max="3000" :step="50" :precision="0" unit="ms" />
-        <NumberField v-model="draft.dragThreshold" :help="HELP['prefs.dragThreshold']" label="Drag threshold" :min="0" :max="30" :precision="0" unit="px" />
+        <NumberField v-model="draft.longPressMs" :help="HELP['prefs.longPressMs']" label="Long press" :min="100" :max="3000" :step="50" :precision="0" unit="milliseconds" />
+        <NumberField v-model="draft.dragThreshold" :help="HELP['prefs.dragThreshold']" label="Drag threshold" :min="0" :max="30" :precision="0" unit="pixels" />
         <label class="f">
           <span class="dim">Auto-select<HelpTip :text="HELP['prefs.autoSelect']" /></span>
           <select v-model="draft.autoSelect">
@@ -46,8 +46,8 @@ function reset(): void {
       <fieldset>
         <legend>Navigation</legend>
         <NumberField v-model="draft.zoomStep" :help="HELP['prefs.zoomStep']" label="Zoom step" :min="1.01" :max="3" :step="0.01" />
-        <NumberField v-model="draft.minZoom" :help="HELP['prefs.minZoom']" label="Min zoom" :min="0.01" :max="1" :step="0.01" />
-        <NumberField v-model="draft.maxZoom" :help="HELP['prefs.maxZoom']" label="Max zoom" :min="1" :max="100" :step="1" />
+        <NumberField v-model="draft.minZoom" :help="HELP['prefs.minZoom']" label="Smallest zoom" :min="0.01" :max="1" :step="0.01" />
+        <NumberField v-model="draft.maxZoom" :help="HELP['prefs.maxZoom']" label="Largest zoom" :min="1" :max="100" :step="1" />
       </fieldset>
       <fieldset>
         <legend>Editing</legend>
@@ -63,7 +63,7 @@ function reset(): void {
         <ColorField v-model="draft.gridColor" :help="HELP['prefs.gridColor']" label="Grid" />
         <ColorField v-model="draft.gridMajorColor" :help="HELP['prefs.gridMajorColor']" label="Major grid" />
         <NumberField v-model="draft.gridMajorEvery" :help="HELP['prefs.gridMajorEvery']" label="Major every" :min="1" :max="100" :precision="0" unit="cells" />
-        <NumberField v-model="draft.minGridPixels" :help="HELP['prefs.minGridPixels']" label="Hide grid below" :min="1" :max="50" :precision="0" unit="px" />
+        <NumberField v-model="draft.minGridPixels" :help="HELP['prefs.minGridPixels']" label="Hide grid below" :min="1" :max="50" :precision="0" unit="pixels" />
         <ColorField v-model="draft.selectionColor" :help="HELP['prefs.selectionColor']" label="Selection" />
         <label class="f"><span class="dim">Layer thumbnails<HelpTip :text="HELP['prefs.showThumbnails']" /></span><input v-model="draft.showThumbnails" type="checkbox" /></label>
       </fieldset>
@@ -95,7 +95,7 @@ fieldset :deep(.color-field) {
 /* label | input | unit columns, so inputs line up with or without a unit */
 fieldset :deep(.num-field) {
   display: grid;
-  grid-template-columns: 1fr auto 34px;
+  grid-template-columns: 1fr auto 66px;
   column-gap: 4px;
 }
 legend {

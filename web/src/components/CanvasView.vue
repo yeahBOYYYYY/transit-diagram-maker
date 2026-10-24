@@ -8,7 +8,7 @@ import { CELL_PX, cellAt, screenToWorld, unionRects, worldToScreen } from '../co
 import { useEditor } from '../stores/editor'
 import { prefs } from '../stores/prefs'
 import { actionForEvent, runAction } from '../stores/commands'
-import { createTools, pillGrowTargets, selectedPill, type PointerInfo, type Tool } from '../tools'
+import { createTools, iconPlace, pillGrowTargets, placeIcon, selectedPill, type PointerInfo, type Tool } from '../tools'
 
 const store = useEditor()
 const s = store.state
@@ -238,6 +238,29 @@ function onDblClick(e: MouseEvent): void {
   tool.value.dblclick?.(p)
 }
 
+// Pictograms dragged from the Icons panel.
+const ICON_MIME = 'application/x-transit-icon'
+function onDragOver(e: DragEvent): void {
+  if (!e.dataTransfer?.types.includes(ICON_MIME)) return
+  e.preventDefault()
+  e.dataTransfer.dropEffect = 'copy'
+  const p = info(e)
+  s.cursor = p.cells
+  tools.icon.move?.(p, false)
+}
+function onDrop(e: DragEvent): void {
+  const name = e.dataTransfer?.getData(ICON_MIME)
+  if (!name) return
+  e.preventDefault()
+  clearDropPreview()
+  if (s.textEdit) store.finishTextEdit(true)
+  placeIcon(store, name, iconPlace(info(e)))
+  host.value?.focus({ preventScroll: true })
+}
+function clearDropPreview(): void {
+  if (s.tool !== 'icon') s.overlay = { ...s.overlay, preview: '' }
+}
+
 function onLeave(): void {
   s.cursor = null
   hoverId.value = null
@@ -391,6 +414,9 @@ defineExpose({ boundsOf })
     @pointercancel="onPointerUp"
     @pointerleave="onLeave"
     @dblclick="onDblClick"
+    @dragover="onDragOver"
+    @dragleave="clearDropPreview"
+    @drop="onDrop"
     @contextmenu.prevent
   >
     <svg class="canvas" xmlns="http://www.w3.org/2000/svg">

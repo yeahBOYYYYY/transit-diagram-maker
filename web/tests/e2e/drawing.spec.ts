@@ -81,12 +81,26 @@ test.describe('drawing tools', () => {
   test('icon tool drops library pictograms', async ({ page }) => {
     await page.keyboard.press('i')
     await page.getByTestId('icon-picker').click()
-    await page.click('[data-icon=ferry]')
+    await page.click('[data-testid=icons-panel] [data-icon=ferry]')
+    expect(await state(page, (s) => s.tool)).toBe('icon')
     await clickCell(page, 2, 2)
     await layerRow(page, 'Ferry')
     const icon = await state(page, (s) => (window as any).__transit.node(s.fragments[0].id).content)
     expect(icon.pos).toEqual({ x: 2.5, y: 2.5 })
     expect(icon.size).toBeCloseTo(1.24)
+  })
+
+  test('pictograms can be dragged from the Icons panel onto the canvas', async ({ page }) => {
+    await page.click('[data-testid=dock] [data-tab=Icons]')
+    const target = await cellPos(page, 4, 3)
+    const canvas = (await page.getByTestId('canvas').boundingBox())!
+    await page.locator('[data-testid=icons-panel] [data-icon=bus]').dragTo(page.getByTestId('canvas'), {
+      targetPosition: { x: target.x - canvas.x, y: target.y - canvas.y },
+    })
+    await layerRow(page, 'Bus')
+    const icon = await state(page, (s) => (window as any).__transit.node(s.fragments[0].id).content)
+    expect(icon.pos).toEqual({ x: 4.5, y: 3.5 })
+    expect(await state(page, (s) => s.tool)).toBe('select')
   })
 
   test('line style options from the options bar are applied', async ({ page }) => {

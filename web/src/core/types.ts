@@ -37,9 +37,17 @@ export interface DocSettings {
   label_font_size: number
   label_font_family: string
   icon_size: number | null
-  export_margin: number
-  export_background: string
   route_mode: RouteMode
+}
+
+/** How the drawing is turned into a standalone SVG (not part of the document). */
+export interface ExportOptions {
+  /** Pixels per grid cell. */
+  cell_px: number
+  /** Empty space around the drawing, in cells. */
+  margin: number
+  /** Background color; empty for transparent. */
+  background: string
 }
 
 export interface LineStyle {

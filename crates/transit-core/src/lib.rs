@@ -1,5 +1,5 @@
 //! Core of Transit Diagram Maker: a grid based, topologically aware document
-//! model for metro maps with undo/redo, `.transit` serialization and SVG output.
+//! model for metro maps with undo/redo, `.transit.svg` files and SVG output.
 
 pub mod assets;
 pub mod editor;

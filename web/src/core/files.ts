@@ -51,7 +51,14 @@ interface FsWindow {
   showOpenFilePicker?: (o: PickerOptions) => Promise<FileHandle[]>
 }
 
-const TRANSIT_TYPES = [{ description: 'Transit diagram', accept: { 'application/json': ['.transit'] } }]
+/** Saved documents are SVG pictures with the editor data embedded. */
+export const TRANSIT_EXT = '.transit.svg'
+const TRANSIT_TYPES = [{ description: 'Transit diagram (SVG)', accept: { 'image/svg+xml': ['.svg'] } }]
+
+/** Document name for a file name: without `.transit.svg` (or `.svg`). */
+export function docNameOf(fileName: string): string {
+  return fileName.replace(/(\.transit)?\.svg$/i, '')
+}
 
 function fsWindow(): FsWindow {
   return window as unknown as FsWindow
@@ -81,11 +88,11 @@ export async function writeHandle(handle: FileHandle, text: string): Promise<voi
   await w.close()
 }
 
-/** Open a .transit file, keeping its handle for saving back when the browser allows it. */
+/** Open a .transit.svg file, keeping its handle for saving back when the browser allows it. */
 export async function pickTransitFile(): Promise<{ name: string; text: string; handle: FileHandle | null } | null> {
   const open = fsWindow().showOpenFilePicker
   if (typeof open !== 'function') {
-    const f = await pickTextFile('.transit,application/json')
+    const f = await pickTextFile('.svg,image/svg+xml')
     return f && { ...f, handle: null }
   }
   try {

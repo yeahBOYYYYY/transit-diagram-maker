@@ -8,6 +8,7 @@ import type {
   CreatedStation,
   DocNode,
   DocSettings,
+  ExportOptions,
   Fragment,
   Icon,
   IconInfo,
@@ -45,9 +46,9 @@ export class Engine {
   exportSvg(): string {
     return this.ed.exportSvg()
   }
-  /** Export with one-off settings and scale (pixels per cell) without changing the document. */
-  exportSvgWith(settings: DocSettings, cellPx: number): string {
-    return this.ed.exportSvgWith(j(settings), cellPx)
+  /** Export with the given scale, margin and background. */
+  exportSvgWith(options: ExportOptions): string {
+    return this.ed.exportSvgWith(j(options))
   }
 
   // queries
@@ -182,8 +183,13 @@ export class Engine {
   addIcon(i: Partial<Icon>): Id {
     return this.ed.addIcon(j(i))
   }
+  /** Merge a patch into a layer. A segment's style changes that segment only, except its color, which the whole line shares. */
   updateContent(id: Id, patch: Record<string, unknown>): void {
     this.ed.updateContent(id, j(patch))
+  }
+  /** Merge a style patch into every segment of a line. */
+  updateLineStyle(lineId: Id, patch: Partial<LineStyle>): void {
+    this.ed.updateLineStyle(lineId, j(patch))
   }
   rename(id: Id, name: string): void {
     this.ed.rename(id, name)

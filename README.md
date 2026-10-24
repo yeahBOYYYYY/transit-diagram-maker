@@ -1,7 +1,7 @@
 # Transit Diagram Maker
 
 A grid based vector editor for topologically sound metro and transit maps.
-The document model, geometry, undo/redo history, `.transit` serialization and
+The document model, geometry, undo/redo history, `.transit.svg` files and
 SVG rendering are written in **Rust** and compiled to **WebAssembly**; the
 dark, Photoshop-style workspace is built with **Vue 3 + TypeScript**.
 
@@ -41,6 +41,8 @@ npx playwright test     # browser tests (from web/, needs Google Chrome)
 - **Line pen** (`P`): click cells to add points; unaligned points are routed with
   one straight run and one 45° run, and every turn gets a smooth curve.
   Plain, hollow and dashed styles; butt or round caps (roundness adjustable).
+  Each segment has its own style (a line can turn dashed part of the way); the
+  color is shared by the whole line.
 - **Erase tool** (`E`, shares the pen slot – long press to switch): cuts lines
   into separate segment layers inside the same line group.
 - **Stations** (`S`): dot stations that snap to the line center, tick stations
@@ -48,7 +50,9 @@ npx playwright test     # browser tests (from web/, needs Google Chrome)
   with a constant-radius outline. Each station gets a name label grouped with it.
 - **Text** (`T`) with inline editing and **pictograms** (`I`): wheelchair,
   airport, ferry, national rail, metro, parking, bus, tram, bicycle, taxi,
-  information and interchange. Icons default to the dot station size.
+  information and interchange, plus uploaded SVG icons, all shown in the Icons
+  panel (click to pick, drag onto the canvas to place). Icons default to the dot
+  station size.
 - **Selection** (`V`): click, Shift+click, marquee, drag to move, click a
   selected object again to get rotate handles (grid content rotates in 45°
   steps), arrow-key nudging, duplicate, delete.
@@ -56,12 +60,15 @@ npx playwright test     # browser tests (from web/, needs Google Chrome)
   re-ordering; the top of the list is painted on top.
 - **History**: `Ctrl+Z` / `Ctrl+Shift+Z` (also `Ctrl+Y`); drags, erase strokes
   and slider scrubs are single steps.
-- **Everything is configurable**: Document settings (grid size, line width,
-  curve radius, cap roundness, station sizes, label defaults, export options)
-  are stored in the document; Preferences (zoom, nudges, colors, history size…)
-  and fully rebindable keyboard shortcuts are stored in the browser.
-- **Files**: save/open lossless `.transit` (versioned JSON) and export a
-  standalone SVG that renders exactly like the canvas.
+- **Everything is configurable**: Document settings (line width, curve
+  radius, cap roundness, station sizes, label defaults) are stored in the
+  document; Preferences (zoom, nudges, colors, history size…), the last SVG
+  export options and fully rebindable keyboard shortcuts are stored in the
+  browser.
+- **Files**: save/open lossless `.transit.svg` files, which are SVG pictures of
+  the map (any browser or image viewer shows them) with the editor data
+  embedded, and export a plain SVG (with its own scale, margin and background)
+  that renders exactly like the canvas.
 
 ## Getting started
 

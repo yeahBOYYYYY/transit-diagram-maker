@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Fonts and SVG icons uploaded into the document. They are saved inside the
-// .transit file and embedded in SVG exports.
+// .transit.svg file and embedded in SVG exports.
 import ModalDialog from './ModalDialog.vue'
 import HelpTip from '../ui/HelpTip.vue'
 import { uploadedFamily } from '../../core/fonts'

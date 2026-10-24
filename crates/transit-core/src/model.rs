@@ -12,6 +12,34 @@ pub type Id = u64;
 /// Pixels per cell on the canvas (at 100% zoom) and the default SVG export scale.
 pub const CELL_PX: f64 = 24.0;
 
+/// How a drawing is turned into a standalone SVG. These only affect the
+/// exported picture, not the document, so they are not part of `DocSettings`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ExportOptions {
+    /// Pixels per cell.
+    pub cell_px: f64,
+    /// Empty space around the drawing, in cells.
+    pub margin: f64,
+    /// Background color; empty for transparent.
+    pub background: String,
+}
+
+impl Default for ExportOptions {
+    fn default() -> Self {
+        ExportOptions { cell_px: CELL_PX, margin: 1.0, background: "#ffffff".into() }
+    }
+}
+
+impl ExportOptions {
+    pub fn sanitized(mut self) -> Self {
+        let d = ExportOptions::default();
+        self.cell_px = if self.cell_px.is_finite() { self.cell_px.clamp(1.0, 512.0) } else { d.cell_px };
+        self.margin = if self.margin.is_finite() { self.margin.clamp(0.0, 100.0) } else { d.margin };
+        self
+    }
+}
+
 /// Document-wide constants that affect rendering. All lengths are in cell units
 /// unless the name says otherwise.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -39,10 +67,6 @@ pub struct DocSettings {
     pub label_font_family: String,
     /// Default icon size; `None` means "match the dot station diameter".
     pub icon_size: Option<f64>,
-    /// Margin added around the drawing when exporting to SVG.
-    pub export_margin: f64,
-    /// Background color used for SVG export; empty for transparent.
-    pub export_background: String,
     /// Routing used when a path is normalized after editing operations.
     pub route_mode: RouteMode,
 }
@@ -62,8 +86,6 @@ impl Default for DocSettings {
             label_font_size: 0.75,
             label_font_family: "Helvetica, Arial, sans-serif".into(),
             icon_size: None,
-            export_margin: 1.0,
-            export_background: "#ffffff".into(),
             route_mode: RouteMode::StraightFirst,
         }
     }
@@ -89,7 +111,6 @@ impl DocSettings {
         self.label_offset = fix(self.label_offset, 0.0, 20.0, d.label_offset);
         self.label_font_size = fix(self.label_font_size, 0.05, 20.0, d.label_font_size);
         self.icon_size = self.icon_size.map(|v| fix(v, 0.05, 50.0, d.icon_size()));
-        self.export_margin = fix(self.export_margin, 0.0, 100.0, d.export_margin);
         self
     }
 }

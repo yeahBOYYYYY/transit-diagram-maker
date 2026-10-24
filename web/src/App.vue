@@ -7,6 +7,8 @@ import CanvasView from './components/CanvasView.vue'
 import StatusBar from './components/StatusBar.vue'
 import LayersPanel from './components/panels/LayersPanel.vue'
 import PropertiesPanel from './components/panels/PropertiesPanel.vue'
+import IconsPanel from './components/panels/IconsPanel.vue'
+import PanelFrame from './components/panels/PanelFrame.vue'
 import DocumentSettingsDialog from './components/dialogs/DocumentSettingsDialog.vue'
 import ExportDialog from './components/dialogs/ExportDialog.vue'
 import AssetsDialog from './components/dialogs/AssetsDialog.vue'
@@ -58,13 +60,19 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       <main class="center">
         <CanvasView />
       </main>
-      <aside v-if="showDock" ref="dock" class="dock">
-        <PropertiesPanel
+      <aside v-if="showDock" ref="dock" class="dock" data-testid="dock">
+        <PanelFrame
           v-if="prefs.panels.properties"
+          v-model:active="s.dockTab"
+          title="Properties"
+          :tabs="['Properties', 'Icons']"
           class="props-panel"
           :class="{ fill: !prefs.panels.layers }"
           :style="bothPanels ? { height: prefs.propertiesHeight + 'px' } : undefined"
-        />
+        >
+          <PropertiesPanel v-if="s.dockTab === 'Properties'" />
+          <IconsPanel v-else />
+        </PanelFrame>
         <div
           v-if="bothPanels"
           class="splitter"

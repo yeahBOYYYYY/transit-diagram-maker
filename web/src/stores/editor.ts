@@ -8,7 +8,7 @@ import { registerFonts } from '../core/fonts'
 import { leafIds, findItem, topLevelOf } from '../core/tree'
 import { fitRect, unionRects, zoomAt, type View } from '../core/viewport'
 import { prefs } from './prefs'
-import type { FileHandle } from '../core/files'
+import { docNameOf, type FileHandle } from '../core/files'
 
 export type ToolId = 'select' | 'hand' | 'pen' | 'eraser' | 'station' | 'text' | 'icon'
 
@@ -57,6 +57,8 @@ export function createEditor(engine = new Engine()) {
     /** Angle shown while rotating. */
     rotation: null as number | null,
     spaceHeld: false,
+    /** Tab shown in the upper dock panel. */
+    dockTab: 'Properties' as 'Properties' | 'Icons',
     dialog: null as null | 'document' | 'assets' | 'export' | 'preferences' | 'shortcuts' | 'about' | 'reference',
   })
 
@@ -279,7 +281,7 @@ export function createEditor(engine = new Engine()) {
     }
     state.selection = []
     state.dirty = false
-    state.docName = name.replace(/\.transit$/i, '')
+    state.docName = docNameOf(name)
     fileHandle = handle
     refresh()
     fitToScreen()

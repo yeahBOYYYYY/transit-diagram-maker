@@ -85,12 +85,12 @@ const pillSelected = computed(() => {
         </label>
         <template v-if="hasChannel(prefs.line.kind)">
           <ColorField v-model="prefs.line.inner_color" label="Channel" :help="HELP['line.channel']" />
-          <NumberField v-model="prefs.line.inner_width_pct" label="W" :min="0" :max="100" :precision="0" unit="%" :width="36" :help="HELP['line.channel_width']" />
+          <NumberField v-model="prefs.line.inner_width_pct" label="Width" :min="0" :max="100" :precision="0" unit="%" :width="36" :help="HELP['line.channel_width']" />
         </template>
         <template v-if="hasDashes(prefs.line.kind)">
           <NumberField v-model="prefs.line.dash_length" label="Dash" :min="0.1" :step="0.1" :precision="1" unit="cells" :width="36" :help="HELP['line.dash_length']" />
           <NumberField v-model="prefs.line.dash_gap" label="Gap" :min="0" :step="0.1" :precision="1" unit="cells" :width="36" :help="HELP['line.dash_gap']" />
-          <NumberField v-if="prefs.line.kind === 'hollow_dashed'" v-model="prefs.line.dash_width_pct" label="Dash W" :min="0" :max="100" :precision="0" unit="%" :width="36" :help="HELP['line.dash_width']" />
+          <NumberField v-if="prefs.line.kind === 'hollow_dashed'" v-model="prefs.line.dash_width_pct" label="Dash width" :min="0" :max="100" :precision="0" unit="%" :width="36" :help="HELP['line.dash_width']" />
         </template>
         <div class="sep-v" />
         <label class="opt">
@@ -178,7 +178,7 @@ const pillSelected = computed(() => {
 
     <template v-else-if="tool === 'icon'">
       <span class="dim opt">Symbol<HelpTip :text="HELP['icon.icon']" /></span>
-      <IconPicker v-model="prefs.icon.icon" />
+      <IconPicker :model-value="prefs.icon.icon" />
       <ColorField v-model="prefs.icon.color" label="Glyph" :help="HELP['icon.color']" />
       <ColorField v-model="prefs.icon.background" label="Tile" :help="HELP['icon.background']" />
       <label class="opt">
@@ -186,7 +186,7 @@ const pillSelected = computed(() => {
         <span class="dim">Match station size<HelpTip :text="HELP['icon.size_default']" /></span>
       </label>
       <NumberField v-if="prefs.icon.size !== null" v-model="prefs.icon.size" label="Size" :min="0.1" :step="0.1" :width="40" unit="cells" :help="HELP['icon.size']" />
-      <span class="hint dim">Click to drop · Alt: place off-grid</span>
+      <span class="hint dim">Click to place · Alt: place off-grid · or drag a pictogram from the Icons panel</span>
     </template>
   </div>
 </template>

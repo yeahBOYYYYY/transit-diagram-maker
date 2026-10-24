@@ -444,18 +444,33 @@ fn update_text_renames_layer_that_followed_text() {
 }
 
 #[test]
+fn segment_style_is_per_segment_but_color_is_shared() {
+    let mut ed = Editor::new();
+    let l = line(&mut ed, &[c(0, 0), c(9, 0)]);
+    ed.erase(&[c(4, 0)]).unwrap();
+    let segs = segments_of(&ed, l.line_id);
+    assert_eq!(segs.len(), 2);
+    ed.update_content(segs[0], &json!({"style": {"color": "#123456", "kind": "dashed", "end_cap": "butt"}})).unwrap();
+    let (a, b) = (segment(&ed, segs[0]).style.clone(), segment(&ed, segs[1]).style.clone());
+    assert_eq!((a.kind, a.end_cap, a.start_cap), (StrokeKind::Dashed, Cap::Butt, Cap::Round));
+    assert_eq!((b.kind, b.end_cap), (StrokeKind::Plain, Cap::Round), "other segments keep their style");
+    assert_eq!((a.color.as_str(), b.color.as_str()), ("#123456", "#123456"), "the color is the line's");
+}
+
+#[test]
 fn update_line_style_applies_to_all_segments() {
     let mut ed = Editor::new();
     let l = line(&mut ed, &[c(0, 0), c(9, 0)]);
     ed.erase(&[c(4, 0)]).unwrap();
-    ed.update_content(l.layer_id, &json!({"style": {"color": "#123456", "kind": "dashed", "end_cap": "butt"}})).unwrap();
+    ed.update_line_style(l.line_id, &json!({"kind": "hollow", "start_cap": "butt"})).unwrap();
     for s in segments_of(&ed, l.line_id) {
         let st = &segment(&ed, s).style;
-        assert_eq!(st.color, "#123456");
-        assert_eq!(st.kind, StrokeKind::Dashed);
-        assert_eq!(st.end_cap, Cap::Butt);
-        assert_eq!(st.start_cap, Cap::Round);
+        assert_eq!((st.kind, st.start_cap, st.end_cap), (StrokeKind::Hollow, Cap::Butt, Cap::Round));
     }
+    assert!(ed.undo());
+    assert!(segments_of(&ed, l.line_id).iter().all(|s| segment(&ed, *s).style.kind == StrokeKind::Plain), "one undo step");
+    assert!(ed.update_line_style(l.line_id, &json!({"kind": "zigzag"})).is_err());
+    assert!(ed.update_line_style(999, &json!({})).is_err());
 }
 
 #[test]
@@ -574,10 +589,11 @@ fn add_segment_joins_an_existing_line() {
 fn dropping_a_segment_into_another_line_group_joins_that_line() {
     let mut ed = Editor::new();
     let a = ed.create_line(&[c(0, 0), c(4, 0)], LineStyle { color: "#ff0000".into(), ..LineStyle::default() }).unwrap();
-    let b = ed.create_line(&[c(0, 5), c(4, 5)], LineStyle { color: "#0000ff".into(), ..LineStyle::default() }).unwrap();
+    let b = ed.create_line(&[c(0, 5), c(4, 5)], LineStyle { color: "#0000ff".into(), kind: StrokeKind::Dashed, ..LineStyle::default() }).unwrap();
     ed.move_node(b.layer_id, Some(a.group_id), 1).unwrap();
     assert_eq!(segment(&ed, b.layer_id).line_id, a.line_id);
-    assert_eq!(segment(&ed, b.layer_id).style.color, "#ff0000");
+    assert_eq!(segment(&ed, b.layer_id).style.color, "#ff0000", "takes the line's color");
+    assert_eq!(segment(&ed, b.layer_id).style.kind, StrokeKind::Dashed, "keeps its own style");
     assert!(ed.node(b.group_id).is_none(), "the emptied line group is pruned");
     // A style change now reaches both segments.
     ed.update_content(a.layer_id, &json!({"style": {"color": "#00ff00"}})).unwrap();

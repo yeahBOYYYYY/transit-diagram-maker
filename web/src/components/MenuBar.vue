@@ -6,8 +6,11 @@ import { displayCombo } from '../core/shortcuts'
 import { useEditor } from '../stores/editor'
 import { isEnabled, runAction } from '../stores/commands'
 import { prefs } from '../stores/prefs'
-import { APP } from '../core/about'
+import { TRANSIT_EXT } from '../core/files'
 import UiIcon from './ui/UiIcon.vue'
+
+// The same artwork as the browser tab icon.
+const logoUrl = `${import.meta.env.BASE_URL}favicon.svg`
 
 type Item =
   | { action: ActionId; label?: string }
@@ -149,11 +152,17 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocDown))
 <template>
   <nav ref="bar" class="menubar" data-testid="menubar">
     <div class="brand" title="Transit Diagram Maker">
-      <svg viewBox="0 0 32 32" width="20" height="20">
-        <rect width="32" height="32" rx="6" fill="#0d2238" />
-        <text x="16" y="21.5" text-anchor="middle" font-size="14" font-weight="700" fill="#31a8ff" font-family="Segoe UI, Arial">Td</text>
-      </svg>
+      <img :src="logoUrl" width="20" height="20" alt="Transit Diagram Maker" data-testid="app-logo" />
     </div>
+    <button
+      type="button"
+      class="bar-btn"
+      :title="`Save (${displayCombo(prefs.shortcuts['file.save'] ?? '')})`"
+      data-testid="quick-save"
+      @click="runAction(store, 'file.save')"
+    >
+      <UiIcon name="save" :size="16" />
+    </button>
     <div
       v-for="m in menus"
       :key="m.name"
@@ -183,19 +192,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocDown))
       </div>
     </div>
     <div class="spacer" />
-    <div class="doc-title dim" data-testid="doc-title">{{ store.state.docName }}.transit{{ store.state.dirty ? ' •' : '' }} — Transit Diagram Maker</div>
-    <button
-      type="button"
-      class="bar-btn"
-      :title="`Save (${displayCombo(prefs.shortcuts['file.save'] ?? '')})`"
-      data-testid="quick-save"
-      @click="runAction(store, 'file.save')"
-    >
-      <UiIcon name="save" :size="16" />
-    </button>
-    <a class="bar-btn" :href="APP.repoUrl" target="_blank" rel="noopener" title="Transit Diagram Maker on GitHub" data-testid="github-link">
-      <UiIcon name="github" :size="16" />
-    </a>
+    <div class="doc-title dim" data-testid="doc-title">{{ store.state.docName }}{{ TRANSIT_EXT }}{{ store.state.dirty ? ' •' : '' }} — Transit Diagram Maker</div>
   </nav>
 </template>
 
@@ -213,7 +210,10 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocDown))
 .brand {
   display: flex;
   align-items: center;
-  padding: 0 8px 0 2px;
+  padding: 0 4px 0 2px;
+}
+.brand + .bar-btn {
+  margin-right: 4px;
 }
 .menu {
   position: relative;

@@ -197,7 +197,7 @@ fn parse_len(v: Option<&str>) -> Option<f64> {
 /// event handlers, styles, links and external references are dropped.
 pub fn sanitize_svg(text: &str) -> Result<(String, String), String> {
     if text.len() > MAX_SVG_BYTES {
-        return Err(format!("the SVG file is larger than {} KB", MAX_SVG_BYTES / 1024));
+        return Err(format!("the SVG file is larger than {} kilobytes", MAX_SVG_BYTES / 1024));
     }
     let doc = roxmltree::Document::parse(text).map_err(|e| format!("not a valid SVG file: {e}"))?;
     let root = doc.root_element();

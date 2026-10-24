@@ -1,6 +1,6 @@
 // Application preferences (not part of the document), persisted in localStorage.
 import { reactive, watch } from 'vue'
-import type { Icon, LineStyle, StationKind, StationOptions, TextAlign } from '../core/types'
+import type { ExportOptions, Icon, LineStyle, StationKind, StationOptions, TextAlign } from '../core/types'
 import { DEFAULT_SHORTCUTS, type ActionId } from '../core/actions'
 import { FONT_FAMILIES } from '../core/fonts'
 
@@ -14,8 +14,8 @@ export interface Prefs {
   bigNudge: number
   dragThreshold: number
   textSnap: number
-  /** SVG export scale: pixels per grid cell. */
-  exportCellPx: number
+  /** Last used SVG export options. */
+  export: ExportOptions
   canvasBackground: string
   gridColor: string
   gridMajorColor: string
@@ -49,7 +49,7 @@ export function defaultPrefs(): Prefs {
     bigNudge: 5,
     dragThreshold: 3,
     textSnap: 0.5,
-    exportCellPx: 24,
+    export: { cell_px: 24, margin: 1, background: '#ffffff' },
     canvasBackground: '#ffffff',
     gridColor: '#ececec',
     gridMajorColor: '#d6d6d6',

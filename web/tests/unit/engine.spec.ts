@@ -46,7 +46,7 @@ describe('Engine bridge', () => {
     expect(m?.type === 'layer' && m.content.kind === 'line' && m.content.points[0]).toEqual({ x: 3, y: 0 })
   })
 
-  it('round-trips .transit files and exports SVG', () => {
+  it('round-trips .transit.svg files and exports SVG', () => {
     const e = new Engine()
     e.createLine([{ x: 0, y: 0 }, { x: 5, y: 0 }], { kind: 'dashed' })
     e.addStation('tick', { x: 2, y: 0 }, { tick_side: -1 })
@@ -55,6 +55,7 @@ describe('Engine bridge', () => {
     const other = new Engine()
     other.loadTransit(saved)
     expect(other.saveTransit()).toBe(saved)
+    expect(saved).toContain('<transit:segment ')
     expect(other.fragments().map((f) => f.kind)).toEqual(['line', 'station', 'text', 'text'])
     const svg = other.exportSvg()
     expect(svg).toMatch(/^<\?xml/)

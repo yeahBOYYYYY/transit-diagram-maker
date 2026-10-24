@@ -417,23 +417,16 @@ fn export_nodes(nodes: &[Node], settings: &DocSettings, assets: &Assets, out: &m
     }
 }
 
-/// Standalone SVG document of everything visible, cropped to the content.
-pub fn export_svg(doc: &Document) -> String {
-    export_svg_with(doc, &doc.settings)
-}
-
-/// Like `export_svg`, but rendered with one-off settings (including the
-/// pixels-per-cell scale) instead of the document's own.
-pub fn export_svg_with(doc: &Document, settings: &DocSettings) -> String {
-    let s = &settings.clone().sanitized();
-    let doc = &Document { settings: s.clone(), ..doc.clone() };
-    let g = s.cell_px;
-    let b = document_bounds(doc).unwrap_or(Rect { x: 0.0, y: 0.0, w: g, h: g }).inflate(s.export_margin * g);
+/// Start of a standalone SVG cropped to the visible content: the root element
+/// (with `root_attrs` appended), the title and the background.
+pub(crate) fn svg_head(doc: &Document, opts: &ExportOptions, root_attrs: &str) -> String {
+    let g = opts.cell_px;
+    let b = document_bounds(doc).unwrap_or(Rect { x: 0.0, y: 0.0, w: g, h: g }).inflate(opts.margin * g);
     let mut out = String::new();
     let _ = writeln!(out, r#"<?xml version="1.0" encoding="UTF-8"?>"#);
     let _ = writeln!(
         out,
-        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="{} {} {} {}" width="{}" height="{}">"#,
+        r#"<svg xmlns="http://www.w3.org/2000/svg"{root_attrs} viewBox="{} {} {} {}" width="{}" height="{}">"#,
         n(b.x),
         n(b.y),
         n(b.w),
@@ -442,7 +435,7 @@ pub fn export_svg_with(doc: &Document, settings: &DocSettings) -> String {
         n(b.h)
     );
     let _ = writeln!(out, "  <title>Transit diagram</title>");
-    if !s.export_background.is_empty() {
+    if !opts.background.is_empty() {
         let _ = writeln!(
             out,
             r#"  <rect x="{}" y="{}" width="{}" height="{}" fill="{}"/>"#,
@@ -450,9 +443,29 @@ pub fn export_svg_with(doc: &Document, settings: &DocSettings) -> String {
             n(b.y),
             n(b.w),
             n(b.h),
-            esc(&s.export_background)
+            esc(&opts.background)
         );
     }
+    out
+}
+
+/// `doc` with its settings rendered at `opts.cell_px` pixels per cell.
+pub(crate) fn scaled(doc: &Document, opts: &ExportOptions) -> Document {
+    Document { settings: DocSettings { cell_px: opts.cell_px, ..doc.settings.clone() }, ..doc.clone() }
+}
+
+/// Standalone SVG document of everything visible, cropped to the content,
+/// with the default export options.
+pub fn export_svg(doc: &Document) -> String {
+    export_svg_with(doc, &ExportOptions::default())
+}
+
+/// Standalone SVG document of everything visible, with the given scale,
+/// margin and background. The document is not changed.
+pub fn export_svg_with(doc: &Document, opts: &ExportOptions) -> String {
+    let opts = &opts.clone().sanitized();
+    let doc = &scaled(doc, opts);
+    let mut out = svg_head(doc, opts, "");
     // Embed the uploaded fonts that visible text actually uses.
     let mut used = Vec::new();
     tree::walk_layers(&doc.root, &mut |l, vis, _| {
@@ -467,7 +480,7 @@ pub fn export_svg_with(doc: &Document, settings: &DocSettings) -> String {
     if !used.is_empty() {
         let _ = writeln!(out, "  <defs><style>{}</style></defs>", crate::assets::font_face_css(&used));
     }
-    export_nodes(&doc.root, s, &doc.assets, &mut out, 1);
+    export_nodes(&doc.root, &doc.settings, &doc.assets, &mut out, 1);
     out.push_str("</svg>\n");
     out
 }

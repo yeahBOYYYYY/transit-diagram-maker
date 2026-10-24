@@ -14,7 +14,7 @@ test.describe('workspace layout', () => {
     }
     const tools = page.locator('[data-testid=tools-panel] .tool')
     await expect(tools).toHaveCount(6)
-    await expect(page.getByTestId('doc-title')).toHaveText(/^Untitled-1\.transit — /)
+    await expect(page.getByTestId('doc-title')).toHaveText(/^Untitled-1\.transit\.svg — /)
     // One document at a time: there is no document tab strip.
     await expect(page.locator('.doc-tabs')).toHaveCount(0)
   })

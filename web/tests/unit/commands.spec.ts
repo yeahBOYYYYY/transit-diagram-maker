@@ -108,20 +108,20 @@ describe('commands', () => {
 
     it('asks for a location once, then saves back to the same file', async () => {
       const store = freshStore()
-      const f = fakeHandle('city.transit')
+      const f = fakeHandle('city.transit.svg')
       const picker = vi.fn(async () => f.handle)
       ;(window as any).showSaveFilePicker = picker
       store.run((e) => e.addText({}))
       await saveTransit(store)
       expect(picker).toHaveBeenCalledTimes(1)
-      expect(picker.mock.calls[0]).toEqual([expect.objectContaining({ suggestedName: 'Untitled-1.transit' })])
+      expect(picker.mock.calls[0]).toEqual([expect.objectContaining({ suggestedName: 'Untitled-1.transit.svg' })])
       expect(store.state.docName).toBe('city')
       expect(store.state.dirty).toBe(false)
       store.run((e) => e.addText({}))
       await saveTransit(store)
       expect(picker).toHaveBeenCalledTimes(1)
       expect(f.writes).toHaveLength(2)
-      expect(JSON.parse(f.writes[1]).format).toBe('transit-diagram')
+      expect(f.writes[1]).toMatch(/^<\?xml[\s\S]*<svg [^>]*xmlns:transit=/)
       // Save As always asks again.
       await saveTransit(store, true)
       expect(picker).toHaveBeenCalledTimes(2)

@@ -64,12 +64,11 @@ impl TransitEditor {
         render::export_svg(self.inner.document())
     }
 
-    /// Export with one-off settings and `cell_px` pixels per cell; the document is not changed.
+    /// Export with the given `ExportOptions` (scale, margin, background).
     #[wasm_bindgen(js_name = exportSvgWith)]
-    pub fn export_svg_with(&self, settings_json: &str, cell_px: f64) -> Result<String, JsError> {
-        let mut settings: transit_core::DocSettings = parse(settings_json)?;
-        settings.cell_px = cell_px;
-        Ok(render::export_svg_with(self.inner.document(), &settings))
+    pub fn export_svg_with(&self, options_json: &str) -> Result<String, JsError> {
+        let opts: transit_core::ExportOptions = parse(options_json)?;
+        Ok(render::export_svg_with(self.inner.document(), &opts))
     }
 
     // ---------------------------------------------------------- queries
@@ -309,6 +308,13 @@ impl TransitEditor {
     pub fn update_content(&mut self, id: f64, patch_json: &str) -> Result<(), JsError> {
         let patch: Value = parse(patch_json)?;
         self.inner.update_content(id as u64, &patch).map_err(err)
+    }
+
+    /// Merge a style patch into every segment of a line.
+    #[wasm_bindgen(js_name = updateLineStyle)]
+    pub fn update_line_style(&mut self, line_id: f64, patch_json: &str) -> Result<(), JsError> {
+        let patch: Value = parse(patch_json)?;
+        self.inner.update_line_style(line_id as u64, &patch).map_err(err)
     }
 
     pub fn rename(&mut self, id: f64, name: &str) -> Result<(), JsError> {

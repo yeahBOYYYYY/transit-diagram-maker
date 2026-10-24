@@ -24,7 +24,7 @@ test.describe('saving, opening and exporting', () => {
     expect(ok).toBe(true)
   })
 
-  test('export options apply to one export only', async ({ page }) => {
+  test('export options change the picture only and are remembered', async ({ page }) => {
     await drawLine(page, [[0, 0], [4, 0]])
     await page.keyboard.press('Control+Shift+e')
     const dialog = page.getByTestId('dialog')
@@ -37,27 +37,39 @@ test.describe('saving, opening and exporting', () => {
     const svg = readFileSync((await download.path())!, 'utf8')
     expect(svg).toContain('width="336" height="144"')
     expect(svg).not.toContain('<rect')
-    // The document keeps its own settings.
-    expect(await state(page, (s) => s.settings.export_background)).toBe('#ffffff')
+    expect(svg).not.toContain('transit:')
+    // The document is unchanged; the dialog remembers the options.
     expect(await state(page, (s) => s.fragments[0].svg)).toContain('stroke-width="24"')
+    expect(await state(page, (s) => s.canUndo)).toBe(true)
+    await page.keyboard.press('Control+Shift+e')
+    await expect(dialog.getByTestId('export-cell-px').locator('input')).toHaveValue('48')
+    await expect(dialog.getByTestId('export-options')).not.toContainText('Line width')
   })
 
-  test('save .transit and open it again losslessly', async ({ page }) => {
+  test('save a .transit.svg file that is a picture and open it again losslessly', async ({ page }) => {
     await buildSampleMap(page)
     const before = await state(page, (s) => ({ tree: s.tree, frags: s.fragments.map((f: any) => f.svg) }))
     const [download] = await Promise.all([page.waitForEvent('download'), page.keyboard.press('Control+s')])
-    expect(download.suggestedFilename()).toBe('Untitled-1.transit')
+    expect(download.suggestedFilename()).toBe('Untitled-1.transit.svg')
     const path = (await download.path())!
-    const json = JSON.parse(readFileSync(path, 'utf8'))
-    expect(json.format).toBe('transit-diagram')
+    const text = readFileSync(path, 'utf8')
+    // The saved file is an SVG picture of the map that also carries the editor data.
+    const parsed = await page.evaluate((t) => {
+      const d = new DOMParser().parseFromString(t, 'image/svg+xml')
+      const ns = d.documentElement.lookupNamespaceURI('transit')
+      return { root: d.documentElement.nodeName, ok: !d.querySelector('parsererror'), segments: d.getElementsByTagNameNS(ns, 'segment').length }
+    }, text)
+    const lines = (await fragmentKinds(page)).filter((k: string) => k === 'line').length
+    expect(parsed).toEqual({ root: 'svg', ok: true, segments: lines })
+    expect(text).toContain('Metro Network')
 
     page.once('dialog', (d) => d.accept())
     await page.keyboard.press('Control+Alt+n')
     expect(await fragmentKinds(page)).toEqual([])
 
     const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.keyboard.press('Control+o')])
-    await chooser.setFiles({ name: 'city.transit', mimeType: 'application/json', buffer: readFileSync(path) })
-    await expect(page.getByTestId('doc-title')).toContainText('city.transit')
+    await chooser.setFiles({ name: 'city.transit.svg', mimeType: 'image/svg+xml', buffer: readFileSync(path) })
+    await expect(page.getByTestId('doc-title')).toContainText('city.transit.svg')
     const after = await state(page, (s) => ({ tree: s.tree, frags: s.fragments.map((f: any) => f.svg) }))
     expect(after).toEqual(before)
   })
@@ -70,8 +82,8 @@ test.describe('saving, opening and exporting', () => {
       w.showSaveFilePicker = async () => {
         w.__picks++
         return {
-          name: 'metro.transit',
-          getFile: async () => new File([], 'metro.transit'),
+          name: 'metro.transit.svg',
+          getFile: async () => new File([], 'metro.transit.svg'),
           createWritable: async () => ({ write: async (d: string) => void w.__writes.push(d), close: async () => {} }),
         }
       }
@@ -81,14 +93,14 @@ test.describe('saving, opening and exporting', () => {
     await page.keyboard.type('A')
     await page.keyboard.press('Enter')
     await page.getByTestId('quick-save').click()
-    await expect(page.getByTestId('doc-title')).toContainText('metro.transit')
+    await expect(page.getByTestId('doc-title')).toContainText('metro.transit.svg')
     await page.keyboard.press('Control+s')
     await expect.poll(() => page.evaluate(() => (window as any).__writes.length)).toBe(2)
     expect(await page.evaluate(() => (window as any).__picks)).toBe(1)
   })
 
-  test('the menu bar links to the GitHub repository', async ({ page }) => {
-    const link = page.getByTestId('github-link')
+  test('the status bar links to the GitHub repository', async ({ page }) => {
+    const link = page.locator('[data-testid=status-bar] [data-testid=github-link]')
     await expect(link).toHaveAttribute('href', 'https://github.com/yeahBOYYYYY/transit-diagram-maker')
     await expect(link).toHaveAttribute('target', '_blank')
   })
@@ -106,9 +118,10 @@ test.describe('saving, opening and exporting', () => {
     await page.keyboard.type('Central')
     await page.keyboard.press('Enter')
 
-    // An icon: upload it from the pictogram picker.
+    // An icon: upload it from the Icons panel (the pictogram picker opens it).
     await page.keyboard.press('i')
     await page.getByTestId('icon-picker').click()
+    await expect(page.getByTestId('icons-panel')).toBeVisible()
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M5 0L10 10H0Z" fill="currentColor" onclick="alert(1)"/><script>alert(1)</script></svg>'
     const [iconChooser] = await Promise.all([page.waitForEvent('filechooser'), page.getByTestId('upload-icon').click()])
     await iconChooser.setFiles({ name: 'star.svg', mimeType: 'image/svg+xml', buffer: Buffer.from(svg) })
@@ -126,10 +139,10 @@ test.describe('saving, opening and exporting', () => {
     await expect(page.getByTestId('asset-icons')).toContainText('star')
     await page.getByTestId('dialog-ok').click()
 
-    // Saved in the .transit file and embedded in the SVG export.
-    const saved = JSON.parse(await page.evaluate(() => (window as any).__transit.engine.value.saveTransit()))
-    expect(saved.document.assets.fonts[0].family).toBe('City Sans')
-    expect(saved.document.assets.icons[0].label).toBe('star')
+    // Saved in the .transit.svg file and embedded in the SVG export.
+    const saved = await page.evaluate(() => (window as any).__transit.engine.value.saveTransit())
+    expect(saved).toContain('<style transit:font="City Sans">')
+    expect(saved).toMatch(/<transit:icon name="custom-1" label="star"/)
     const exported = await page.evaluate(() => (window as any).__transit.engine.value.exportSvg())
     expect(exported).toContain('@font-face{font-family:"City Sans"')
   })
@@ -138,8 +151,8 @@ test.describe('saving, opening and exporting', () => {
     await buildSampleMap(page)
     const count = (await fragmentKinds(page)).length
     const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.keyboard.press('Control+o')])
-    await chooser.setFiles({ name: 'broken.transit', mimeType: 'application/json', buffer: Buffer.from('{"nope":1}') })
-    await expect(page.getByTestId('status-message')).toContainText('could not read file')
+    await chooser.setFiles({ name: 'broken.transit.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>') })
+    await expect(page.getByTestId('status-message')).toContainText('no Transit Diagram Maker data')
     expect((await fragmentKinds(page)).length).toBe(count)
   })
 })

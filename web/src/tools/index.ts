@@ -509,9 +509,22 @@ function textTool(store: EditorStore): Tool {
 
 // ----------------------------------------------------------------- icon
 
+/** Where a pictogram dropped at `p` goes: its cell center, or exactly under the pointer with Alt. */
+export function iconPlace(p: Pick<PointerInfo, 'alt' | 'cells' | 'cell'>): Vec2 {
+  return p.alt ? p.cells : { x: p.cell.x + 0.5, y: p.cell.y + 0.5 }
+}
+
+/** Add a pictogram with the icon tool's colors and size, and select it. */
+export function placeIcon(store: EditorStore, icon: string, pos: Vec2): void {
+  const s = store.state
+  const size = prefs.icon.size ?? s.settings.icon_size ?? s.settings.station_outer_radius * 2
+  const id = store.run((e) => e.addIcon({ icon, color: prefs.icon.color, background: prefs.icon.background, size, pos }))
+  if (id !== undefined) store.select([id])
+}
+
 function iconTool(store: EditorStore): Tool {
   const s = store.state
-  const place = (p: PointerInfo): Vec2 => (p.alt ? p.cells : { x: p.cell.x + 0.5, y: p.cell.y + 0.5 })
+  const place = iconPlace
   return {
     cursor: () => 'copy',
     move(p) {
@@ -527,18 +540,7 @@ function iconTool(store: EditorStore): Tool {
       }
     },
     down(p) {
-      if (p.button !== 0) return
-      const size = prefs.icon.size ?? s.settings.icon_size ?? s.settings.station_outer_radius * 2
-      const id = store.run((e) =>
-        e.addIcon({
-          icon: prefs.icon.icon,
-          color: prefs.icon.color,
-          background: prefs.icon.background,
-          size,
-          pos: place(p),
-        }),
-      )
-      if (id !== undefined) store.select([id])
+      if (p.button === 0) placeIcon(store, prefs.icon.icon, place(p))
     },
     reset() {
       clearOverlay(store)
