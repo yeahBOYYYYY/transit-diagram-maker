@@ -463,7 +463,7 @@ dependencies = [
 
 [[package]]
 name = "transit-core"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "insta",
  "proptest",
@@ -474,7 +474,7 @@ dependencies = [
 
 [[package]]
 name = "transit-wasm"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "serde",
  "serde_json",
