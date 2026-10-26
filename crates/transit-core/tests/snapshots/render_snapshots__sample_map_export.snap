@@ -1,0 +1,29 @@
+---
+source: crates/transit-core/tests/render_snapshots.rs
+expression: "render::export_svg(sample_map().document())"
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-33.36 -120 312.24 312" width="312.24" height="312">
+  <title>Transit diagram</title>
+  <rect x="-33.36" y="-120" width="312.24" height="312" fill="#ffffff"/>
+  <g id="group-3" data-name="Line 1">
+    <g id="layer-2" data-name="Segment 1"><path d="M12 12L141.088 12A36 36 0 0 1 166.544 22.544L228 84" fill="none" stroke="#e32017" stroke-width="24" stroke-linejoin="round"/><path d="M13.2 24L12 24A12 12 0 0 1 0 12L0 12A12 12 0 0 1 12 0L13.2 0ZM235.637 74.666L236.485 75.515A12 12 0 0 1 236.485 92.485L236.485 92.485A12 12 0 0 1 219.515 92.485L218.666 91.637Z" fill="#e32017"/></g>
+    <g id="group-9" data-name="Station 1">
+      <g id="layer-7" data-name="Station 1"><path d="M36 12h0.01" fill="#000000" stroke="#000000" stroke-width="29.76" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 12h0.01" fill="#ffffff" stroke="#ffffff" stroke-width="19.2" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <g id="layer-8" data-name="Station 1"><text font-size="18" font-family="Helvetica, Arial, sans-serif" fill="#1a1a1a" style="white-space:pre"><tspan data-line="" x="36" y="-12.9" text-anchor="middle">Station 1</tspan></text></g>
+    </g>
+  </g>
+  <g id="group-6" data-name="Line 2">
+    <g id="layer-5" data-name="Segment 1"><path d="M84 -84L84 156" fill="none" stroke="#0098d4" stroke-width="24" stroke-linejoin="round"/><path d="M72 -82.8L72 -84A12 12 0 0 1 84 -96L84 -96A12 12 0 0 1 96 -84L96 -82.8ZM96 154.8L96 156A12 12 0 0 1 84 168L84 168A12 12 0 0 1 72 156L72 154.8Z" fill="#0098d4"/><path d="M84 -84L84 156" fill="none" stroke="#ffffff" stroke-width="7.92" stroke-linejoin="round"/><path d="M80.04 -83.604L80.04 -84A3.96 3.96 0 0 1 84 -87.96L84 -87.96A3.96 3.96 0 0 1 87.96 -84L87.96 -83.604ZM87.96 155.604L87.96 156A3.96 3.96 0 0 1 84 159.96L84 159.96A3.96 3.96 0 0 1 80.04 156L80.04 155.604Z" fill="#ffffff"/></g>
+    <g id="group-12" data-name="Station 2">
+      <g id="layer-10" data-name="Station 2"><path d="M94.8 -48L109.2 -48L109.2 -39.6L94.8 -39.6Z" fill="#0098d4"/></g>
+      <g id="layer-11" data-name="Station 2"><text font-size="18" font-family="Helvetica, Arial, sans-serif" fill="#1a1a1a" style="white-space:pre"><tspan data-line="" x="140.4" y="-37.5" text-anchor="start">Station 2</tspan></text></g>
+    </g>
+    <g id="group-15" data-name="Station 3">
+      <g id="layer-13" data-name="Station 3"><path d="M84 12h0.01M84 12L84 36M84 36h0.01" fill="#000000" stroke="#000000" stroke-width="29.76" stroke-linecap="round" stroke-linejoin="round"/><path d="M84 12h0.01M84 12L84 36M84 36h0.01" fill="#ffffff" stroke="#ffffff" stroke-width="19.2" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <g id="layer-14" data-name="Station 3"><text font-size="18" font-family="Helvetica, Arial, sans-serif" fill="#1a1a1a" style="white-space:pre"><tspan data-line="" x="84" y="-12.9" text-anchor="middle">Station 3</tspan></text></g>
+    </g>
+  </g>
+  <g id="layer-16" data-name="Central"><text font-size="18" font-family="Helvetica, Arial, sans-serif" fill="#1a1a1a" style="white-space:pre"><tspan data-line="" x="131.28" y="-54.9" text-anchor="middle">Central</tspan></text></g>
+  <g id="layer-17" data-name="Ferry"><g transform="translate(240 120) rotate(0) scale(1.24) translate(-12 -12)"><rect width="24" height="24" rx="5" fill="#1d4f91"/><path d="M9 4h6v3H9z" fill="#ffffff"/><path d="M6.5 8h11l1.5 5.2-7-2.6-7 2.6z" fill="#ffffff"/><path d="M4 14l8-3 8 3-1.6 4.2H5.6z" fill="#ffffff"/><path d="M3 20.5c1.5 0 1.5-1 3-1s1.5 1 3 1 1.5-1 3-1 1.5 1 3 1 1.5-1 3-1 1.5 1 3 1" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round"/></g></g>
+</svg>

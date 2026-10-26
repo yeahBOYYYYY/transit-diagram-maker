@@ -8,7 +8,9 @@ export default defineConfig({
   build: { target: 'es2022' },
   test: {
     environment: 'happy-dom',
-    include: ['tests/unit/**/*.spec.ts'],
+    // unit: one module at a time; component: Testing Library, driven the way a user would;
+    // integration: several modules (tools, store, commands, engine, files) working together.
+    include: ['tests/{unit,component,integration}/**/*.spec.ts'],
     setupFiles: ['tests/unit/setup.ts'],
   },
 })

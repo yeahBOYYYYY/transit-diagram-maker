@@ -50,8 +50,9 @@ const defaults = defaultPrefs().line
       </label>
       <button type="button" class="swap" data-testid="tool-colors-swap" :title="title('color.swap')" @click="runAction(store, 'color.swap')">
         <svg viewBox="0 0 10 10" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.2">
-          <path d="M2 7.5V4a2 2 0 0 1 2-2h3.5" />
-          <path d="M6 0.5 7.8 2 6 3.5M0.5 6 2 7.8 3.5 6" />
+          <!-- One arrow points left at the line color, the other down at the inner color. -->
+          <path d="M2.5 2H6a2 2 0 0 1 2 2v3.5" />
+          <path d="M4 0.5 2.2 2 4 3.5M9.5 6 8 7.8 6.5 6" />
         </svg>
       </button>
       <button type="button" class="reset" data-testid="tool-colors-reset" :title="title('color.reset')" @click="runAction(store, 'color.reset')">

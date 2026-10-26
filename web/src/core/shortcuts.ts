@@ -78,8 +78,9 @@ export function normalizeCombo(combo: string): string {
 }
 
 export function splitCombos(binding: string): string[] {
+  // A comma right after "+" is the comma key ("Ctrl+,"), not a separator.
   return binding
-    .split(/,\s*/)
+    .split(/(?<!\+),\s*/)
     .map((c) => c.trim())
     .filter(Boolean)
     .map(normalizeCombo)

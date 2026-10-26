@@ -1166,11 +1166,14 @@ impl Editor {
             let cells = grid_rotation(d, &leaves, pivot, angle, steps);
             let map_cell = |c: Cell| cells.get(&c).copied().unwrap_or_else(|| rot_cell(c));
             let old_anchors = station_anchors(d);
+            let route = d.settings.route_mode;
             for id in &leaves {
                 let Some(layer) = tree::find_layer_mut(&mut d.root, *id) else { continue };
                 match &mut layer.content {
                     Content::Line(seg) => {
-                        let norm = geom::compress(&seg.points.iter().map(|c| map_cell(*c)).collect::<Vec<_>>());
+                        // Lines touching along a loop can't all keep their run lengths,
+                        // which leaves a step off the 8 directions: route it like a load would.
+                        let norm = geom::normalize_path(&seg.points.iter().map(|c| map_cell(*c)).collect::<Vec<_>>(), route);
                         if norm.len() >= 2 {
                             seg.points = norm;
                         }
@@ -1359,7 +1362,10 @@ pub fn free_rotation(a: f64) -> f64 {
     if !a.is_finite() {
         return 0.0;
     }
-    normalize_angle((a * 10.0).round() / 10.0) + 0.0
+    // Rounding after normalizing keeps the result exact (subtracting 360
+    // afterwards would bring the float error back); normalizing again turns
+    // a rounded -180 into 180.
+    normalize_angle((normalize_angle(a) * 10.0).round() / 10.0) + 0.0
 }
 
 fn first_line_name(text: &str, fallback: &str) -> String {

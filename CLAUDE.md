@@ -13,6 +13,7 @@ Rust (from the repo root):
 cargo test                                   # all Rust tests
 cargo test -p transit-core --test editor     # one integration test file
 cargo test -p transit-core pill              # tests whose name matches "pill"
+INSTA_UPDATE=always cargo test -p transit-core --test render_snapshots   # rewrite the SVG markup snapshots after an intended rendering change (or `cargo insta review`)
 cargo clippy --all-targets                   # expected to be warning-free
 ```
 Do not run `cargo fmt`: the code is not rustfmt-clean (long lines, compact literals, no `rustfmt.toml`), so it rewrites nearly every file. Match the surrounding style by hand.
@@ -21,17 +22,19 @@ Web (from `web/`):
 ```bash
 npm run build:wasm      # REQUIRED after any Rust change: regenerates web/src/wasm/pkg (gitignored)
 npm run dev             # http://localhost:5173 ; on WSL with the repo on /mnt/*, use VITE_POLL=1 npm run dev
-npm test                # vitest (tests/unit), loads the real wasm via initSync in tests/unit/setup.ts
+npm test                # vitest: tests/unit, tests/component (Testing Library) and tests/integration; loads the real wasm via initSync in tests/unit/setup.ts
 npx vitest run tests/unit/tools.spec.ts -t "eraser"   # single file / test name
 npm run typecheck       # vue-tsc
 npm run build           # typecheck + vite build to web/dist
 npx playwright test                         # e2e (tests/e2e), starts its own vite on :5174
 npx playwright test editing -g "rotate"     # single e2e file / test
-npx playwright test --update-snapshots      # refresh failing visual baselines (Linux-specific PNGs)
-npx playwright test visual --update-snapshots=all   # rewrite every baseline (small UI changes pass the 2% tolerance)
 npm run screenshots                         # regenerate the README screenshots in docs/images (skipped in normal runs)
 ```
 Playwright uses the locally installed Google Chrome (`channel: 'chrome'`); `PW_CHANNEL=chromium` switches to the bundled browser. Unit and e2e tests both need the wasm package built first. Outside CI the e2e config reuses a server already listening on :5174, so a leftover vite (e.g. started with `npx vite` and killed only at the `npx` level) can serve stale code; kill stray `vite.js` processes if tests behave as if your change isn't there (`pkill -f '[v]ite.js'`: a plain `pkill -f vite.js` also matches, and kills, the shell running it).
+
+Tests never compare screenshots, so they pass the same on every machine and in CI. The drawing is pinned down by `insta` snapshots of the SVG markup (`crates/transit-core/tests/render_snapshots.rs`, `.snap` files in `tests/snapshots/`), the e2e tests check menus and dialogs with Playwright ARIA snapshots (`toMatchAriaSnapshot`) and the canvas against the engine fragments (`tests/e2e/structure.spec.ts`). `crates/transit-core/tests/properties.rs` holds `proptest` property tests; keep its `properties.proptest-regressions` file committed, since it replays inputs that once failed. Component tests in `tests/component` use `@testing-library/vue` + `user-event` (query by role or label, not by CSS class); `@testing-library/jest-dom` matchers are loaded in the setup file.
+
+CI (`.github/workflows/ci.yml`) runs clippy with `-D warnings`, `cargo test`, the wasm build, `npm test`, `npm run build` and Playwright on every pull request. `release.yml` reruns it on every push to `main` and publishes a GitHub release `v<version>` from `web/package.json` (which must equal the Cargo workspace version), skipping it when that tag exists.
 
 Unit tests run components in happy-dom, which can crash while patching `OptionsBar` from one tool's branch to another (real Chrome is fine); mount a fresh component per tool instead of switching tools on a mounted one.
 

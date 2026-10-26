@@ -146,8 +146,10 @@ web/
   src/stores/      editor state, commands and preferences
   src/tools/       pointer and keyboard behavior of each tool
   src/components/  menu bar, options bar, tools, canvas, panels and dialogs
-  tests/unit/      Vitest unit and component tests (with the real WebAssembly engine)
-  tests/e2e/       Playwright browser tests and visual snapshots
+  tests/unit/        Vitest unit tests, one module at a time (with the real WebAssembly engine)
+  tests/component/   components driven like a user would, with Testing Library
+  tests/integration/ tools, store, commands, engine and files working together
+  tests/e2e/         Playwright browser tests, with accessibility snapshots instead of screenshots
 docs/
   requirements.md  the specification
   images/          README screenshots (npm run screenshots)
@@ -156,18 +158,28 @@ docs/
 ## Development
 
 ```bash
-cargo test                    # Rust tests (from the repository root)
+cargo test                    # Rust tests (from the repository root), including render snapshots and property tests
 cargo clippy --all-targets    # expected to be warning-free
 cd web
-npm test                      # unit and component tests
+npm test                      # unit, component and integration tests
 npm run typecheck
-npx playwright test           # browser tests and visual snapshots (uses Google Chrome)
+npx playwright test           # browser tests (uses Google Chrome)
 npm run screenshots           # regenerate the README screenshots in docs/images
 ```
 
 Playwright uses the installed Google Chrome; set `PW_CHANNEL=chromium` to use its bundled
-browser instead (`npx playwright install chromium`). After an intentional UI change, refresh
-the visual baselines with `npx playwright test --update-snapshots`.
+browser instead (`npx playwright install chromium`).
+
+There are no screenshot comparisons, so the tests pass the same on every machine. The drawing
+is pinned down by snapshots of the SVG markup (`crates/transit-core/tests/snapshots`); after an
+intentional rendering change, review and accept them with `cargo insta review` (install it with
+`cargo install cargo-insta`) or rewrite them with `INSTA_UPDATE=always cargo test`. The browser
+tests compare accessibility snapshots (`toMatchAriaSnapshot`), which are text written in the test.
+
+Every pull request runs all of the above on GitHub Actions (`.github/workflows/ci.yml`). Every
+push to `main` runs them again and publishes a release tagged with the version in
+`web/package.json` (`.github/workflows/release.yml`), so bump that version, and the Cargo
+workspace version with it, to cut a new release.
 
 Branches: `main` holds releases and `dev` is the integration branch. New work goes on
 `feature/*` and fixes on `bugfix/*`, both branched from `dev` and merged back with `--no-ff`.

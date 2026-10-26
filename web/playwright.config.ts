@@ -7,7 +7,6 @@ const channel = process.env.PW_CHANNEL ?? 'chrome'
 export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 60_000,
-  expect: { toHaveScreenshot: { maxDiffPixelRatio: 0.02, animations: 'disabled' } },
   fullyParallel: true,
   retries: process.env.CI ? 1 : 0,
   reporter: [['list'], ['html', { open: 'never' }]],

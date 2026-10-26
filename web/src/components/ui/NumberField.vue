@@ -56,7 +56,7 @@ function commitText(): void {
 
 function onKey(e: KeyboardEvent): void {
   if (e.key === 'Enter') {
-    commitText()
+    // Leaving the field commits (committing here too would emit twice).
     ;(e.target as HTMLInputElement).blur()
   } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
     e.preventDefault()

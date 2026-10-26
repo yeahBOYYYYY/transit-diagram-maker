@@ -7,3 +7,6 @@ web/playwright-report
 *.log
 .DS_Store
 web/.vite
+# insta snapshots awaiting review
+*.snap.new
+*.pending-snap

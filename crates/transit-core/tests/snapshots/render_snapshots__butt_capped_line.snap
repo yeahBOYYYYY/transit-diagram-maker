@@ -1,0 +1,5 @@
+---
+source: crates/transit-core/tests/render_snapshots.rs
+expression: "line(LineStyle\n{ start_cap: Cap::Butt, end_cap: Cap::Butt, ..LineStyle::default() })"
+---
+<path d="M12 12L93.088 12A36 36 0 0 1 118.544 22.544L156 60" fill="none" stroke="#e03c31" stroke-width="24" stroke-linejoin="round"/><path d="M13.2 24L0 24L0 0L13.2 0ZM163.637 50.666L172.971 60L156 76.971L146.666 67.637Z" fill="#e03c31"/>

@@ -846,6 +846,29 @@ fn rotate_45_degrees_keeps_the_shape_of_a_bent_line() {
 }
 
 #[test]
+fn rotate_45_degrees_keeps_lines_that_touch_in_a_loop_on_the_grid() {
+    // The two lines share (0,1) and (-1,1), closing a loop that can't keep
+    // every run length when turned by 45°; the step that breaks is routed.
+    let mut ed = Editor::new();
+    let a = line(&mut ed, &[c(-11, 2), c(0, 0), c(0, 7)]);
+    let b = line(&mut ed, &[c(0, 1), c(-9, 0)]);
+    ed.rotate(&[a.group_id, b.group_id], 45.0, Vec2::new(0.0, 0.0), false).unwrap();
+    for id in [a.layer_id, b.layer_id] {
+        let pts = &segment(&ed, id).points;
+        assert!(pts.windows(2).all(|w| Dir8::between(w[0], w[1]).is_some()), "{pts:?}");
+    }
+    let saved = io::to_transit(ed.document());
+    assert_eq!(&io::from_transit(&saved).unwrap(), ed.document());
+}
+
+#[test]
+fn free_rotation_past_half_a_turn_stays_exact() {
+    assert_eq!(editor::free_rotation(498.1), 138.1);
+    assert_eq!(editor::free_rotation(-180.04), 180.0);
+    assert_eq!(editor::free_rotation(180.04), 180.0);
+}
+
+#[test]
 fn rotate_45_degrees_keeps_stations_on_their_cell_of_the_line() {
     let mut ed = Editor::new();
     let l = line(&mut ed, &[c(0, 0), c(4, 0), c(6, 2)]);

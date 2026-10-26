@@ -1,7 +1,9 @@
-// Load the real WebAssembly engine synchronously for unit tests.
+// Shared setup for every vitest test: load the real WebAssembly engine synchronously, reset the preferences.
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { beforeEach } from 'vitest'
+import { afterEach, beforeEach } from 'vitest'
+import { cleanup } from '@testing-library/vue'
+import '@testing-library/jest-dom/vitest'
 import { initSync } from '../../src/wasm/pkg/transit_wasm.js'
 import { resetPrefs } from '../../src/stores/prefs'
 
@@ -11,3 +13,6 @@ beforeEach(() => {
   resetPrefs()
   localStorage.clear()
 })
+
+// Testing Library only cleans up by itself when test globals are enabled.
+afterEach(() => cleanup())

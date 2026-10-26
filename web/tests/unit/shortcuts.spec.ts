@@ -39,6 +39,13 @@ describe('combos', () => {
     expect(displayCombo('Delete, Backspace')).toBe('Delete')
     expect(displayCombo('')).toBe('')
   })
+  it('reads a comma after "+" as the comma key, not a separator', () => {
+    expect(splitCombos('Ctrl+,')).toEqual(['Ctrl+,'])
+    expect(splitCombos('Ctrl+,, Ctrl+Y')).toEqual(['Ctrl+,', 'Ctrl+Y'])
+    expect(displayCombo('Ctrl+,')).toBe('Ctrl+,')
+    expect(matches('Ctrl+,', { key: ',', code: 'Comma', ctrlKey: true })).toBe(true)
+    expect(matches('Ctrl+,', { key: 'Control', code: 'ControlLeft', ctrlKey: true })).toBe(false)
+  })
   it('detects conflicts', () => {
     const c = findConflicts({ a: 'Ctrl+K', b: 'ctrl+k', c: 'X' })
     expect([...c.keys()]).toEqual(['Ctrl+K'])
