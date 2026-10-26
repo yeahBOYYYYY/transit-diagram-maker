@@ -86,33 +86,9 @@ pub fn line_svg(points: &[Cell], style: &LineStyle, settings: &DocSettings) -> S
     let color = esc(&style.color);
     let radius = settings.corner_radius * g;
     let mut s = String::new();
-    // Requested dash and gap in pixels; a dash is never shorter than a cap.
-    let dash = (style.dash_length * g).max(h).max(0.5);
     let gap = (style.dash_gap * g).max(0.0);
     let (lead, trail) = (style.dash_start_offset * g, style.dash_end_offset * g);
-    let dash_attrs = |v: &[f64]| v.iter().map(|x| n(*x)).collect::<Vec<_>>().join(" ");
-    // The caps reach half a line width past the end cells, so the dash
-    // pattern of a dashed line covers them too: it starts one cap length
-    // before the path and the caps complete the first and last dash.
-    let outer = if style.kind == StrokeKind::Dashed && gap > 0.0 {
-        dash_array(rounded_polyline_len(&pts, radius) + 2.0 * h, lead, trail, dash, gap, true)
-    } else {
-        None
-    };
-    match outer {
-        Some(v) => {
-            let _ = write!(
-                s,
-                r#"<path d="{body}" fill="none" stroke="{color}" stroke-width="{}" stroke-linejoin="round" stroke-dasharray="{}" stroke-dashoffset="{}"/>"#,
-                n(w),
-                dash_attrs(&v),
-                n(h)
-            );
-        }
-        None => {
-            let _ = write!(s, r#"<path d="{body}" fill="none" stroke="{color}" stroke-width="{}" stroke-linejoin="round"/>"#, n(w));
-        }
-    }
+    let _ = write!(s, r#"<path d="{body}" fill="none" stroke="{color}" stroke-width="{}" stroke-linejoin="round"/>"#, n(w));
     let _ = write!(s, r#"<path d="{}" fill="{color}"/>"#, caps(h));
     if style.kind == StrokeKind::Hollow {
         let wi = w * (style.inner_width_pct / 100.0).clamp(0.0, 1.0);
@@ -130,14 +106,15 @@ pub fn line_svg(points: &[Cell], style: &LineStyle, settings: &DocSettings) -> S
         // Dashes of the inner color run down the middle of the line, from the
         // first to the last cell center.
         let wd = w * (style.dash_width_pct / 100.0).clamp(0.0, 1.0);
-        let pattern = dash_array(rounded_polyline_len(&pts, radius), lead, trail, (style.dash_length * g).max(0.5), gap, false);
+        let pattern = dash_array(rounded_polyline_len(&pts, radius), lead, trail, (style.dash_length * g).max(0.5), gap);
         if let (true, Some(v)) = (wd > 0.0, pattern) {
+            let dash_attrs = v.iter().map(|x| n(*x)).collect::<Vec<_>>().join(" ");
             let _ = write!(
                 s,
                 r#"<path d="{body}" fill="none" stroke="{}" stroke-width="{}" stroke-dasharray="{}"/>"#,
                 esc(&style.inner_color),
                 n(wd),
-                dash_attrs(&v)
+                dash_attrs
             );
         }
     }
@@ -245,33 +222,40 @@ fn station_shape_svg(st: &Station, settings: &DocSettings) -> String {
     }
 }
 
-fn text_metrics(t: &TextBox, g: f64) -> (Vec<&str>, f64, f64) {
-    let lines: Vec<&str> = t.text.split('\n').collect();
-    let fs = t.size * g;
-    let chars = lines.iter().map(|l| l.chars().count()).max().unwrap_or(0) as f64;
-    let w = chars * fs * if t.bold { 0.62 } else { 0.56 };
-    let h = lines.len() as f64 * fs * 1.2;
-    (lines, w, h)
+/// Formatting attributes of a run that differ from its text box.
+fn run_attrs(t: &TextBox, r: &RunStyle, g: f64) -> String {
+    let mut a = String::new();
+    if let Some(v) = &r.font_family {
+        let _ = write!(a, r#" font-family="{}""#, esc(v));
+    }
+    if let Some(v) = r.size {
+        let _ = write!(a, r#" font-size="{}""#, n(v * g));
+    }
+    if let Some(v) = &r.color {
+        let _ = write!(a, r#" fill="{}""#, esc(v));
+    }
+    if let Some(v) = r.bold.filter(|v| *v != t.bold) {
+        a.push_str(if v { r#" font-weight="bold""# } else { r#" font-weight="normal""# });
+    }
+    if let Some(v) = r.italic.filter(|v| *v != t.italic) {
+        a.push_str(if v { r#" font-style="italic""# } else { r#" font-style="normal""# });
+    }
+    a
 }
 
+/// A text box: one `<tspan>` per paragraph (marked `data-line` so the editor
+/// can measure it) holding one `<tspan>` per formatted run. Lines are placed
+/// from the top-left corner of the box and aligned inside its width.
 pub fn text_svg(t: &TextBox, settings: &DocSettings) -> String {
     let g = settings.cell_px;
     let p = t.pos.scale(g);
-    let fs = t.size * g;
-    let (lines, _, _) = text_metrics(t, g);
+    let w = t.width * g;
     // `align` is visual (start = left), while SVG anchors follow the writing
     // direction, so right-to-left text swaps them.
     let rtl = t.direction == TextDirection::Rtl;
-    let anchor = match (t.align, rtl) {
-        (TextAlign::Middle, _) => "middle",
-        (TextAlign::Start, false) | (TextAlign::End, true) => "start",
-        (TextAlign::End, false) | (TextAlign::Start, true) => "end",
-    };
     let mut s = format!(
-        r#"<text x="{}" y="{}" font-size="{}" font-family="{}" fill="{}" text-anchor="{anchor}" dominant-baseline="central""#,
-        n(p.x),
-        n(p.y),
-        n(fs),
+        r#"<text font-size="{}" font-family="{}" fill="{}""#,
+        n(t.size * g),
         esc(&t.font_family),
         esc(&t.color)
     );
@@ -288,10 +272,26 @@ pub fn text_svg(t: &TextBox, settings: &DocSettings) -> String {
         let _ = write!(s, r#" transform="rotate({} {} {})""#, n(t.rotation), n(p.x), n(p.y));
     }
     s.push_str(r#" style="white-space:pre">"#);
-    let first_dy = -((lines.len() as f64 - 1.0) / 2.0) * 1.2;
-    for (i, line) in lines.iter().enumerate() {
-        let dy = if i == 0 { first_dy } else { 1.2 };
-        let _ = write!(s, r#"<tspan x="{}" dy="{}em">{}</tspan>"#, n(p.x), n(dy), esc(line));
+    let mut top = p.y;
+    for para in &t.paragraphs {
+        let size = t.line_size(para) * g;
+        let (x, anchor) = match (t.align_of(para), rtl) {
+            (TextAlign::Middle, _) => (p.x + w / 2.0, "middle"),
+            (TextAlign::Start, false) => (p.x, "start"),
+            (TextAlign::Start, true) => (p.x, "end"),
+            (TextAlign::End, false) => (p.x + w, "end"),
+            (TextAlign::End, true) => (p.x + w, "start"),
+        };
+        let _ = write!(s, r#"<tspan data-line="" x="{}" y="{}" text-anchor="{anchor}">"#, n(x), n(top + size * BASELINE));
+        for r in &para.runs {
+            if r.style.is_empty() {
+                s.push_str(&esc(&r.text));
+            } else {
+                let _ = write!(s, "<tspan{}>{}</tspan>", run_attrs(t, &r.style, g), esc(&r.text));
+            }
+        }
+        s.push_str("</tspan>");
+        top += size * LINE_SPACING;
     }
     s.push_str("</text>");
     s
@@ -351,14 +351,8 @@ pub fn content_bounds(c: &Content, settings: &DocSettings) -> Option<Rect> {
             r.map(|r| Rect { x: r.x + st.offset.x * g, y: r.y + st.offset.y * g, ..r })
         }
         Content::Text(t) => {
-            let (_, w, h) = text_metrics(t, g);
             let p = t.pos.scale(g);
-            let x = match t.align {
-                TextAlign::Start => p.x,
-                TextAlign::Middle => p.x - w / 2.0,
-                TextAlign::End => p.x - w,
-            };
-            Some(rotated_rect_bounds(p, Rect { x, y: p.y - h / 2.0, w, h }, t.rotation))
+            Some(rotated_rect_bounds(p, Rect { x: p.x, y: p.y, w: t.width * g, h: t.height() * g }, t.rotation))
         }
         Content::Icon(i) => {
             let p = i.pos.scale(g);
@@ -558,21 +552,17 @@ mod tests {
     }
 
     #[test]
-    fn dash_offsets_keep_the_line_ends_solid() {
+    fn dash_offsets_keep_the_line_ends_plain() {
         let s = settings();
-        let style = LineStyle { kind: StrokeKind::Dashed, dash_start_offset: 2.0, dash_end_offset: 1.0, ..LineStyle::default() };
-        let m = line_svg(&[Cell::new(0, 0), Cell::new(10, 0)], &style, &s);
-        parse(&m);
-        let (first, _, offset) = dash_pattern(&m);
-        assert_eq!((first, offset), (48.0, 12.0), "two solid cells from the start cap");
         let style = LineStyle { kind: StrokeKind::InnerDashed, dash_start_offset: 2.0, ..LineStyle::default() };
         let m = line_svg(&[Cell::new(0, 0), Cell::new(10, 0)], &style, &s);
+        parse(&m);
         assert!(m.contains(r#"stroke-dasharray="0 48 "#), "no inner dashes over the first two cells: {m}");
     }
 
     #[test]
     fn right_to_left_text_keeps_its_visual_alignment() {
-        let t = TextBox { text: "שלום".into(), align: TextAlign::Start, direction: TextDirection::Rtl, ..TextBox::default() };
+        let t = TextBox { align: TextAlign::Start, direction: TextDirection::Rtl, ..TextBox::with_text("שלום") };
         let m = text_svg(&t, &settings());
         parse(&m);
         assert!(m.contains(r#"direction="rtl""#) && m.contains(r#"text-anchor="end""#), "{m}");
@@ -580,51 +570,37 @@ mod tests {
         assert!(!m.contains("direction") && m.contains(r#"text-anchor="start""#), "{m}");
     }
 
-    /// (dash, gap, offset) of the first dashed path in the markup.
-    fn dash_pattern(s: &str) -> (f64, f64, f64) {
-        let attr = |name: &str| -> String {
-            let start = s.find(&format!(r#"{name}=""#)).unwrap_or_else(|| panic!("no {name}: {s}")) + name.len() + 2;
-            s[start..].split('"').next().unwrap().to_string()
-        };
-        let arr: Vec<f64> = attr("stroke-dasharray").split(' ').map(|v| v.parse().unwrap()).collect();
-        (arr[0], arr[1], attr("stroke-dashoffset").parse().unwrap())
+    /// (dash, gap) of the first dashed path in the markup.
+    fn dash_pattern(s: &str) -> (f64, f64) {
+        let start = s.find(r#"stroke-dasharray=""#).unwrap_or_else(|| panic!("no dashes: {s}")) + 18;
+        let arr: Vec<f64> = s[start..].split('"').next().unwrap().split(' ').map(|v| v.parse().unwrap()).collect();
+        (arr[0], arr[1])
     }
 
     #[test]
-    fn dashed_line_starts_and_ends_with_a_full_dash() {
+    fn inner_dashes_start_and_end_with_a_full_dash() {
         let s = settings();
-        let style = LineStyle { kind: StrokeKind::Dashed, ..LineStyle::default() };
-        // Straight line from cell 0 to cell 10: 240px between centers plus a
-        // 12px cap at each end.
+        let style = LineStyle { kind: StrokeKind::InnerDashed, ..LineStyle::default() };
+        // Straight line from cell 0 to cell 10: 240px between the centers.
         let m = line_svg(&[Cell::new(0, 0), Cell::new(10, 0)], &style, &s);
         parse(&m);
-        assert_eq!(m.matches("<path").count(), 2, "dashed body and caps: {m}");
-        let (dash, gap, offset) = dash_pattern(&m);
-        assert_eq!(offset, 12.0, "the pattern starts under the start cap");
-        let len = 240.0 + 24.0;
-        let count = ((len + gap) / (dash + gap)).round();
-        assert!((count * dash + (count - 1.0) * gap - len).abs() < 0.01, "{dash} {gap}");
-        assert!((dash - 24.0).abs() < 3.0 && (gap - 12.0).abs() < 2.0, "close to the requested 1 / 0.5 cells: {dash} {gap}");
+        let (dash, gap) = dash_pattern(&m);
+        let count = ((240.0 + gap) / (dash + gap)).round();
+        assert!((count * dash + (count - 1.0) * gap - 240.0).abs() < 0.01, "{dash} {gap}");
+        assert!((dash - 24.0).abs() < 3.0 && (gap - 24.0).abs() < 3.0, "close to the requested 1 / 1 cells: {dash} {gap}");
     }
 
     #[test]
-    fn dashed_line_fits_around_rounded_corners() {
+    fn inner_dashes_fit_around_rounded_corners() {
         let s = settings();
-        let style = LineStyle { kind: StrokeKind::Dashed, dash_length: 0.7, dash_gap: 0.3, ..LineStyle::default() };
+        let style = LineStyle { kind: StrokeKind::InnerDashed, dash_length: 0.7, dash_gap: 0.3, ..LineStyle::default() };
         let pts = [Cell::new(0, 0), Cell::new(6, 0), Cell::new(6, 6)];
         let m = line_svg(&pts, &style, &s);
-        let (dash, gap, _) = dash_pattern(&m);
+        let (dash, gap) = dash_pattern(&m);
         let centers: Vec<Vec2> = pts.iter().map(|c| c.center().scale(24.0)).collect();
-        let len = rounded_polyline_len(&centers, s.corner_radius * 24.0) + 24.0;
+        let len = rounded_polyline_len(&centers, s.corner_radius * 24.0);
         let count = ((len + gap) / (dash + gap)).round();
         assert!((count * dash + (count - 1.0) * gap - len).abs() < 0.01);
-    }
-
-    #[test]
-    fn dashed_line_without_gap_is_solid() {
-        let style = LineStyle { kind: StrokeKind::Dashed, dash_gap: 0.0, ..LineStyle::default() };
-        let m = line_svg(&[Cell::new(0, 0), Cell::new(4, 0)], &style, &settings());
-        assert!(!m.contains("dasharray"), "{m}");
     }
 
     #[test]
@@ -730,13 +706,46 @@ mod tests {
 
     #[test]
     fn text_renders_multiline_escaped() {
-        let t = TextBox { text: "A & B\n<C>".into(), rotation: 30.0, bold: true, ..TextBox::default() };
+        let t = TextBox { rotation: 30.0, bold: true, ..TextBox::with_text("A & B\n<C>") };
         let m = text_svg(&t, &settings());
         parse(&m);
         assert_eq!(m.matches("<tspan").count(), 2);
         assert!(m.contains("A &amp; B"));
-        assert!(m.contains("rotate(30"));
+        assert!(m.contains("rotate(30 0 0)"), "rotates around the top-left corner: {m}");
         assert!(m.contains("bold"));
+    }
+
+    #[test]
+    fn text_lines_are_placed_from_the_top_left_corner() {
+        let mut t = TextBox { pos: Vec2::new(1.0, 2.0), align: TextAlign::Start, ..TextBox::with_text("Ab\nC") };
+        t.width = 2.0;
+        t.paragraphs[1].align = Some(TextAlign::End);
+        let m = text_svg(&t, &settings());
+        parse(&m);
+        // First line: left edge, baseline 0.95 × 18 px below the top.
+        assert!(m.contains(r#"x="24" y="65.1" text-anchor="start""#), "{m}");
+        // Second line: right-aligned on its own, one line (1.2 × 18 px) lower.
+        assert!(m.contains(r#"x="72" y="86.7" text-anchor="end""#), "{m}");
+        let b = content_bounds(&Content::Text(t.clone()), &settings()).unwrap();
+        assert_eq!((b.x, b.y, b.w), (24.0, 48.0, 48.0));
+        assert!((b.h - 2.0 * 0.75 * 1.2 * 24.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn text_runs_carry_their_own_formatting() {
+        let mut t = TextBox::with_text("");
+        t.paragraphs = vec![Paragraph {
+            align: None,
+            runs: vec![
+                TextRun::plain("Big "),
+                TextRun { text: "red".into(), style: RunStyle { color: Some("#ff0000".into()), size: Some(1.5), bold: Some(true), ..RunStyle::default() } },
+            ],
+        }];
+        let m = text_svg(&t, &settings());
+        parse(&m);
+        assert!(m.contains(r##"Big <tspan font-size="36" fill="#ff0000" font-weight="bold">red</tspan>"##), "{m}");
+        // The line is as tall as its largest run.
+        assert!((t.height() - 1.5 * 1.2).abs() < 1e-9);
     }
 
     #[test]

@@ -75,10 +75,11 @@ test.describe('selection, transforms and history', () => {
       const t = (window as any).__transit
       const station = s.fragments.find((f: any) => f.kind === 'station')
       const label = s.fragments.find((f: any) => f.kind === 'text')
-      return { cell: t.node(station.id).content.cell, label: t.node(label.id).content.pos }
+      const box = t.node(label.id).content
+      return { cell: t.node(station.id).content.cell, labelCenter: box.pos.x + box.width / 2 }
     })
     expect(st.cell).toEqual({ x: 7, y: 0 })
-    expect(st.label.x).toBeCloseTo(7.5)
+    expect(st.labelCenter, 'the label stays centered over the station').toBeCloseTo(7.5, 1)
   })
 
   test('a selected pill grows into the cell of a double-clicked arrow', async ({ page }) => {
@@ -106,8 +107,7 @@ test.describe('selection, transforms and history', () => {
     await page.keyboard.type('Old')
     await page.keyboard.press('Enter')
     await page.keyboard.press('v')
-    const p = await cellPos(page, 0, 0)
-    await page.mouse.dblclick(p.x, p.y)
+    await page.locator('[data-testid=doc-layer] text').dblclick()
     await expect(page.getByTestId('text-editor')).toBeVisible()
     await page.keyboard.press('Control+a')
     await page.keyboard.type('New')

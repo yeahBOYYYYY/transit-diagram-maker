@@ -29,7 +29,7 @@
 //! ```
 
 use crate::assets::{font_face_css, FontAsset, IconAsset};
-use crate::editor::snap_rotation;
+use crate::editor::free_rotation;
 use crate::error::{EditError, Result};
 use crate::geom::{self, Cell, Dir8, Vec2};
 use crate::model::*;
@@ -100,7 +100,10 @@ impl Tag {
         self.0 + "/>"
     }
     fn with_text(self, name: &str, text: &str) -> String {
-        format!("{}>{}</transit:{name}>", self.0, esc(text).replace('\r', "&#13;"))
+        self.with_children(name, &esc(text).replace('\r', "&#13;"))
+    }
+    fn with_children(self, name: &str, inner: &str) -> String {
+        format!("{}>{inner}</transit:{name}>", self.0)
     }
 }
 
@@ -165,6 +168,7 @@ fn layer_tag(l: &Layer) -> String {
         Content::Text(t) => {
             let mut tag = base("text")
                 .attr("pos", vec2(t.pos))
+                .attr("width", num(t.width))
                 .attr("size", num(t.size))
                 .attr("color", &t.color)
                 .attr("font-family", &t.font_family)
@@ -176,7 +180,37 @@ fn layer_tag(l: &Layer) -> String {
             if let Some(id) = t.station_id {
                 tag = tag.attr("station", id);
             }
-            tag.with_text("text", &t.text)
+            // One <transit:p> per paragraph holding its <transit:run>s,
+            // written without whitespace in between (it would be text).
+            let mut inner = String::new();
+            for p in &t.paragraphs {
+                let mut pt = Tag::new("p");
+                if let Some(a) = p.align {
+                    pt = pt.attr("align", enum_name(&a));
+                }
+                let mut runs = String::new();
+                for r in &p.runs {
+                    let mut rt = Tag::new("run");
+                    if let Some(v) = &r.style.font_family {
+                        rt = rt.attr("font-family", v);
+                    }
+                    if let Some(v) = r.style.size {
+                        rt = rt.attr("size", num(v));
+                    }
+                    if let Some(v) = &r.style.color {
+                        rt = rt.attr("color", v);
+                    }
+                    if let Some(v) = r.style.bold {
+                        rt = rt.attr("bold", v);
+                    }
+                    if let Some(v) = r.style.italic {
+                        rt = rt.attr("italic", v);
+                    }
+                    runs.push_str(&rt.with_text("run", &r.text));
+                }
+                inner.push_str(&pt.with_children("p", &runs));
+            }
+            tag.with_children("text", &inner)
         }
         Content::Icon(i) => base("icon")
             .attr("pos", vec2(i.pos))
@@ -306,6 +340,12 @@ impl<'a, 'i> El<'a, 'i> {
             Some(v) => Err(self.bad(key, v)),
         }
     }
+    fn opt_num(&self, key: &str) -> Result<Option<f64>> {
+        self.get(key).map(|_| self.num(key, 0.0)).transpose()
+    }
+    fn opt_bool(&self, key: &str) -> Result<Option<bool>> {
+        self.get(key).map(|_| self.bool(key, false)).transpose()
+    }
     fn enumeration<T: DeserializeOwned + Default>(&self, key: &str) -> Result<T> {
         match self.get(key) {
             None => Ok(T::default()),
@@ -399,9 +439,28 @@ fn read_station(e: &El) -> Result<Station> {
 
 fn read_text(e: &El) -> Result<TextBox> {
     let d = TextBox::default();
-    Ok(TextBox {
+    let mut paragraphs = Vec::new();
+    for p in e.0.children().filter(|n| is_transit(n, "p")) {
+        let pe = El(p);
+        let align = if pe.get("align").is_some() { Some(pe.enumeration("align")?) } else { None };
+        let mut runs = Vec::new();
+        for r in p.children().filter(|n| is_transit(n, "run")) {
+            let re = El(r);
+            let style = RunStyle {
+                font_family: re.get("font-family").map(String::from),
+                size: re.opt_num("size")?,
+                color: re.get("color").map(String::from),
+                bold: re.opt_bool("bold")?,
+                italic: re.opt_bool("italic")?,
+            };
+            runs.push(TextRun { text: r.text().unwrap_or("").to_string(), style });
+        }
+        paragraphs.push(Paragraph { align, runs });
+    }
+    let mut t = TextBox {
         pos: e.vec2("pos")?,
-        text: e.0.text().unwrap_or("").to_string(),
+        paragraphs,
+        width: e.num("width", 0.0)?.max(0.0),
         size: e.num("size", d.size)?,
         color: e.string("color", &d.color),
         font_family: e.string("font-family", &d.font_family),
@@ -411,7 +470,12 @@ fn read_text(e: &El) -> Result<TextBox> {
         direction: e.enumeration("direction")?,
         rotation: e.num("rotation", 0.0)?,
         station_id: e.get("station").map(|_| e.id("station")).transpose()?,
-    })
+    };
+    t.normalize();
+    if e.get("width").is_none() {
+        t.width = t.estimated_width();
+    }
+    Ok(t)
 }
 
 fn read_icon(e: &El) -> Result<Icon> {
@@ -538,11 +602,11 @@ pub fn validate(mut doc: Document) -> Result<Document> {
         match &mut l.content {
             Content::Line(seg) => seg.points = geom::normalize_path(&seg.points, route),
             Content::Text(t) => {
-                t.rotation = snap_rotation(t.rotation);
-                t.pos = t.pos.snapped();
+                t.rotation = free_rotation(t.rotation);
+                t.pos = t.pos.rounded(1000.0);
             }
             Content::Icon(i) => {
-                i.rotation = snap_rotation(i.rotation);
+                i.rotation = free_rotation(i.rotation);
                 i.pos = i.pos.snapped();
             }
             Content::Station(_) => {}

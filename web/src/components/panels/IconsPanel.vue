@@ -16,7 +16,7 @@ import { CELL_PX, cellAt, screenToWorld } from '../../core/viewport'
 import { useEditor } from '../../stores/editor'
 import { prefs } from '../../stores/prefs'
 import { uploadIcon } from '../../stores/commands'
-import { placeAt, placeIcon } from '../../tools'
+import { placeIconAt, placeIcon } from '../../tools'
 
 const store = useEditor()
 const s = store.state
@@ -48,7 +48,7 @@ function choose(icon: IconInfo): void {
   // Add it in the cell in the middle of the view.
   const { width, height } = s.viewport
   const cells = screenToWorld(s.view, width / 2, height / 2)
-  placeIcon(store, icon.name, placeAt({ alt: false, cells, cell: cellAt(cells, CELL_PX) }))
+  placeIcon(store, icon.name, placeIconAt({ alt: false, cells, cell: cellAt(cells, CELL_PX) }))
 }
 
 function onDragStart(icon: IconInfo, e: DragEvent): void {

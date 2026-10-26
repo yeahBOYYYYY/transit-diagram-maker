@@ -40,6 +40,7 @@ const menus = computed<{ name: string; items: Item[] }[]>(() => [
       { sep: true },
       { action: 'edit.shortcuts' },
       { action: 'edit.preferences' },
+      { action: 'edit.restoreDefaults' },
     ],
   },
   {
@@ -112,11 +113,15 @@ const menus = computed<{ name: string; items: Item[] }[]>(() => [
   },
   {
     name: 'Window',
-    items: (['tools', 'options', 'properties', 'layers'] as const).map((k) => ({
-      label: { tools: 'Tools', options: 'Options', properties: 'Properties', layers: 'Layers' }[k],
-      toggle: () => prefs.panels[k],
-      set: () => (prefs.panels[k] = !prefs.panels[k]),
-    })),
+    items: [
+      ...(['tools', 'options', 'properties', 'layers'] as const).map((k) => ({
+        label: { tools: 'Tools', options: 'Options', properties: 'Properties', layers: 'Layers' }[k],
+        toggle: () => prefs.panels[k],
+        set: () => (prefs.panels[k] = !prefs.panels[k]),
+      })),
+      { sep: true as const },
+      { action: 'window.resetWorkspace' as const },
+    ],
   },
   { name: 'Help', items: [{ action: 'help.shortcuts' }, { sep: true }, { action: 'help.about' }] },
 ])

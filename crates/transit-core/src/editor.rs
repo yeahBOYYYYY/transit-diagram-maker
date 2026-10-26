@@ -45,6 +45,8 @@ pub struct StationOptions {
     /// Create a name label next to the station.
     pub label: bool,
     pub label_color: String,
+    /// How far from a line (in cells) a click still places a station on it.
+    pub snap_distance: f64,
 }
 
 impl Default for StationOptions {
@@ -58,6 +60,7 @@ impl Default for StationOptions {
             tick_length: None,
             label: true,
             label_color: "#1a1a1a".into(),
+            snap_distance: 1.5,
         }
     }
 }
@@ -493,7 +496,7 @@ impl Editor {
     fn station_shape_at(&self, kind: StationKind, cell: Cell, pos: Vec2, opts: &StationOptions) -> Result<(LineHit, StationShape)> {
         let hit = self
             .line_hit_at(cell)
-            .or_else(|| self.nearest_line_cell(cell.center(), 1.5))
+            .or_else(|| self.nearest_line_cell(cell.center(), opts.snap_distance.clamp(0.0, 50.0)))
             .ok_or_else(|| EditError::Invalid("stations must be placed on a line".into()))?;
         let line_color = match self.layer(hit.layer_id).map(|l| &l.content) {
             Some(Content::Line(seg)) => seg.style.color.clone(),
@@ -647,19 +650,23 @@ impl Editor {
 
     // ----------------------------------------------------------- text, icons
 
+    /// Add a text box. Its width is estimated from the text until the
+    /// browser measures it (`fit_text_widths`).
     pub fn add_text(&mut self, mut text: TextBox) -> Result<Id> {
-        text.rotation = snap_rotation(text.rotation);
+        text.rotation = free_rotation(text.rotation);
         text.pos = text.pos.snapped();
+        text.normalize();
+        text.width = text.estimated_width();
         self.apply(|d| {
             let id = d.alloc_id();
-            let name = first_line_name(&text.text, "Text");
+            let name = first_line_name(&text.text(), "Text");
             d.root.push(Node::Layer(Layer { id, name, visible: true, locked: false, content: Content::Text(text) }));
             Ok(id)
         })
     }
 
     pub fn add_icon(&mut self, mut icon: Icon) -> Result<Id> {
-        icon.rotation = snap_rotation(icon.rotation);
+        icon.rotation = free_rotation(icon.rotation);
         icon.pos = icon.pos.snapped();
         self.apply(|d| {
             let id = d.alloc_id();
@@ -758,7 +765,9 @@ impl Editor {
 
     /// Merge a JSON patch into a layer's content. A style change to a line
     /// segment applies to that segment only, except its color, which is the
-    /// line's identity and is shared by every segment of the line.
+    /// line's identity and is shared by every segment of the line. A text
+    /// property patched without new `paragraphs` applies to all of the text:
+    /// the runs (or paragraphs, for `align`) lose their own value for it.
     pub fn update_content(&mut self, id: Id, patch: &Value) -> Result<()> {
         let obj = patch.as_object().ok_or_else(|| EditError::Invalid("patch must be an object".into()))?;
         if obj.contains_key("kind") || obj.contains_key("shape") || obj.contains_key("line_id") {
@@ -769,20 +778,49 @@ impl Editor {
             let mut v = serde_json::to_value(&layer.content).map_err(|e| EditError::Invalid(e.to_string()))?;
             merge(&mut v, patch);
             let mut content: Content = serde_json::from_value(v).map_err(|e| EditError::Invalid(e.to_string()))?;
-            match &mut content {
-                Content::Text(t) => {
-                    t.rotation = snap_rotation(t.rotation);
-                    t.pos = t.pos.snapped();
+            match (&layer.content, &mut content) {
+                (Content::Text(old), Content::Text(t)) => {
+                    t.rotation = free_rotation(t.rotation);
+                    t.pos = if obj.contains_key("pos") { t.pos.snapped() } else { old.pos };
+                    if !obj.contains_key("paragraphs") {
+                        for key in RUN_PROPERTIES.iter().chain(["align"].iter()) {
+                            if obj.contains_key(*key) {
+                                t.clear_overrides(key);
+                            }
+                        }
+                    }
+                    t.normalize();
+                    // Keep the measured width unless the text or its fonts
+                    // changed; then estimate it until the browser measures it.
+                    let (mut a, mut b) = (old.clone(), t.clone());
+                    for x in [&mut a, &mut b] {
+                        x.pos = Vec2::default();
+                        x.color.clear();
+                        x.align = TextAlign::Start;
+                        x.direction = TextDirection::Ltr;
+                        x.rotation = 0.0;
+                        x.station_id = None;
+                        x.width = 0.0;
+                        for p in &mut x.paragraphs {
+                            p.align = None;
+                            for r in &mut p.runs {
+                                r.style.color = None;
+                            }
+                        }
+                    }
+                    if a != b {
+                        t.set_width(t.estimated_width());
+                    }
                 }
-                Content::Icon(i) => {
-                    i.rotation = snap_rotation(i.rotation);
+                (_, Content::Icon(i)) => {
+                    i.rotation = free_rotation(i.rotation);
                     i.pos = i.pos.snapped();
                 }
                 _ => {}
             }
             let rename = match (&layer.content, &content) {
-                (Content::Text(old), Content::Text(new)) if layer.name == first_line_name(&old.text, "Text") => {
-                    Some(first_line_name(&new.text, "Text"))
+                (Content::Text(old), Content::Text(new)) if layer.name == first_line_name(&old.text(), "Text") => {
+                    Some(first_line_name(&new.text(), "Text"))
                 }
                 _ => None,
             };
@@ -883,6 +921,23 @@ impl Editor {
             }
             None => Err(EditError::NotFound(id)),
         }
+    }
+
+    /// Store the widths of text boxes as measured by the browser (cell units),
+    /// keeping the edge each box is aligned to in place. A measurement only
+    /// describes the text already there, so it is not recorded in the history.
+    /// Returns whether anything changed.
+    pub fn fit_text_widths(&mut self, widths: &[(Id, f64)]) -> bool {
+        let mut changed = false;
+        for (id, w) in widths {
+            if let Some(Layer { content: Content::Text(t), .. }) = tree::find_layer_mut(&mut self.doc.root, *id) {
+                if w.is_finite() && (t.width - w).abs() > 1e-3 {
+                    t.set_width(*w);
+                    changed = true;
+                }
+            }
+        }
+        changed
     }
 
     pub fn delete(&mut self, ids: &[Id]) -> Result<usize> {
@@ -1069,9 +1124,11 @@ impl Editor {
     /// Move nodes by a delta in cell units. Lines move in whole cells. Stations
     /// normally move in whole cells and re-snap onto their line; with `free`
     /// they leave the line and move in tenths (their coupling to the line is
-    /// kept). Text and icons snap to the cells too: along with grid content
-    /// they move in whole cells, and on their own the top-left anchor of the
-    /// group lands on a cell center. With `free` they move in tenths.
+    /// kept). Text boxes always put their top-left corner on a grid
+    /// intersection, except labels moved along with their station, which keep
+    /// their place next to it. Pictograms move in whole cells along with grid
+    /// content, and on their own the top-left corner of their centers lands on
+    /// a cell center. With `free` text and pictograms move in tenths.
     pub fn translate(&mut self, ids: &[Id], dx: f64, dy: f64, free: bool) -> Result<()> {
         self.apply(|d| {
             let leaves = editable_leaves(d, ids);
@@ -1082,18 +1139,21 @@ impl Editor {
 
     /// Rotate nodes by `deg` around `pivot` (cell units). Everything rotates in
     /// 45° steps; selections with grid-bound content (lines, stations) pivot
-    /// around a cell center so they land back on the grid. Returns the angle
-    /// actually applied.
-    pub fn rotate(&mut self, ids: &[Id], deg: f64, pivot: Vec2) -> Result<f64> {
+    /// around a cell center so they land back on the grid, and text boxes put
+    /// their corner back on a grid intersection. With `free` (Alt), text and
+    /// pictograms rotate by any whole number of degrees; grid content keeps
+    /// its 45° steps. Returns the angle actually applied.
+    pub fn rotate(&mut self, ids: &[Id], deg: f64, pivot: Vec2, free: bool) -> Result<f64> {
         self.apply(|d| {
             let leaves = editable_leaves(d, ids);
             let grid_bound = leaves.iter().any(|id| {
                 matches!(tree::find_layer(&d.root, *id).map(|l| &l.content), Some(Content::Line(_) | Content::Station(_)))
             });
+            let free = free && !grid_bound;
             let steps = (deg / 45.0).round() as i32;
-            let angle = steps as f64 * 45.0;
+            let angle = if free { normalize_angle(deg.round()) } else { steps as f64 * 45.0 };
             let pivot = if grid_bound { Cell::containing(pivot).center() } else { pivot };
-            if steps == 0 {
+            if angle == 0.0 || !angle.is_finite() {
                 return Ok(0.0);
             }
             let route = d.settings.route_mode;
@@ -1130,12 +1190,14 @@ impl Editor {
                         }
                     }
                     Content::Text(t) => {
-                        t.pos = t.pos.rotate_around(pivot, angle).snapped();
-                        t.rotation = snap_rotation(t.rotation + angle);
+                        let pos = t.pos.rotate_around(pivot, angle);
+                        let label_follows = t.station_id.is_some_and(|s| leaves.contains(&s));
+                        t.pos = if free || label_follows { pos.snapped() } else { pos.rounded(1.0) };
+                        t.rotation = if free { free_rotation(t.rotation + angle) } else { snap_rotation(t.rotation + angle) };
                     }
                     Content::Icon(i) => {
                         i.pos = i.pos.rotate_around(pivot, angle).snapped();
-                        i.rotation = snap_rotation(i.rotation + angle);
+                        i.rotation = if free { free_rotation(i.rotation + angle) } else { snap_rotation(i.rotation + angle) };
                     }
                 }
             }
@@ -1202,12 +1264,21 @@ fn normalize_angle(a: f64) -> f64 {
     a
 }
 
-/// Rotations are always whole multiples of 45°, normalized to (-180, 180].
+/// A rotation snapped to a whole multiple of 45°, normalized to (-180, 180].
 pub fn snap_rotation(a: f64) -> f64 {
     if !a.is_finite() {
         return 0.0;
     }
     normalize_angle((a / 45.0).round() * 45.0)
+}
+
+/// Any rotation (text and pictograms rotated with Alt, or typed in), rounded
+/// to a tenth of a degree and normalized to (-180, 180].
+pub fn free_rotation(a: f64) -> f64 {
+    if !a.is_finite() {
+        return 0.0;
+    }
+    normalize_angle((a * 10.0).round() / 10.0) + 0.0
 }
 
 fn first_line_name(text: &str, fallback: &str) -> String {
@@ -1375,15 +1446,18 @@ fn insert_station(
             name: name.clone(),
             visible: true,
             locked: false,
-            content: Content::Text(TextBox {
-                pos: label_pos.snapped(),
-                text: name.clone(),
-                size: s.label_font_size,
-                color: opts.label_color.clone(),
-                font_family: s.label_font_family.clone(),
-                align,
-                station_id: Some(station_id),
-                ..TextBox::default()
+            content: Content::Text({
+                let mut t = TextBox {
+                    size: s.label_font_size,
+                    color: opts.label_color.clone(),
+                    font_family: s.label_font_family.clone(),
+                    align,
+                    station_id: Some(station_id),
+                    ..TextBox::with_text(&name)
+                };
+                t.width = t.estimated_width();
+                t.place_at(label_pos);
+                t
             }),
         }));
         text_id = Some(id);
@@ -1490,7 +1564,7 @@ fn move_orphan_labels(d: &mut Document, moved: &[Id], old: &HashMap<Id, Vec2>) {
                     return;
                 }
                 if let (Some(a), Some(b)) = (old.get(&sid), new.get(&sid)) {
-                    t.pos = t.pos.add(b.sub(*a)).snapped();
+                    t.pos = t.pos.add(b.sub(*a)).rounded(1000.0);
                 }
             }
         }
@@ -1526,19 +1600,20 @@ fn snap_stations(d: &mut Document, leaves: &[Id]) {
     });
 }
 
-/// The delta text and icons move by in a non-free move: whole cells next to
-/// grid content, otherwise whatever puts their top-left anchor on a cell center.
-fn free_content_delta(d: &Document, leaves: &[Id], dx: f64, dy: f64) -> Vec2 {
+/// The delta pictograms move by in a non-free move: whole cells next to grid
+/// content, otherwise whatever puts the top-left corner of their centers on a
+/// cell center.
+fn icon_delta(d: &Document, leaves: &[Id], dx: f64, dy: f64) -> Vec2 {
     let mut anchor: Option<Vec2> = None;
     for id in leaves {
         match tree::find_layer(&d.root, *id).map(|l| &l.content) {
             Some(Content::Line(_) | Content::Station(_)) => return Vec2::new(dx.round(), dy.round()),
-            Some(c @ (Content::Text(_) | Content::Icon(_))) => {
+            Some(c @ Content::Icon(_)) => {
                 if let Some(p) = content_anchor(c) {
                     anchor = Some(anchor.map_or(p, |a| Vec2::new(a.x.min(p.x), a.y.min(p.y))));
                 }
             }
-            None => {}
+            _ => {}
         }
     }
     let Some(a) = anchor else { return Vec2::new(dx, dy) };
@@ -1549,7 +1624,7 @@ fn free_content_delta(d: &Document, leaves: &[Id], dx: f64, dy: f64) -> Vec2 {
 fn translate_layers(d: &mut Document, leaves: &[Id], dx: f64, dy: f64, free: bool) {
     let (ix, iy) = (dx.round() as i32, dy.round() as i32);
     let delta = Vec2::new(dx, dy);
-    let content_delta = if free { delta } else { free_content_delta(d, leaves, dx, dy) };
+    let icon_delta = if free { delta } else { icon_delta(d, leaves, dx, dy) };
     let old = station_anchors(d);
     // Stations whose lines move along keep their place relative to them.
     let mut moved_lines = HashSet::new();
@@ -1560,6 +1635,8 @@ fn translate_layers(d: &mut Document, leaves: &[Id], dx: f64, dy: f64, free: boo
     }
     let mut snap = Vec::new();
     let mut ticks = Vec::new();
+    // Labels moved along with their station stay where they are next to it.
+    let mut followers = Vec::new();
     for id in leaves {
         let Some(layer) = tree::find_layer_mut(&mut d.root, *id) else { continue };
         match &mut layer.content {
@@ -1594,8 +1671,17 @@ fn translate_layers(d: &mut Document, leaves: &[Id], dx: f64, dy: f64, free: boo
                     snap.push(*id);
                 }
             }
-            Content::Text(t) => t.pos = t.pos.add(content_delta).snapped(),
-            Content::Icon(i) => i.pos = i.pos.add(content_delta).snapped(),
+            Content::Text(t) => {
+                if free {
+                    t.pos = t.pos.add(delta).snapped();
+                } else if t.station_id.is_some_and(|s| leaves.contains(&s)) {
+                    followers.push(*id);
+                } else {
+                    // The corner of a text box always lands on a grid intersection.
+                    t.pos = t.pos.add(delta).rounded(1.0);
+                }
+            }
+            Content::Icon(i) => i.pos = i.pos.add(icon_delta).snapped(),
         }
     }
     snap_stations(d, &snap);
@@ -1616,7 +1702,8 @@ fn translate_layers(d: &mut Document, leaves: &[Id], dx: f64, dy: f64, free: boo
             }
         }
     }
-    move_orphan_labels(d, leaves, &old);
+    let leading: Vec<Id> = leaves.iter().copied().filter(|id| !followers.contains(id)).collect();
+    move_orphan_labels(d, &leading, &old);
 }
 
 fn reassign_ids(d: &mut Document, node: Node, map: &mut HashMap<Id, Id>, line_map: &mut HashMap<Id, Id>) -> Node {
@@ -1690,6 +1777,13 @@ mod tests {
         assert_eq!(normalize_angle(190.0), -170.0);
         assert_eq!(normalize_angle(-180.0), 180.0);
         assert_eq!(normalize_angle(720.0), 0.0);
+    }
+
+    #[test]
+    fn free_rotation_keeps_any_angle() {
+        assert_eq!(free_rotation(30.04), 30.0);
+        assert_eq!(free_rotation(-200.0), 160.0);
+        assert_eq!(free_rotation(f64::INFINITY), 0.0);
     }
 
     #[test]

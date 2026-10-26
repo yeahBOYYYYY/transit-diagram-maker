@@ -21,7 +21,7 @@ export interface Rect {
 
 export type RouteMode = 'straight_first' | 'diagonal_first'
 export type Cap = 'butt' | 'round'
-export type StrokeKind = 'plain' | 'hollow' | 'dashed' | 'inner_dashed'
+export type StrokeKind = 'plain' | 'hollow' | 'inner_dashed'
 export type StationKind = 'dot' | 'tick' | 'pill'
 export type TextAlign = 'start' | 'middle' | 'end'
 export type TextDirection = 'ltr' | 'rtl'
@@ -83,9 +83,31 @@ export type StationShape =
 /** `offset` is the free displacement from the line cell (Alt-drag), in cells. */
 export type StationContent = { kind: 'station'; line_ids: Id[]; offset: Vec2 } & StationShape
 
+/** Character formatting of a run; a missing value uses the text box's. */
+export interface RunStyle {
+  font_family?: string
+  /** Font size in cells. */
+  size?: number
+  color?: string
+  bold?: boolean
+  italic?: boolean
+}
+
+export interface TextRun extends RunStyle {
+  text: string
+}
+
+/** One line of a text box; `align` overrides the box alignment. */
+export interface Paragraph {
+  align?: TextAlign
+  runs: TextRun[]
+}
+
+/** A text box: `pos` is its top-left corner and `width` its widest line, both in cells; it rotates around `pos`. */
 export interface TextBox {
   pos: Vec2
-  text: string
+  paragraphs: Paragraph[]
+  width: number
   size: number
   color: string
   font_family: string
@@ -174,6 +196,8 @@ export interface StationOptions {
   tick_length: number | null
   label: boolean
   label_color: string
+  /** How far from a line (cells) a click still places a station on it. */
+  snap_distance: number
 }
 
 export interface CreatedLine {

@@ -82,7 +82,7 @@ export async function dropIcon(page: Page, icon: string, x: number, y: number) {
 
 export async function buildSampleMap(page: Page) {
   await drawLine(page, [[-16, -4], [-6, -4], [0, 2], [12, 2]])
-  await page.selectOption('[data-testid=line-style]', 'dashed')
+  await page.selectOption('[data-testid=line-style]', 'inner_dashed')
   await setPenColor(page, '#0098d4')
   await drawLine(page, [[-2, -10], [-2, 9]])
   await page.selectOption('[data-testid=line-style]', 'hollow')

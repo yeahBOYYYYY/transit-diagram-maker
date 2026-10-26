@@ -18,6 +18,7 @@ export const ACTIONS = {
   'edit.rotateCcw': { label: 'Rotate 45° Counter Clockwise', category: 'Edit', key: 'Shift+R' },
   'edit.preferences': { label: 'Preferences…', category: 'Edit', key: 'Ctrl+K' },
   'edit.shortcuts': { label: 'Keyboard Shortcuts…', category: 'Edit', key: 'Ctrl+Alt+Shift+K' },
+  'edit.restoreDefaults': { label: 'Restore All Defaults…', category: 'Edit', key: '' },
 
   'document.settings': { label: 'Document Settings…', category: 'Document', key: 'Ctrl+Alt+D' },
   'document.assets': { label: 'Fonts & Icons…', category: 'Document', key: '' },
@@ -37,6 +38,7 @@ export const ACTIONS = {
   'view.fit': { label: 'Fit on Screen', category: 'View', key: 'Ctrl+0' },
   'view.actual': { label: '100%', category: 'View', key: 'Ctrl+1' },
   'view.toggleGrid': { label: 'Show Grid', category: 'View', key: "Ctrl+'" },
+  'window.resetWorkspace': { label: 'Reset Workspace', category: 'Window', key: '' },
 
   'tool.select': { label: 'Selection Tool', category: 'Tools', key: 'V' },
   'tool.hand': { label: 'Hand Tool', category: 'Tools', key: 'H' },

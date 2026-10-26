@@ -6,18 +6,18 @@
 export const HELP = {
   // Selection
   position:
-    'Position in grid cells. Text and pictograms use their anchor point, stations their center, lines the top-left cell center they pass through, and several objects the top-left-most of those. Dragged objects snap to the cells (hold Alt to move in steps of 0.1 cell). Typed values can use 0.1 steps, except for lines, which move in whole cells; moving a station by a fraction of a cell takes it off its line.',
+    'Position in grid cells. Text uses the top-left corner of its box, pictograms their center, stations their center, lines the top-left cell center they pass through, and several objects the top-left-most of those. Dragged objects snap: text puts its corner on a grid intersection, everything else snaps to the cells (hold Alt to move in steps of 0.1 cell). Typed values can use 0.1 steps, except for lines, which move in whole cells; moving a station by a fraction of a cell takes it off its line.',
 
   // Lines
   'line.target': 'Draw a new line, or add a disconnected segment to an existing line. New segments take that line\'s style.',
   'line.color': 'Main color of the line. It is shared by all segments of the line, so changing it recolors the whole line.',
   'line.kind':
-    'Plain: a solid line. Hollow: a line with an inner channel. Dashed: the line is broken into dashes with empty gaps. Inner dashed: a solid line with thinner dashes of another color running down its middle.',
+    'Plain: a solid line. Hollow: a line with an inner channel. Inner dashed: a solid line with thinner dashes of another color running down its middle.',
   'line.channel': 'Color of the inner channel of a hollow line.',
   'line.dash_color': 'Color of the dashes running down the middle of an inner dashed line.',
   'line.channel_width': 'Width of the inner channel as a percentage of the line width.',
   'line.dash_length': 'Length of each dash, in cells. Dashes and gaps are stretched slightly so the line starts and ends with a full dash.',
-  'line.dash_gap': 'Space between two dashes, in cells. 0 makes the line solid.',
+  'line.dash_gap': 'Space between two dashes, in cells. 0 joins the dashes into one inner stripe.',
   'line.dash_width': 'Width of the dashes inside an inner dashed line, as a percentage of the line width.',
   'line.dash_start_offset': 'Length at the start of the line where the dashes do not begin yet, in cells. That part looks like a plain line. 0 starts the dashes right at the line end.',
   'line.dash_end_offset': 'Length at the end of the line where the dashes have already stopped, in cells. That part looks like a plain line. 0 runs the dashes up to the line end.',
@@ -40,13 +40,15 @@ export const HELP = {
   'station.coupled': 'The lines this station belongs to. It snaps back onto them when moved without Alt.',
 
   // Text
-  'text.text': 'The text. Press Shift+Enter for a new line when editing on the canvas.',
-  'text.font': 'Font family, bold and italic.',
-  'text.color': 'Text color.',
-  'text.align': 'How the text lines up with its position: left edge, center or right edge.',
+  'text.edit':
+    'Edit the text on the canvas (or double-click it). Select part of it to give that part its own font, size, color, bold or italic; Shift+Enter starts a new line, Enter finishes and Escape cancels.',
+  'text.font': 'Font family, bold and italic. While editing on the canvas they apply to the selected characters; otherwise to all of the text.',
+  'text.color': 'Text color. While editing on the canvas it applies to the selected characters; otherwise to all of the text.',
+  'text.align':
+    'How the lines line up inside the text box: left, center or right. The box itself stays where it is. While editing on the canvas it applies to the lines the selection touches.',
   'text.direction': 'Writing direction. Right to left orders the words for languages such as Hebrew and Arabic, including mixed runs with numbers and Latin words. It does not change the alignment.',
-  'text.size': 'Font size, in cells.',
-  'text.rotation': 'Rotation in degrees, in steps of 45°.',
+  'text.size': 'Font size, in cells. While editing on the canvas it applies to the selected characters; otherwise to all of the text.',
+  'text.rotation': 'Rotation in degrees around the top-left corner. The rotate handles turn in steps of 45°; hold Alt to turn freely.',
 
   // Pictograms
   'icon.icon': 'Which pictogram to show. Pick another one in the Icons panel.',
@@ -58,7 +60,7 @@ export const HELP = {
   'icon.background': 'Color of the rounded tile behind the symbol.',
   'icon.size': 'Edge length of the tile, in cells.',
   'icon.size_default': 'New pictograms match the dot station diameter unless a size is set.',
-  'icon.rotation': 'Rotation in degrees, in steps of 45°.',
+  'icon.rotation': 'Rotation in degrees. The rotate handles turn in steps of 45°; hold Alt to turn freely.',
 
   // Eraser
   'eraser.size': 'Width of the eraser brush, in cells.',
@@ -101,6 +103,18 @@ export const HELP = {
   'prefs.gridMajorEvery': 'Draw a heavier grid line every this many cells.',
   'prefs.minGridPixels': 'Hide the grid when cells are smaller than this on screen.',
   'prefs.selectionColor': 'Color of selection outlines and handles.',
+  'prefs.warningColor': 'Color of the eraser brush and of cells where a station cannot be placed.',
+  'prefs.previewOpacity': 'How opaque the previews of the pen, the station tool and dragged pictograms are.',
+  'prefs.confirmDiscard': 'Ask before New throws away unsaved changes.',
+  'prefs.newText': 'The text a new text box starts with (it is selected, so typing replaces it).',
+  'prefs.messageDuration': 'How long messages stay in the status bar, in milliseconds.',
+  'prefs.errorDuration': 'How long error messages stay in the status bar, in milliseconds.',
+  'prefs.panels': 'Which panels are shown. Window ▸ Reset Workspace shows all of them again.',
+  'prefs.propertiesHeight': 'Height of the Properties panel when the Layers panel is shown below it, in pixels. Dragging the border between them changes it too.',
+  'prefs.panelEditPause': 'Changes made in the Properties panel (dragging a number, picking colors) become one undo step until they pause for this long, in milliseconds.',
+  'prefs.fitMargin': 'Space left around the drawing by Fit on Screen, in screen pixels.',
+  'prefs.fitMaxZoom': 'Largest zoom Fit on Screen uses for a small drawing (1 = 100%).',
+  'prefs.snapDistance': 'How far from a line a click with the station tool still places a station on it, in cells.',
 } as const
 
 export type HelpKey = keyof typeof HELP

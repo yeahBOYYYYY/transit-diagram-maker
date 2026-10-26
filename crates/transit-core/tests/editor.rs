@@ -196,7 +196,7 @@ fn dot_station_joins_line_group_with_label() {
     assert!(matches!(st.shape, StationShape::Dot { cell, ref outer_color, ref inner_color }
         if cell == c(3, 0) && outer_color == "#000000" && inner_color == "#ffffff"));
     let label = text(&ed, text_id);
-    assert_eq!(label.text, "Station 1");
+    assert_eq!(label.text(), "Station 1");
     assert_eq!(label.station_id, Some(s.station_id));
     assert!(label.pos.y < 0.5, "label sits above a horizontal line");
 }
@@ -287,10 +287,10 @@ fn tick_snaps_into_the_nearest_cell_corner() {
     assert_eq!(tick_slot(&ed, a.station_id), (c(3, 0), Dir8::E, 1));
     let b = ed.add_station_at(StationKind::Tick, c(5, 0), Vec2::new(5.1, 0.6), &StationOptions::default()).unwrap();
     assert_eq!(tick_slot(&ed, b.station_id), (c(5, 0), Dir8::E, -1));
-    // The label sits above the tick, not above the cell center.
-    let label = text(&ed, b.text_id.unwrap()).pos;
+    // The label is centered above the tick, not above the cell center.
+    let label = text(&ed, b.text_id.unwrap());
     let w = ed.settings().tick_width;
-    assert!((label.x - geom::snap_tenth(5.0 + w / 2.0)).abs() < 1e-9, "{label:?}");
+    assert!((label.pos.x + label.width / 2.0 - (5.0 + w / 2.0)).abs() < 1e-3, "{label:?}");
 }
 
 #[test]
@@ -426,7 +426,7 @@ fn freely_moved_station_keeps_offset_when_its_line_moves() {
 #[test]
 fn text_and_icon_layers() {
     let mut ed = Editor::new();
-    let t = ed.add_text(TextBox { text: "Central\nStation".into(), ..TextBox::default() }).unwrap();
+    let t = ed.add_text(TextBox::with_text("Central\nStation")).unwrap();
     assert_eq!(ed.layer(t).unwrap().name, "Central");
     let i = ed.add_icon(Icon { icon: "airport".into(), ..Icon::default() }).unwrap();
     assert_eq!(ed.layer(i).unwrap().name, "Airport");
@@ -441,12 +441,12 @@ fn text_and_icon_layers() {
 fn update_text_renames_layer_that_followed_text() {
     let mut ed = Editor::new();
     let t = ed.add_text(TextBox::default()).unwrap();
-    ed.update_content(t, &json!({"text": "Harbour", "size": 1.5})).unwrap();
-    assert_eq!(text(&ed, t).text, "Harbour");
+    ed.update_content(t, &json!({"paragraphs": [{"runs": [{"text": "Harbour"}]}], "size": 1.5})).unwrap();
+    assert_eq!(text(&ed, t).text(), "Harbour");
     assert_eq!(text(&ed, t).size, 1.5);
     assert_eq!(ed.layer(t).unwrap().name, "Harbour");
     ed.rename(t, "Custom").unwrap();
-    ed.update_content(t, &json!({"text": "Other"})).unwrap();
+    ed.update_content(t, &json!({"paragraphs": [{"runs": [{"text": "Other"}]}]})).unwrap();
     assert_eq!(ed.layer(t).unwrap().name, "Custom", "custom names are kept");
 }
 
@@ -457,9 +457,9 @@ fn segment_style_is_per_segment_but_color_is_shared() {
     ed.erase(&[c(4, 0)]).unwrap();
     let segs = segments_of(&ed, l.line_id);
     assert_eq!(segs.len(), 2);
-    ed.update_content(segs[0], &json!({"style": {"color": "#123456", "kind": "dashed", "end_cap": "butt"}})).unwrap();
+    ed.update_content(segs[0], &json!({"style": {"color": "#123456", "kind": "inner_dashed", "end_cap": "butt"}})).unwrap();
     let (a, b) = (segment(&ed, segs[0]).style.clone(), segment(&ed, segs[1]).style.clone());
-    assert_eq!((a.kind, a.end_cap, a.start_cap), (StrokeKind::Dashed, Cap::Butt, Cap::Round));
+    assert_eq!((a.kind, a.end_cap, a.start_cap), (StrokeKind::InnerDashed, Cap::Butt, Cap::Round));
     assert_eq!((b.kind, b.end_cap), (StrokeKind::Plain, Cap::Round), "other segments keep their style");
     assert_eq!((a.color.as_str(), b.color.as_str()), ("#123456", "#123456"), "the color is the line's");
 }
@@ -596,11 +596,11 @@ fn add_segment_joins_an_existing_line() {
 fn dropping_a_segment_into_another_line_group_joins_that_line() {
     let mut ed = Editor::new();
     let a = ed.create_line(&[c(0, 0), c(4, 0)], LineStyle { color: "#ff0000".into(), ..LineStyle::default() }).unwrap();
-    let b = ed.create_line(&[c(0, 5), c(4, 5)], LineStyle { color: "#0000ff".into(), kind: StrokeKind::Dashed, ..LineStyle::default() }).unwrap();
+    let b = ed.create_line(&[c(0, 5), c(4, 5)], LineStyle { color: "#0000ff".into(), kind: StrokeKind::InnerDashed, ..LineStyle::default() }).unwrap();
     ed.move_node(b.layer_id, Some(a.group_id), 1).unwrap();
     assert_eq!(segment(&ed, b.layer_id).line_id, a.line_id);
     assert_eq!(segment(&ed, b.layer_id).style.color, "#ff0000", "takes the line's color");
-    assert_eq!(segment(&ed, b.layer_id).style.kind, StrokeKind::Dashed, "keeps its own style");
+    assert_eq!(segment(&ed, b.layer_id).style.kind, StrokeKind::InnerDashed, "keeps its own style");
     assert!(ed.node(b.group_id).is_none(), "the emptied line group is pruned");
     // A style change now reaches both segments.
     ed.update_content(a.layer_id, &json!({"style": {"color": "#00ff00"}})).unwrap();
@@ -681,17 +681,48 @@ fn duplicate_line_with_station_gets_fresh_ids_and_references() {
 // ------------------------------------------------------------- transforms
 
 #[test]
-fn translate_moves_text_with_grid_content_in_whole_cells() {
+fn translate_moves_text_with_grid_content_onto_grid_intersections() {
     let mut ed = Editor::new();
     let l = line(&mut ed, &[c(0, 0), c(3, 0)]);
-    let t = ed.add_text(TextBox { pos: Vec2::new(1.2, 1.0), ..TextBox::default() }).unwrap();
+    let t = ed.add_text(TextBox { pos: Vec2::new(1.0, 1.0), ..TextBox::default() }).unwrap();
     ed.translate(&[l.group_id, t], 1.6, -0.4, false).unwrap();
     assert_eq!(segment(&ed, l.layer_id).points, vec![c(2, 0), c(5, 0)]);
-    assert_eq!(text(&ed, t).pos, Vec2::new(3.2, 1.0), "keeps its place next to the line");
+    assert_eq!(text(&ed, t).pos, Vec2::new(3.0, 1.0), "keeps its place next to the line");
 }
 
 #[test]
-fn moved_icons_and_text_snap_to_cell_centers() {
+fn moved_text_snaps_its_corner_to_grid_intersections() {
+    let mut ed = Editor::new();
+    let t = ed.add_text(TextBox { pos: Vec2::new(1.2, 5.7), ..TextBox::default() }).unwrap();
+    ed.translate(&[t], 0.3, 0.0, false).unwrap();
+    assert_eq!(text(&ed, t).pos, Vec2::new(2.0, 6.0), "nearest intersection");
+    ed.translate(&[t], 0.4, -0.4, false).unwrap();
+    assert_eq!(text(&ed, t).pos, Vec2::new(2.0, 6.0), "a small drag stays put");
+    ed.translate(&[t], 1.6, 0.0, false).unwrap();
+    assert_eq!(text(&ed, t).pos, Vec2::new(4.0, 6.0));
+    // Alt moves it in tenths, off the grid.
+    ed.translate(&[t], 0.33, 0.0, true).unwrap();
+    assert_eq!(text(&ed, t).pos, Vec2::new(4.3, 6.0));
+    // An icon moved along keeps snapping to cell centers on its own.
+    let i = ed.add_icon(Icon { pos: Vec2::new(2.5, 2.5), ..Icon::default() }).unwrap();
+    ed.translate(&[i, t], 1.0, 1.0, false).unwrap();
+    assert_eq!(text(&ed, t).pos, Vec2::new(5.0, 7.0));
+    assert_eq!(icon(&ed, i).pos, Vec2::new(3.5, 3.5));
+}
+
+#[test]
+fn labels_moved_with_their_station_stay_next_to_it() {
+    let mut ed = Editor::new();
+    line(&mut ed, &[c(0, 0), c(9, 0)]);
+    let s = ed.add_station(StationKind::Dot, c(2, 0), &StationOptions::default()).unwrap();
+    let label = text(&ed, s.text_id.unwrap()).pos;
+    ed.translate(&[s.group_id], 3.0, 0.0, false).unwrap();
+    let moved = text(&ed, s.text_id.unwrap()).pos;
+    assert!((moved.x - label.x - 3.0).abs() < 1e-9 && (moved.y - label.y).abs() < 1e-9, "{label:?} {moved:?}");
+}
+
+#[test]
+fn moved_icons_snap_to_cell_centers() {
     let mut ed = Editor::new();
     let i = ed.add_icon(Icon { pos: Vec2::new(2.5, 2.5), ..Icon::default() }).unwrap();
     // A small drag leaves it in its cell, a larger one moves it a whole cell.
@@ -700,15 +731,15 @@ fn moved_icons_and_text_snap_to_cell_centers() {
     ed.translate(&[i], 0.7, -1.2, false).unwrap();
     assert_eq!(icon(&ed, i).pos, Vec2::new(3.5, 1.5));
     // Content off the grid lands on the nearest cell center.
-    let t = ed.add_text(TextBox { pos: Vec2::new(1.2, 5.7), ..TextBox::default() }).unwrap();
-    ed.translate(&[t], 1.0, 0.0, false).unwrap();
-    assert_eq!(text(&ed, t).pos, Vec2::new(2.5, 5.5));
-    // Moved together, the top-left anchor snaps and the rest keeps its distance.
-    ed.translate(&[i, t], 0.4, 0.4, false).unwrap();
-    assert_eq!(text(&ed, t).pos, Vec2::new(2.5, 5.5));
+    let j = ed.add_icon(Icon { pos: Vec2::new(1.2, 5.7), ..Icon::default() }).unwrap();
+    ed.translate(&[j], 1.0, 0.0, false).unwrap();
+    assert_eq!(icon(&ed, j).pos, Vec2::new(2.5, 5.5));
+    // Moved together, the top-left center snaps and the rest keeps its distance.
+    ed.translate(&[i, j], 0.4, 0.4, false).unwrap();
+    assert_eq!(icon(&ed, j).pos, Vec2::new(2.5, 5.5));
     assert_eq!(icon(&ed, i).pos, Vec2::new(3.5, 1.5));
-    ed.translate(&[i, t], 1.0, 1.0, false).unwrap();
-    assert_eq!(text(&ed, t).pos, Vec2::new(3.5, 6.5));
+    ed.translate(&[i, j], 1.0, 1.0, false).unwrap();
+    assert_eq!(icon(&ed, j).pos, Vec2::new(3.5, 6.5));
     assert_eq!(icon(&ed, i).pos, Vec2::new(4.5, 2.5));
 }
 
@@ -758,7 +789,7 @@ fn cancel_transaction_restores() {
 fn rotate_line_quarter_turn() {
     let mut ed = Editor::new();
     let l = line(&mut ed, &[c(0, 0), c(4, 0)]);
-    let applied = ed.rotate(&[l.group_id], 88.0, Vec2::new(0.5, 0.5)).unwrap();
+    let applied = ed.rotate(&[l.group_id], 88.0, Vec2::new(0.5, 0.5), false).unwrap();
     assert_eq!(applied, 90.0, "grid content snaps to 45° steps");
     assert_eq!(segment(&ed, l.layer_id).points, vec![c(0, 0), c(0, 4)]);
 }
@@ -767,7 +798,7 @@ fn rotate_line_quarter_turn() {
 fn rotate_line_45_degrees_stays_on_grid() {
     let mut ed = Editor::new();
     let l = line(&mut ed, &[c(0, 0), c(4, 0)]);
-    ed.rotate(&[l.layer_id], 45.0, Vec2::new(0.5, 0.5)).unwrap();
+    ed.rotate(&[l.layer_id], 45.0, Vec2::new(0.5, 0.5), false).unwrap();
     let pts = &segment(&ed, l.layer_id).points;
     assert_eq!(pts[0], c(0, 0));
     assert_eq!(Dir8::between(pts[0], *pts.last().unwrap()), Some(Dir8::SE));
@@ -778,7 +809,7 @@ fn rotate_tick_station_with_its_line() {
     let mut ed = Editor::new();
     let l = line(&mut ed, &[c(0, 0), c(6, 0)]);
     let s = ed.add_station(StationKind::Tick, c(3, 0), &StationOptions::default()).unwrap();
-    ed.rotate(&[l.group_id], 90.0, Vec2::new(3.5, 0.5)).unwrap();
+    ed.rotate(&[l.group_id], 90.0, Vec2::new(3.5, 0.5), false).unwrap();
     match &station(&ed, s.station_id).shape {
         StationShape::Tick { cell, dir, .. } => {
             assert_eq!(*cell, c(3, 0));
@@ -794,12 +825,38 @@ fn rotate_tick_station_with_its_line() {
 fn text_and_icons_rotate_in_45_degree_steps() {
     let mut ed = Editor::new();
     let t = ed.add_text(TextBox { pos: Vec2::new(2.0, 0.0), ..TextBox::default() }).unwrap();
-    let applied = ed.rotate(&[t], 30.0, Vec2::new(2.0, 0.0)).unwrap();
+    let applied = ed.rotate(&[t], 30.0, Vec2::new(2.0, 0.0), false).unwrap();
     assert_eq!(applied, 45.0);
     assert_eq!(text(&ed, t).rotation, 45.0);
-    ed.rotate(&[t], 170.0, Vec2::new(2.0, 0.0)).unwrap();
+    ed.rotate(&[t], 170.0, Vec2::new(2.0, 0.0), false).unwrap();
     assert_eq!(text(&ed, t).rotation, -135.0);
-    assert_eq!(ed.rotate(&[t], 20.0, Vec2::new(2.0, 0.0)).unwrap(), 0.0);
+    assert_eq!(ed.rotate(&[t], 20.0, Vec2::new(2.0, 0.0), false).unwrap(), 0.0);
+}
+
+#[test]
+fn free_rotation_turns_text_and_icons_by_any_angle() {
+    let mut ed = Editor::new();
+    let t = ed.add_text(TextBox { pos: Vec2::new(2.0, 0.0), ..TextBox::default() }).unwrap();
+    let i = ed.add_icon(Icon { pos: Vec2::new(5.5, 0.5), ..Icon::default() }).unwrap();
+    assert_eq!(ed.rotate(&[t], 30.4, Vec2::new(2.0, 0.0), true).unwrap(), 30.0, "whole degrees");
+    assert_eq!(text(&ed, t).rotation, 30.0);
+    ed.rotate(&[i], 12.0, Vec2::new(5.5, 0.5), true).unwrap();
+    assert_eq!(icon(&ed, i).rotation, 12.0);
+    // Without Alt the result snaps back to a 45° multiple.
+    ed.rotate(&[t], 45.0, Vec2::new(2.0, 0.0), false).unwrap();
+    assert_eq!(text(&ed, t).rotation, 90.0);
+    // Lines and stations always turn in 45° steps.
+    let l = line(&mut ed, &[c(0, 4), c(4, 4)]);
+    assert_eq!(ed.rotate(&[l.group_id], 30.0, Vec2::new(0.5, 4.5), true).unwrap(), 45.0);
+}
+
+#[test]
+fn text_rotated_without_alt_puts_its_corner_on_an_intersection() {
+    let mut ed = Editor::new();
+    let t = ed.add_text(TextBox { pos: Vec2::new(2.0, 1.0), ..TextBox::default() }).unwrap();
+    ed.rotate(&[t], 90.0, Vec2::new(3.3, 1.4), false).unwrap();
+    let p = text(&ed, t).pos;
+    assert_eq!((p.x.fract(), p.y.fract()), (0.0, 0.0), "{p:?}");
 }
 
 #[test]
@@ -814,19 +871,84 @@ fn text_and_icon_positions_have_one_decimal() {
 }
 
 #[test]
-fn rotation_properties_snap_to_45_degrees() {
+fn typed_rotations_are_kept_to_a_tenth_of_a_degree() {
     let mut ed = Editor::new();
     let t = ed.add_text(TextBox { rotation: 30.0, ..TextBox::default() }).unwrap();
-    assert_eq!(text(&ed, t).rotation, 45.0);
-    ed.update_content(t, &json!({"rotation": 100.0})).unwrap();
-    assert_eq!(text(&ed, t).rotation, 90.0);
+    assert_eq!(text(&ed, t).rotation, 30.0);
+    ed.update_content(t, &json!({"rotation": 100.04})).unwrap();
+    assert_eq!(text(&ed, t).rotation, 100.0);
+    ed.update_content(t, &json!({"rotation": 270.0})).unwrap();
+    assert_eq!(text(&ed, t).rotation, -90.0);
+}
+
+#[test]
+fn changing_the_alignment_keeps_the_box_in_place() {
+    let mut ed = Editor::new();
+    let t = ed.add_text(TextBox { pos: Vec2::new(2.0, 3.0), ..TextBox::with_text("Long line\nShort") }).unwrap();
+    for align in ["start", "end", "middle"] {
+        ed.update_content(t, &json!({"align": align})).unwrap();
+        assert_eq!(text(&ed, t).pos, Vec2::new(2.0, 3.0), "{align}");
+    }
+}
+
+#[test]
+fn measured_widths_keep_the_corner_of_a_text_box() {
+    let mut ed = Editor::new();
+    let t = ed.add_text(TextBox { pos: Vec2::new(2.0, 3.0), align: TextAlign::Middle, ..TextBox::with_text("Name") }).unwrap();
+    ed.fit_text_widths(&[(t, 7.0)]);
+    ed.update_content(t, &json!({"paragraphs": [{"runs": [{"text": "A longer name"}]}]})).unwrap();
+    assert_eq!(text(&ed, t).pos, Vec2::new(2.0, 3.0), "it grows to the right");
+}
+
+#[test]
+fn measured_widths_keep_a_label_next_to_its_station() {
+    let mut ed = Editor::new();
+    line(&mut ed, &[c(0, 0), c(9, 0)]);
+    let s = ed.add_station(StationKind::Dot, c(4, 0), &StationOptions::default()).unwrap();
+    let t = s.text_id.unwrap();
+    let before = text(&ed, t).clone();
+    let depth = ed.undo_depth();
+    assert!(ed.fit_text_widths(&[(t, before.width + 1.0)]));
+    let after = text(&ed, t);
+    assert!((after.pos.x - (before.pos.x - 0.5)).abs() < 1e-9, "the center stays put");
+    assert!((after.width - before.width - 1.0).abs() < 1e-9);
+    assert_eq!(ed.undo_depth(), depth, "a measurement is not an undo step");
+    assert!(!ed.fit_text_widths(&[(t, before.width + 1.0)]), "nothing left to change");
+    // Right-aligned boxes grow to the left, left-aligned ones to the right.
+    ed.update_content(t, &json!({"align": "end"})).unwrap();
+    let x = text(&ed, t).pos.x;
+    ed.fit_text_widths(&[(t, before.width)]);
+    assert!((text(&ed, t).pos.x - (x + 1.0)).abs() < 1e-9);
+}
+
+#[test]
+fn parts_of_a_text_keep_their_own_formatting() {
+    let mut ed = Editor::new();
+    let t = ed.add_text(TextBox::default()).unwrap();
+    let rich = json!({"paragraphs": [
+        {"runs": [{"text": "Red", "color": "#ff0000"}, {"text": " big", "size": 1.5}]},
+        {"align": "end", "runs": [{"text": "Second"}, {"text": " line"}]}
+    ]});
+    ed.update_content(t, &rich).unwrap();
+    let tb = text(&ed, t);
+    assert_eq!(tb.text(), "Red big\nSecond line");
+    assert_eq!(tb.paragraphs[0].runs[0].style.color.as_deref(), Some("#ff0000"));
+    assert_eq!(tb.paragraphs[0].runs[1].style.size, Some(1.5));
+    assert_eq!(tb.paragraphs[1].runs.len(), 1, "runs with the same formatting merge");
+    assert_eq!(tb.paragraphs[1].align, Some(TextAlign::End));
+    // A box property set from the panel applies to all of the text.
+    ed.update_content(t, &json!({"color": "#00ff00"})).unwrap();
+    assert!(text(&ed, t).paragraphs[0].runs.iter().all(|r| r.style.color.is_none()));
+    assert_eq!(text(&ed, t).paragraphs[0].runs[1].style.size, Some(1.5), "other overrides stay");
+    ed.update_content(t, &json!({"align": "start"})).unwrap();
+    assert_eq!(text(&ed, t).paragraphs[1].align, None);
 }
 
 #[test]
 fn rotation_below_half_step_is_noop() {
     let mut ed = Editor::new();
     let l = line(&mut ed, &[c(0, 0), c(4, 0)]);
-    assert_eq!(ed.rotate(&[l.group_id], 10.0, Vec2::new(0.5, 0.5)).unwrap(), 0.0);
+    assert_eq!(ed.rotate(&[l.group_id], 10.0, Vec2::new(0.5, 0.5), false).unwrap(), 0.0);
     assert_eq!(ed.undo_depth(), 1);
 }
 

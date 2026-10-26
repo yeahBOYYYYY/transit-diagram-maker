@@ -82,6 +82,10 @@ impl Vec2 {
     pub fn snapped(self) -> Vec2 {
         Vec2::new(snap_tenth(self.x), snap_tenth(self.y))
     }
+    /// Round both coordinates to multiples of `1 / steps` (1 = grid intersections).
+    pub fn rounded(self, steps: f64) -> Vec2 {
+        Vec2::new((self.x * steps).round() / steps + 0.0, (self.y * steps).round() / steps + 0.0)
+    }
     /// Rotate by `deg` degrees around `pivot` (clockwise on screen for positive angles).
     pub fn rotate_around(self, pivot: Vec2, deg: f64) -> Vec2 {
         let (s, c) = deg.to_radians().sin_cos();
@@ -494,12 +498,10 @@ pub fn fit_dashes(len: f64, dash: f64, gap: f64) -> (f64, f64) {
 }
 
 /// `stroke-dasharray` values for a run of length `len` whose first `lead` and
-/// last `trail` stay free of the dash pattern. With `solid_ends` those parts
-/// are drawn (a dashed line that is solid near its ends) and a gap separates
-/// them from the dashes; otherwise they are left empty (inner dashes that stop
-/// short of the ends). The dashes in between are fitted like `fit_dashes`.
-/// None when the free parts leave no room for dashes.
-pub fn dash_array(len: f64, lead: f64, trail: f64, dash: f64, gap: f64, solid_ends: bool) -> Option<Vec<f64>> {
+/// last `trail` are left empty (inner dashes that stop short of the line ends).
+/// The dashes in between are fitted like `fit_dashes`. None when the empty
+/// parts leave no room for dashes.
+pub fn dash_array(len: f64, lead: f64, trail: f64, dash: f64, gap: f64) -> Option<Vec<f64>> {
     let (lead, trail) = (lead.max(0.0), trail.max(0.0));
     if lead == 0.0 && trail == 0.0 {
         let (d, g) = fit_dashes(len, dash, gap);
@@ -507,32 +509,23 @@ pub fn dash_array(len: f64, lead: f64, trail: f64, dash: f64, gap: f64, solid_en
     }
     let (dash, gap) = (dash.max(1e-6), gap.max(0.0));
     let mid = len - lead - trail;
-    // Gaps between the solid ends and the dashes.
-    let extra = if solid_ends { (lead > 0.0) as u8 as f64 + (trail > 0.0) as u8 as f64 } else { 0.0 };
-    if mid <= extra * gap + 1e-6 {
+    if mid <= 1e-6 {
         return None;
     }
-    // mid = n dashes + (n - 1 + extra) gaps
-    let n = ((mid + (1.0 - extra) * gap) / (dash + gap)).round().max(1.0);
-    let k = mid / (n * dash + (n - 1.0 + extra) * gap);
+    // mid = n dashes + (n - 1) gaps
+    let n = ((mid + gap) / (dash + gap)).round().max(1.0);
+    let k = mid / (n * dash + (n - 1.0) * gap);
     let (d, g) = (dash * k, gap * k);
     // Alternating drawn / empty lengths, starting with a drawn one.
     let mut v = Vec::new();
     if lead > 0.0 {
-        if solid_ends {
-            v.extend([lead, g]);
-        } else {
-            v.extend([0.0, lead]);
-        }
+        v.extend([0.0, lead]);
     }
     for i in 0..n as usize {
         if i > 0 {
             v.push(g);
         }
         v.push(d);
-    }
-    if trail > 0.0 && solid_ends {
-        v.extend([g, trail]);
     }
     // A closing gap long enough that the pattern never repeats.
     v.push(len);
@@ -682,29 +675,16 @@ mod tests {
 
     #[test]
     fn dash_array_without_offsets_is_periodic() {
-        assert_eq!(dash_array(11.0, 0.0, 0.0, 1.0, 1.0, true), Some(vec![1.0, 1.0]));
-    }
-
-    #[test]
-    fn dash_array_keeps_solid_ends() {
-        let v = dash_array(20.0, 3.0, 2.0, 1.0, 1.0, true).unwrap();
-        assert_eq!(v.len() % 2, 0, "drawn and empty runs alternate: {v:?}");
-        assert_eq!(v[0], 3.0, "solid start");
-        assert!((v[v.len() - 2] - 2.0).abs() < 1e-9, "solid end: {v:?}");
-        let (total, _) = runs(&v);
-        assert!((total - 20.0).abs() < 1e-9, "{v:?}");
-        // The gaps around the dashes all have the same length.
-        let gaps: Vec<f64> = v[..v.len() - 1].iter().skip(1).step_by(2).copied().collect();
-        assert!(gaps.iter().all(|g| (g - gaps[0]).abs() < 1e-9), "{v:?}");
+        assert_eq!(dash_array(11.0, 0.0, 0.0, 1.0, 1.0), Some(vec![1.0, 1.0]));
     }
 
     #[test]
     fn dash_array_leaves_ends_empty_for_inner_dashes() {
-        let v = dash_array(20.0, 3.0, 2.0, 1.0, 1.0, false).unwrap();
+        let v = dash_array(20.0, 3.0, 2.0, 1.0, 1.0).unwrap();
         assert_eq!(&v[..2], &[0.0, 3.0], "nothing drawn over the first 3: {v:?}");
         let (total, _) = runs(&v);
         assert!((total - 18.0).abs() < 1e-9, "the dashes stop 2 before the end: {v:?}");
-        assert_eq!(dash_array(4.0, 3.0, 2.0, 1.0, 1.0, false), None, "no room left");
+        assert_eq!(dash_array(4.0, 3.0, 2.0, 1.0, 1.0), None, "no room left");
     }
 
     #[test]

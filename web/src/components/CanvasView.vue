@@ -3,19 +3,20 @@
 // text editor. Owns pointer/keyboard dispatch to the active tool.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import type { Id, Rect, TextBox } from '../core/types'
+import { LINE_SPACING, editorSelection, insertText, readEditor, renderEditor, setEditorSelection } from '../core/richtext'
 import { leafIds } from '../core/tree'
 import { CELL_PX, cellAt, screenToWorld, unionRects, worldToScreen } from '../core/viewport'
 import { useEditor } from '../stores/editor'
 import { prefs } from '../stores/prefs'
 import { actionForEvent, runAction } from '../stores/commands'
-import { createTools, iconPreview, pillGrowTargets, placeAt, placeIcon, selectedPill, type PointerInfo, type Tool } from '../tools'
+import { createTools, iconPreview, pillGrowTargets, placeIconAt, placeIcon, selectedPill, type PointerInfo, type Tool } from '../tools'
 
 const store = useEditor()
 const s = store.state
 
 const host = ref<HTMLDivElement | null>(null)
 const docLayer = ref<SVGGElement | null>(null)
-const textArea = ref<HTMLTextAreaElement | null>(null)
+const textEditor = ref<HTMLDivElement | null>(null)
 const lastPointer = shallowRef<PointerInfo | null>(null)
 const pressed = ref(false)
 const panning = ref<{ x: number; y: number } | null>(null)
@@ -188,7 +189,7 @@ function info(e: PointerEvent | MouseEvent): PointerInfo {
 let lastDown: PointerInfo | null = null
 
 function onPointerDown(e: PointerEvent): void {
-  if (s.textEdit && (e.target as Element).closest('textarea')) return
+  if (s.textEdit && (e.target as Element).closest('[data-testid=text-editor]')) return
   if (s.textEdit) store.finishTextEdit(true)
   host.value?.focus({ preventScroll: true })
   const p = info(e)
@@ -246,7 +247,7 @@ function onDragOver(e: DragEvent): void {
   e.dataTransfer.dropEffect = 'copy'
   const p = info(e)
   s.cursor = p.cells
-  s.overlay = { ...s.overlay, preview: iconPreview(store, placeAt(p)), cells: [] }
+  s.overlay = { ...s.overlay, preview: iconPreview(store, placeIconAt(p)), cells: [] }
 }
 function onDrop(e: DragEvent): void {
   const name = e.dataTransfer?.getData(ICON_MIME)
@@ -254,7 +255,7 @@ function onDrop(e: DragEvent): void {
   e.preventDefault()
   clearDropPreview()
   if (s.textEdit) store.finishTextEdit(true)
-  placeIcon(store, name, placeAt(info(e)))
+  placeIcon(store, name, placeIconAt(info(e)))
   host.value?.focus({ preventScroll: true })
 }
 function clearDropPreview(): void {
@@ -321,53 +322,152 @@ const editing = computed(() => {
   return n.content as TextBox & { kind: 'text' }
 })
 
+// The editor sits exactly over the text box (top-left corner, same rotation);
+// run sizes are relative to its font size, so zooming needs no redraw.
 const editorStyle = computed(() => {
   const t = editing.value
   if (!t) return {}
   const g = CELL_PX
-  const fs = t.size * g * s.view.zoom
   const p = worldToScreen(s.view, t.pos.x * g, t.pos.y * g)
-  const lines = (s.textEdit?.value ?? '').split('\n')
-  const cols = Math.max(4, ...lines.map((l) => l.length))
-  const shift = t.align === 'middle' ? '-50%' : t.align === 'end' ? '-100%' : '0'
   return {
     left: `${p.x}px`,
     top: `${p.y}px`,
-    fontSize: `${fs}px`,
-    lineHeight: '1.2',
+    fontSize: `${t.size * g * s.view.zoom}px`,
+    lineHeight: String(LINE_SPACING),
     fontFamily: t.font_family,
     fontWeight: t.bold ? 'bold' : 'normal',
     fontStyle: t.italic ? 'italic' : 'normal',
     color: t.color,
-    textAlign: (t.align === 'middle' ? 'center' : t.align === 'end' ? 'right' : 'left') as 'center' | 'right' | 'left',
     direction: t.direction,
-    width: `${cols * 0.62 + 1}em`,
-    height: `${lines.length * 1.2 + 0.4}em`,
-    transform: `translate(${shift}, -50%) rotate(${t.rotation}deg)`,
-    transformOrigin: t.align === 'middle' ? '50% 50%' : t.align === 'end' ? '100% 50%' : '0 50%',
+    transform: `rotate(${t.rotation}deg)`,
   }
 })
 
+/** Redraw the editor from the draft; `focus` also focuses it and restores the selection. */
+async function drawEditor(focus: boolean): Promise<void> {
+  await nextTick()
+  const el = textEditor.value
+  const ed = s.textEdit
+  const t = editing.value
+  if (!el || !ed || !t) return
+  renderEditor(el, ed.paragraphs, t)
+  const active = document.activeElement
+  if (focus || active === el || active === document.body || active === null) {
+    el.focus({ preventScroll: true })
+    if (ed.selection) setEditorSelection(el, ed.selection)
+  }
+}
+
 watch(
   () => s.textEdit?.id,
-  async (id) => {
-    if (id === undefined) return
-    await nextTick()
-    textArea.value?.focus()
-    textArea.value?.select()
+  (id) => {
+    if (id !== undefined) void drawEditor(true)
+  },
+)
+watch(
+  () => s.textEdit?.version,
+  (v, old) => {
+    if (v !== undefined && old !== undefined) void drawEditor(false)
   },
 )
 
+function onEditorInput(): void {
+  const el = textEditor.value
+  if (!el) return
+  const sel = editorSelection(el)
+  store.setTextDraft(readEditor(el).paragraphs, sel)
+}
+
+/** Replace the selection with `text` through the model (pasting, new paragraphs). */
+function insertIntoEditor(text: string): void {
+  const el = textEditor.value
+  const ed = s.textEdit
+  if (!el || !ed) return
+  const sel = editorSelection(el) ?? ed.selection
+  if (!sel) return
+  const { paragraphs, caret } = insertText(readEditor(el).paragraphs, sel, text)
+  store.setTextDraft(paragraphs, { start: caret, end: caret }, true)
+}
+
 function onTextKey(e: KeyboardEvent): void {
   e.stopPropagation()
+  const mod = e.ctrlKey || e.metaKey
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
     store.finishTextEdit(true)
+  } else if (e.key === 'Enter') {
+    e.preventDefault()
+    insertIntoEditor('\n')
   } else if (e.key === 'Escape') {
     e.preventDefault()
     store.finishTextEdit(false)
+  } else if (mod && (e.key === 'b' || e.key === 'B' || e.key === 'i' || e.key === 'I')) {
+    e.preventDefault()
+    const f = store.textFormat()
+    if (!f) return
+    if (e.key.toLowerCase() === 'b') store.formatText({ bold: !f.bold })
+    else store.formatText({ italic: !f.italic })
+  } else if (mod && ['z', 'y', 'u'].includes(e.key.toLowerCase())) {
+    // The browser's own undo and underline would bypass the model.
+    e.preventDefault()
   }
 }
+
+function onBeforeInput(e: InputEvent): void {
+  if (e.inputType === 'insertParagraph' || e.inputType === 'insertLineBreak') {
+    e.preventDefault()
+    insertIntoEditor('\n')
+  } else if (e.inputType.startsWith('format') || e.inputType.startsWith('history') || e.inputType === 'insertFromDrop') {
+    e.preventDefault()
+  }
+}
+
+function onEditorPaste(e: ClipboardEvent): void {
+  e.preventDefault()
+  insertIntoEditor(e.clipboardData?.getData('text/plain') ?? '')
+}
+
+/** Leaving the editor commits it, except for the panels that format its text. */
+function onEditorFocusOut(e: FocusEvent): void {
+  const to = e.relatedTarget as Element | null
+  if (to && !textEditor.value?.contains(to) && !to.closest('[data-keeps-text-edit]')) store.finishTextEdit(true)
+}
+
+function onSelectionChange(): void {
+  const el = textEditor.value
+  const ed = s.textEdit
+  if (!el || !ed) return
+  const sel = editorSelection(el)
+  if (sel) ed.selection = sel
+}
+
+// ------------------------------------------------------- text widths
+
+/**
+ * Text boxes are as wide as their widest line. The engine can only estimate
+ * that, so after each render the lines are measured here and the widths are
+ * handed back (not an undo step: it describes the text already there).
+ */
+function fitTexts(): void {
+  const layer = docLayer.value
+  if (!layer) return
+  const widths: [Id, number][] = []
+  for (const f of s.fragments) {
+    if (f.kind !== 'text') continue
+    const lines = layer.querySelectorAll<SVGTextContentElement>(`g[data-id="${f.id}"] tspan[data-line]`)
+    let w = 0
+    for (const l of lines) {
+      if (typeof l.getComputedTextLength === 'function') w = Math.max(w, l.getComputedTextLength())
+    }
+    if (!(w > 0)) continue
+    const n = store.node(f.id)
+    if (n?.type !== 'layer' || n.content.kind !== 'text') continue
+    if (Math.abs(w / CELL_PX - n.content.width) > 0.002) widths.push([f.id, w / CELL_PX])
+  }
+  if (widths.length && store.engine.value.fitTextWidths(widths)) store.refresh()
+}
+
+watch(() => s.revision, fitTexts, { flush: 'post' })
 
 // ------------------------------------------------------------ lifecycle
 
@@ -388,6 +488,10 @@ onMounted(() => {
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('keyup', onKeyUp)
   window.addEventListener('blur', () => (s.spaceHeld = false))
+  document.addEventListener('selectionchange', onSelectionChange)
+  // Web fonts change the text widths once they have loaded.
+  document.fonts?.addEventListener?.('loadingdone', fitTexts)
+  fitTexts()
 })
 
 onBeforeUnmount(() => {
@@ -395,6 +499,8 @@ onBeforeUnmount(() => {
   host.value?.removeEventListener('wheel', onWheel)
   window.removeEventListener('keydown', onKeyDown)
   window.removeEventListener('keyup', onKeyUp)
+  document.removeEventListener('selectionchange', onSelectionChange)
+  document.fonts?.removeEventListener?.('loadingdone', fitTexts)
 })
 
 const cursor = computed(() => tool.value.cursor(lastPointer.value))
@@ -458,7 +564,7 @@ defineExpose({ boundsOf })
             stroke-width="1"
             vector-effect="non-scaling-stroke"
           />
-          <g class="preview" opacity="0.75" v-html="s.overlay.preview" />
+          <g class="preview" :opacity="prefs.previewOpacity" v-html="s.overlay.preview" />
         </g>
       </g>
 
@@ -559,17 +665,21 @@ defineExpose({ boundsOf })
       </g>
     </svg>
 
-    <textarea
+    <div
       v-if="s.textEdit && editing"
-      ref="textArea"
-      v-model="s.textEdit.value"
+      ref="textEditor"
       class="text-editor"
       data-testid="text-editor"
+      contenteditable="true"
       spellcheck="false"
       :style="editorStyle"
+      @input="onEditorInput"
+      @beforeinput="onBeforeInput"
+      @paste="onEditorPaste"
       @keydown="onTextKey"
-      @blur="store.finishTextEdit(true)"
+      @focusout="onEditorFocusOut"
       @pointerdown.stop
+      @dblclick.stop
     />
   </div>
 </template>
@@ -606,15 +716,18 @@ defineExpose({ boundsOf })
 .grow-handle:hover path {
   transform: scale(1.3);
 }
+/* Laid out like the text box: no padding, as wide as its widest line. */
 .text-editor {
   position: absolute;
+  display: inline-block;
+  min-width: 0.5em;
   margin: 0;
-  padding: 0 0.1em;
-  border: 1px dashed var(--c-accent);
-  border-radius: 0;
+  padding: 0;
+  outline: 1px dashed var(--c-accent);
+  outline-offset: 2px;
   background: rgba(255, 255, 255, 0.85);
-  resize: none;
-  overflow: hidden;
+  transform-origin: 0 0;
   white-space: pre;
+  cursor: text;
 }
 </style>

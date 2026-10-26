@@ -15,9 +15,11 @@ import ShortcutsDialog from '../../src/components/dialogs/ShortcutsDialog.vue'
 import DocumentSettingsDialog from '../../src/components/dialogs/DocumentSettingsDialog.vue'
 import AboutDialog from '../../src/components/dialogs/AboutDialog.vue'
 import ExportDialog from '../../src/components/dialogs/ExportDialog.vue'
+import PreferencesDialog from '../../src/components/dialogs/PreferencesDialog.vue'
 import IconsPanel from '../../src/components/panels/IconsPanel.vue'
 import * as files from '../../src/core/files'
 import { prefs } from '../../src/stores/prefs'
+import { runAction } from '../../src/stores/commands'
 import { picking, toHex } from '../../src/core/eyedropper'
 
 let wrappers: VueWrapper[] = []
@@ -134,18 +136,20 @@ describe('PropertiesPanel', () => {
     const dashed = () => store.state.fragments.filter((f) => f.svg.includes('stroke-dasharray')).length
     expect(w.text()).toContain('Segment appearance')
     expect(w.text()).toContain('1 of 2 segments')
-    await w.find('[data-testid=prop-line-style]').setValue('dashed')
+    await w.find('[data-testid=prop-line-style]').setValue('hollow')
+    vi.advanceTimersByTime(1000)
+    await nextTick()
+    expect(dashed()).toBe(0)
+    expect(w.text()).toContain('Channel')
+    expect(w.text()).not.toContain('Gap')
+    await w.find('[data-testid=prop-line-style]').setValue('inner_dashed')
     vi.advanceTimersByTime(1000)
     await nextTick()
     expect(dashed()).toBe(1)
-    expect(w.text()).toContain('Gap')
-    expect(w.text()).not.toContain('Dash width')
-    expect(w.text()).toContain('Start offset')
-    expect(w.text()).not.toContain('Dashes')
-    await w.find('[data-testid=prop-line-style]').setValue('inner_dashed')
-    await nextTick()
     expect(w.text()).not.toContain('Channel')
     expect(w.text()).toContain('Dashes')
+    expect(w.text()).toContain('Gap')
+    expect(w.text()).toContain('Start offset')
     expect(w.text()).toContain('End offset')
     await w.find('[data-testid=end-cap]').setValue('butt')
     vi.advanceTimersByTime(1000)
@@ -177,16 +181,17 @@ describe('PropertiesPanel', () => {
     expect(n?.type === 'layer' && n.content.kind === 'station' && n.content.shape).toBe('tick')
   })
 
-  it('edits text content', async () => {
+  it('opens the text editor and formats the whole text', async () => {
     const store = freshStore()
     const t = store.run((e) => e.addText({ text: 'Old' }))!
     store.select([t])
     const w = mountIt(PropertiesPanel)
-    const ta = w.find('[data-testid=prop-text]')
-    await ta.setValue('Riverside')
-    await ta.trigger('change')
+    await w.find('[data-testid=prop-text-bold]').trigger('click')
     const n = store.node(t)
-    expect(n?.type === 'layer' && n.content.kind === 'text' && n.content.text).toBe('Riverside')
+    expect(n?.type === 'layer' && n.content.kind === 'text' && n.content.bold).toBe(true)
+    await w.find('[data-testid=prop-edit-text]').trigger('click')
+    expect(store.state.textEdit?.id).toBe(t)
+    store.finishTextEdit(false)
   })
 
   it('switches the writing direction of text', async () => {
@@ -283,6 +288,11 @@ describe('property help', () => {
     const store = freshStore()
     expectHelpEverywhere(mountIt(DocumentSettingsDialog))
     expectHelpEverywhere(mountIt(ExportDialog))
+    const prefsDialog = mountIt(PreferencesDialog)
+    for (const tab of prefsDialog.findAll('[role=tab]')) {
+      await tab.trigger('click')
+      expectHelpEverywhere(prefsDialog)
+    }
     for (const tool of ['pen', 'eraser', 'station', 'text'] as const) {
       store.setTool(tool)
       // Mounted per tool: happy-dom can't patch the bar between some tools.
@@ -364,8 +374,9 @@ describe('OptionsBar', () => {
     store.setTool('pen')
     await nextTick()
     expect(w.find('[data-testid=line-style]').exists()).toBe(true)
-    await w.find('[data-testid=line-style]').setValue('dashed')
-    expect(prefs.line.kind).toBe('dashed')
+    expect(w.findAll('[data-testid=line-style] option').map((o) => o.text())).toEqual(['Plain', 'Hollow', 'Inner dashed'])
+    await w.find('[data-testid=line-style]').setValue('inner_dashed')
+    expect(prefs.line.kind).toBe('inner_dashed')
     expect(w.text()).toContain('Gap')
     store.setTool('station')
     await nextTick()
@@ -513,6 +524,39 @@ describe('dialogs', () => {
     await w.find('[data-testid=dialog-ok]').trigger('click')
     expect(prefs.shortcuts['tool.text']).toBe('Alt+Y')
     expect(store.state.dialog).toBeNull()
+  })
+
+  it('preferences are organized in tabs and restore their defaults', async () => {
+    const store = freshStore()
+    store.state.dialog = 'preferences'
+    const w = mountIt(PreferencesDialog)
+    expect(w.findAll('[role=tab]').map((t) => t.text())).toEqual(['General', 'Interface', 'Canvas and grid', 'Navigation', 'Editing', 'Export'])
+    await w.find('[data-testid=prefs-tab-navigation]').trigger('click')
+    expect(w.find('[data-testid=prefs-page-navigation]').text()).toContain('Fit on screen margin')
+    // Restoring a tab only touches that tab.
+    prefs.zoomStep = 2
+    prefs.nudge = 3
+    const w2 = mountIt(PreferencesDialog)
+    await w2.find('[data-testid=prefs-tab-navigation]').trigger('click')
+    await w2.find('[data-testid=restore-tab]').trigger('click')
+    await w2.find('[data-testid=dialog-ok]').trigger('click')
+    expect([prefs.zoomStep, prefs.nudge]).toEqual([1.15, 3])
+    // Restoring everything asks first, then also resets tool options and shortcuts.
+    prefs.line.color = '#123456'
+    prefs.shortcuts['tool.text'] = 'Alt+Y'
+    const w3 = mountIt(PreferencesDialog)
+    await w3.find('[data-testid=restore-all]').trigger('click')
+    expect(prefs.nudge).toBe(3)
+    await w3.find('[data-testid=restore-all-confirm]').trigger('click')
+    expect([prefs.nudge, prefs.line.color, prefs.shortcuts['tool.text']]).toEqual([1, '#e03c31', 'T'])
+  })
+
+  it('Edit ▸ Restore All Defaults opens the preferences asking to confirm', async () => {
+    const store = freshStore()
+    runAction(store, 'edit.restoreDefaults')
+    expect(store.state.dialog).toBe('preferences')
+    const w = mountIt(PreferencesDialog)
+    expect(w.find('[data-testid=restore-confirm]').exists()).toBe(true)
   })
 
   it('document settings apply as one undoable change', async () => {

@@ -5,6 +5,7 @@ import { CELL_PX, brush, cellsBetween, rectFromPoints, rectsIntersect } from '..
 import type { EditorStore, ToolId } from '../stores/editor'
 import { prefs } from '../stores/prefs'
 import { nudgeSelection } from '../stores/commands'
+import { plainParagraphs } from '../core/richtext'
 
 export interface PointerInfo {
   /** Position relative to the canvas element. */
@@ -186,13 +187,14 @@ function selectTool(store: EditorStore, boundsOf: BoundsProvider): Tool {
       } else if (mode === 'marquee') {
         s.overlay = { ...s.overlay, marquee: rectFromPoints(start.world, p.world) }
       } else if (mode === 'rotating') {
-        // The engine snaps every rotation to 45° steps.
+        // The engine snaps rotations to 45° steps; with Alt, text and
+        // pictograms turn freely (lines and stations stay on the grid).
         const deg = angleAt(p) - startAngle
         const pv = { x: pivot.x / g, y: pivot.y / g }
         const applied = store.run(
           (e) => {
             e.rebase()
-            return e.rotate(s.selection, deg, pv)
+            return e.rotate(s.selection, deg, pv, p.alt)
           },
           { quiet: true },
         )
@@ -372,7 +374,7 @@ function eraserTool(store: EditorStore): Tool {
   let last: Cell | null = null
   const s = store.state
   const show = (c: Cell) => {
-    s.overlay = { ...s.overlay, preview: '', cells: brush(c, prefs.eraserSize), cellsColor: '#ff4d4f' }
+    s.overlay = { ...s.overlay, preview: '', cells: brush(c, prefs.eraserSize), cellsColor: prefs.warningColor }
   }
   const eraseRun = (from: Cell, to: Cell) => {
     const cells = cellsBetween(from, to).flatMap((c) => brush(c, prefs.eraserSize))
@@ -428,9 +430,9 @@ function stationTool(store: EditorStore): Tool {
       s.overlay = { ...s.overlay, preview: e.previewPill(pill, prefs.station.outer_color, prefs.station.inner_color), cells: [] }
       return
     }
-    const hit = e.nearestLineCell(p.cells.x, p.cells.y, 1.5)
+    const hit = e.nearestLineCell(p.cells.x, p.cells.y, prefs.station.snap_distance)
     if (!hit) {
-      s.overlay = { ...s.overlay, preview: '', cells: [p.cell], cellsColor: '#ff4d4f' }
+      s.overlay = { ...s.overlay, preview: '', cells: [p.cell], cellsColor: prefs.warningColor }
       return
     }
     const preview = e.previewStation(prefs.station.kind, p.cell, p.cells, opts())
@@ -489,10 +491,10 @@ function textTool(store: EditorStore): Tool {
         store.startTextEdit(p.hitId)
         return
       }
-      const pos = placeAt(p)
+      const pos = placeTextAt(p)
       const e = store.engine.value
       e.begin()
-      const id = store.run((en) => en.addText({ ...prefs.text, pos, text: 'Text' }))
+      const id = store.run((en) => en.addText({ ...prefs.text, pos, paragraphs: plainParagraphs(prefs.newText || 'Text') }))
       if (id === undefined) {
         e.cancel()
         return
@@ -504,9 +506,14 @@ function textTool(store: EditorStore): Tool {
 
 // ----------------------------------------------------------------- icon
 
-/** Where text or a pictogram placed at `p` goes: its cell center, or exactly under the pointer with Alt. */
-export function placeAt(p: Pick<PointerInfo, 'alt' | 'cells' | 'cell'>): Vec2 {
+/** Where a pictogram placed at `p` is centered: its cell center, or exactly under the pointer with Alt. */
+export function placeIconAt(p: Pick<PointerInfo, 'alt' | 'cells' | 'cell'>): Vec2 {
   return p.alt ? p.cells : { x: p.cell.x + 0.5, y: p.cell.y + 0.5 }
+}
+
+/** Top-left corner of a text placed at `p`: the nearest grid intersection, or exactly under the pointer with Alt. */
+export function placeTextAt(p: Pick<PointerInfo, 'alt' | 'cells'>): Vec2 {
+  return p.alt ? p.cells : { x: Math.round(p.cells.x), y: Math.round(p.cells.y) }
 }
 
 /** Size of new pictograms, in cells. */

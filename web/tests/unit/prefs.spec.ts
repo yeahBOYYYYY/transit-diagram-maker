@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultPrefs, loadPrefs, savePrefs } from '../../src/stores/prefs'
+import { defaultPrefs, loadPrefs, prefs, resetPrefs, resetWorkspace, savePrefs } from '../../src/stores/prefs'
 
 const mem = (raw: string | null) => ({ getItem: () => raw })
 
@@ -21,8 +21,22 @@ describe('preferences', () => {
     expect(p.shortcuts['tool.pen']).toBe('B')
     expect(p.shortcuts['tool.select']).toBe('V')
   })
-  it('turn the removed hollow dashed line style into inner dashed', () => {
-    expect(loadPrefs(mem(JSON.stringify({ line: { kind: 'hollow_dashed' } }))).line.kind).toBe('inner_dashed')
+  it('fall back to the default line style for one that no longer exists', () => {
+    expect(loadPrefs(mem(JSON.stringify({ line: { kind: 'dashed' } }))).line.kind).toBe('plain')
+    expect(loadPrefs(mem(JSON.stringify({ line: { kind: 'inner_dashed' } }))).line.kind).toBe('inner_dashed')
+  })
+  it('default to the requested line styles', () => {
+    const { line } = defaultPrefs()
+    expect([line.inner_width_pct, line.dash_width_pct, line.dash_length, line.dash_gap, line.dash_start_offset, line.dash_end_offset]).toEqual([33, 30, 1, 1, 0, 0])
+  })
+  it('restore defaults: everything, or only the workspace layout', () => {
+    prefs.zoomStep = 2
+    prefs.panels.layers = false
+    prefs.propertiesHeight = 500
+    resetWorkspace()
+    expect([prefs.panels.layers, prefs.propertiesHeight, prefs.zoomStep]).toEqual([true, defaultPrefs().propertiesHeight, 2])
+    resetPrefs()
+    expect(prefs.zoomStep).toBe(defaultPrefs().zoomStep)
   })
   it('accept values for nullable defaults', () => {
     const p = loadPrefs(mem(JSON.stringify({ icon: { size: 2 }, station: { tick_color: '#ff0000' } })))

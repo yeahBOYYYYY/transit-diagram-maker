@@ -3,7 +3,21 @@
 // purely visual state (selection, view, active tool, overlays).
 import { reactive, shallowRef } from 'vue'
 import { Engine } from '../core/engine'
-import type { AssetList, Cell, DocNode, DocSettings, Fragment, Id, Rect, TreeItem } from '../core/types'
+import type { AssetList, Cell, DocNode, DocSettings, Fragment, Id, Paragraph, Rect, RunStyle, TextAlign, TextBox, TextDirection, TreeItem } from '../core/types'
+import {
+  type RunKey,
+  type TextRange,
+  RUN_KEYS,
+  applyStyle,
+  clearRunProperty,
+  cloneParagraphs,
+  coversAll,
+  isCollapsed,
+  plainText,
+  resolvedStyleAt,
+  setAlign,
+  wholeRange,
+} from '../core/richtext'
 import { registerFonts } from '../core/fonts'
 import { leafIds, findItem, topLevelOf } from '../core/tree'
 import { fitRect, unionRects, zoomAt, type View } from '../core/viewport'
@@ -22,11 +36,22 @@ export interface Overlay {
   cellsColor: string
 }
 
+/**
+ * An inline text edit. It runs as one engine transaction (opened before a new
+ * text is created): every change writes the whole draft, so committing
+ * records one undo step and cancelling restores the text (or removes a new one).
+ */
 export interface TextEditState {
   id: Id
   /** Created by this edit session (cancel removes it). */
   isNew: boolean
-  value: string
+  paragraphs: Paragraph[]
+  /** Box properties changed during the edit. */
+  box: Partial<TextBox>
+  /** Last selection inside the editor (kept while a panel has the focus). */
+  selection: TextRange | null
+  /** Bumped when the draft changes from outside the editor, so it redraws. */
+  version: number
 }
 
 export function createEditor(engine = new Engine()) {
@@ -59,6 +84,8 @@ export function createEditor(engine = new Engine()) {
     /** Tab shown in the upper dock panel. */
     dockTab: 'Properties' as 'Properties' | 'Icons',
     dialog: null as null | 'document' | 'assets' | 'export' | 'preferences' | 'shortcuts' | 'about' | 'reference',
+    /** Open the Preferences dialog asking to restore every default. */
+    restorePrompt: false,
   })
 
   const engineRef = shallowRef(engine)
@@ -83,7 +110,7 @@ export function createEditor(engine = new Engine()) {
     state.message = message
     state.messageKind = kind
     if (messageTimer) clearTimeout(messageTimer)
-    messageTimer = setTimeout(() => (state.message = ''), kind === 'error' ? 6000 : 3000)
+    messageTimer = setTimeout(() => (state.message = ''), kind === 'error' ? prefs.errorDuration : prefs.messageDuration)
   }
 
   /** Run an engine mutation, refresh the mirror and report failures. */
@@ -166,7 +193,7 @@ export function createEditor(engine = new Engine()) {
       state.view = { x: state.viewport.width / 2, y: state.viewport.height / 2, zoom: 1 }
       return
     }
-    state.view = fitRect(r, state.viewport.width, state.viewport.height, 60, prefs.minZoom, Math.min(prefs.maxZoom, 4))
+    state.view = fitRect(r, state.viewport.width, state.viewport.height, prefs.fitMargin, prefs.minZoom, Math.min(prefs.maxZoom, prefs.fitMaxZoom))
   }
 
   function actualSize(): void {
@@ -231,11 +258,87 @@ export function createEditor(engine = new Engine()) {
 
   // ---------------------------------------------------------- text editing
 
+  /** Edit a text box in place. A new text's transaction was already opened by the text tool. */
   function startTextEdit(id: Id, isNew = false): void {
     const n = engine.node(id)
     if (!n || n.type !== 'layer' || n.content.kind !== 'text') return
-    state.textEdit = { id, isNew, value: n.content.text }
+    if (!isNew) engine.begin()
+    const paragraphs = cloneParagraphs(n.content.paragraphs)
+    state.textEdit = { id, isNew, paragraphs, box: {}, selection: wholeRange(paragraphs), version: 0 }
     select([id])
+  }
+
+  function editedText(): TextBox | null {
+    const ed = state.textEdit
+    const n = ed ? engine.node(ed.id) : null
+    return n?.type === 'layer' && n.content.kind === 'text' ? n.content : null
+  }
+
+  /** Show the draft on the canvas. Its values are absolute, so writing it again replaces the last one. */
+  function pushTextDraft(): void {
+    const ed = state.textEdit
+    if (!ed) return
+    run((e) => e.updateContent(ed.id, { ...ed.box, paragraphs: ed.paragraphs }), { quiet: true })
+  }
+
+  /** The editor's content changed (typing); `redraw` also redraws the editor. */
+  function setTextDraft(paragraphs: Paragraph[], selection: TextRange | null, redraw = false): void {
+    const ed = state.textEdit
+    if (!ed) return
+    ed.paragraphs = paragraphs
+    if (selection) ed.selection = selection
+    if (redraw) ed.version++
+    pushTextDraft()
+  }
+
+  /**
+   * Formatting of the text being edited, or of `id`: what the options bar and
+   * the Properties panel show (the first selected character's while editing).
+   */
+  function textFormat(id?: Id): (Required<RunStyle> & { align: TextAlign; direction: TextDirection }) | null {
+    const ed = state.textEdit
+    const editing = ed && (id === undefined || id === ed.id)
+    const n = engine.node(editing ? ed.id : (id ?? -1))
+    if (n?.type !== 'layer' || n.content.kind !== 'text') return null
+    const t = n.content
+    if (editing) return { ...resolvedStyleAt(ed.paragraphs, ed.selection, t), direction: t.direction }
+    return { font_family: t.font_family, size: t.size, color: t.color, bold: t.bold, italic: t.italic, align: t.align, direction: t.direction }
+  }
+
+  /**
+   * Format text like a word processor. While editing, a selection gets the
+   * formatting itself, and nothing selected (or everything) changes the box.
+   * Outside the editor the whole box of `id` changes. `align` applies to the
+   * paragraphs the selection touches.
+   */
+  function formatText(patch: Partial<Record<RunKey, unknown>> & { align?: TextAlign; direction?: TextDirection }, id?: Id): void {
+    const ed = state.textEdit
+    if (!ed || (id !== undefined && id !== ed.id)) {
+      if (id !== undefined) run((e) => e.updateContent(id, patch))
+      return
+    }
+    const sel = ed.selection ?? wholeRange(ed.paragraphs)
+    const whole = isCollapsed(sel) || coversAll(ed.paragraphs, sel)
+    const { align, direction, ...chars } = patch
+    let ps = ed.paragraphs
+    if (direction) ed.box = { ...ed.box, direction }
+    if (Object.keys(chars).length) {
+      if (whole) {
+        for (const k of Object.keys(chars) as RunKey[]) if (RUN_KEYS.includes(k)) ps = clearRunProperty(ps, k)
+        ed.box = { ...ed.box, ...(chars as Partial<TextBox>) }
+      } else {
+        ps = applyStyle(ps, sel, chars)
+      }
+    }
+    if (align) {
+      if (ps.length === 1 || coversAll(ps, sel)) {
+        ps = clearRunProperty(ps, 'align')
+        ed.box = { ...ed.box, align }
+      } else {
+        ps = setAlign(ps, sel, align)
+      }
+    }
+    setTextDraft(ps, null, true)
   }
 
   /** Commit (or cancel) the inline text editor. New, cancelled or emptied texts are removed. */
@@ -243,18 +346,21 @@ export function createEditor(engine = new Engine()) {
     const edit = state.textEdit
     if (!edit) return
     state.textEdit = null
-    const value = edit.value
     if (!commit) {
-      if (edit.isNew) {
-        engine.cancel()
-        refresh()
-      }
+      engine.cancel()
+      refresh()
       return
     }
     run((e) => {
-      if (value.trim() === '') e.delete([edit.id])
-      else e.updateContent(edit.id, { text: value })
-      if (edit.isNew) e.commit()
+      if (plainText(edit.paragraphs).trim() === '') {
+        e.rebase()
+        if (!edit.isNew) e.delete([edit.id])
+        else {
+          e.cancel()
+          return
+        }
+      }
+      e.commit()
     })
   }
 
@@ -312,6 +418,10 @@ export function createEditor(engine = new Engine()) {
     undo,
     redo,
     startTextEdit,
+    editedText,
+    setTextDraft,
+    textFormat,
+    formatText,
     finishTextEdit,
     newDocument,
     openTransit,

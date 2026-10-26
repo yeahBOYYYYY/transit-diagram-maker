@@ -6,7 +6,7 @@ import { findItem, isEffectivelyLocked, leafIds } from '../core/tree'
 import type { Engine } from '../core/engine'
 import { TRANSIT_EXT, baseName, canSaveInPlace, docNameOf, downloadText, fontDataUrl, pickFile, pickSaveHandle, pickTransitFile, writeHandle } from '../core/files'
 import type { EditorStore, ToolId } from './editor'
-import { prefs } from './prefs'
+import { prefs, resetWorkspace } from './prefs'
 import { CELL_PX } from '../core/viewport'
 
 export interface CommandContext {
@@ -170,7 +170,7 @@ export function runAction(store: EditorStore, id: ActionId): void {
   }
   switch (id) {
     case 'file.new':
-      if (!s.dirty || confirm('Discard unsaved changes and start a new document?')) store.newDocument()
+      if (!s.dirty || !prefs.confirmDiscard || confirm('Discard unsaved changes and start a new document?')) store.newDocument()
       return
     case 'file.open':
       void openTransit(store)
@@ -216,6 +216,14 @@ export function runAction(store: EditorStore, id: ActionId): void {
       return
     case 'edit.shortcuts':
       s.dialog = 'shortcuts'
+      return
+    case 'edit.restoreDefaults':
+      s.restorePrompt = true
+      s.dialog = 'preferences'
+      return
+    case 'window.resetWorkspace':
+      resetWorkspace()
+      store.notify('Workspace reset: every panel is shown at its default size')
       return
     case 'document.settings':
       s.dialog = 'document'

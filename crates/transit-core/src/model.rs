@@ -132,10 +132,7 @@ pub enum StrokeKind {
     Plain,
     /// A line with an inner channel of `inner_color`.
     Hollow,
-    /// A broken line: full-width dashes of the line color with empty gaps.
-    Dashed,
     /// A solid line with dashes of `inner_color` running down its middle.
-    #[serde(alias = "hollow_dashed")]
     InnerDashed,
 }
 
@@ -169,9 +166,9 @@ impl Default for LineStyle {
             color: "#e03c31".into(),
             kind: StrokeKind::Plain,
             inner_color: "#ffffff".into(),
-            inner_width_pct: 55.0,
+            inner_width_pct: 33.0,
             dash_length: 1.0,
-            dash_gap: 0.5,
+            dash_gap: 1.0,
             dash_width_pct: 30.0,
             dash_start_offset: 0.0,
             dash_end_offset: 0.0,
@@ -298,21 +295,111 @@ pub enum TextDirection {
     Rtl,
 }
 
+/// Height of a line of text as a multiple of its largest font size.
+pub const LINE_SPACING: f64 = 1.2;
+/// Distance from the top of a line to its baseline, as a multiple of the
+/// largest font size (half the extra line spacing plus a typical ascent; the
+/// browser places the baseline of a CSS line box at about the same height).
+pub const BASELINE: f64 = 0.95;
+
+/// Character formatting of a run of text. Every `None` uses the value of the
+/// text box, so changing the box changes every run that doesn't override it.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct RunStyle {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub font_family: Option<String>,
+    /// Font size in cell units.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bold: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub italic: Option<bool>,
+}
+
+/// Names of the character properties a run may override.
+pub const RUN_PROPERTIES: [&str; 5] = ["font_family", "size", "color", "bold", "italic"];
+
+impl RunStyle {
+    pub fn is_empty(&self) -> bool {
+        *self == RunStyle::default()
+    }
+
+    fn clear(&mut self, key: &str) {
+        match key {
+            "font_family" => self.font_family = None,
+            "size" => self.size = None,
+            "color" => self.color = None,
+            "bold" => self.bold = None,
+            "italic" => self.italic = None,
+            _ => {}
+        }
+    }
+}
+
+/// A piece of a paragraph with one formatting.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct TextRun {
+    #[serde(default)]
+    pub text: String,
+    #[serde(flatten)]
+    pub style: RunStyle,
+}
+
+impl TextRun {
+    pub fn plain(text: &str) -> Self {
+        TextRun { text: text.into(), style: RunStyle::default() }
+    }
+}
+
+/// One line of a text box.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct Paragraph {
+    /// Alignment of this line inside the box; `None` uses the box alignment.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub align: Option<TextAlign>,
+    #[serde(default)]
+    pub runs: Vec<TextRun>,
+}
+
+impl Paragraph {
+    pub fn plain(text: &str) -> Self {
+        let runs = if text.is_empty() { Vec::new() } else { vec![TextRun::plain(text)] };
+        Paragraph { align: None, runs }
+    }
+
+    pub fn text(&self) -> String {
+        self.runs.iter().map(|r| r.text.as_str()).collect()
+    }
+}
+
+/// A text box: paragraphs of formatted runs inside a box whose top-left
+/// corner is `pos`. The box is as wide as its widest line (`width`, measured
+/// by the browser that renders it) and is rotated around that corner.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct TextBox {
-    /// Anchor position in cell units.
+    /// Top-left corner of the box in cell units.
     pub pos: Vec2,
-    pub text: String,
-    /// Font size in cell units.
+    pub paragraphs: Vec<Paragraph>,
+    /// Width of the widest line in cell units.
+    pub width: f64,
+    /// Font size in cell units; runs may override it, like the other
+    /// character properties below.
     pub size: f64,
     pub color: String,
     pub font_family: String,
     pub bold: bool,
     pub italic: bool,
+    /// Alignment of the lines inside the box; paragraphs may override it. For
+    /// a station label it also picks the edge that stays next to the station
+    /// when the width changes.
     pub align: TextAlign,
     pub direction: TextDirection,
-    /// Rotation in degrees (clockwise).
+    /// Rotation in degrees (clockwise) around `pos`.
     pub rotation: f64,
     /// Station this text names, if any.
     pub station_id: Option<Id>,
@@ -320,9 +407,10 @@ pub struct TextBox {
 
 impl Default for TextBox {
     fn default() -> Self {
-        TextBox {
+        let mut t = TextBox {
             pos: Vec2::default(),
-            text: "Text".into(),
+            paragraphs: vec![Paragraph::plain("Text")],
+            width: 0.0,
             size: 0.75,
             color: "#1a1a1a".into(),
             font_family: "Helvetica, Arial, sans-serif".into(),
@@ -332,6 +420,169 @@ impl Default for TextBox {
             direction: TextDirection::Ltr,
             rotation: 0.0,
             station_id: None,
+        };
+        t.width = t.estimated_width();
+        t
+    }
+}
+
+/// The formatting a run is drawn with.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResolvedStyle<'a> {
+    pub font_family: &'a str,
+    pub size: f64,
+    pub color: &'a str,
+    pub bold: bool,
+    pub italic: bool,
+}
+
+impl TextBox {
+    /// A box holding `text`, one paragraph per line.
+    pub fn with_text(text: &str) -> Self {
+        let mut t = TextBox { paragraphs: Self::plain_paragraphs(text), ..TextBox::default() };
+        t.width = t.estimated_width();
+        t
+    }
+
+    pub fn plain_paragraphs(text: &str) -> Vec<Paragraph> {
+        text.split('\n').map(|l| Paragraph::plain(l.strip_suffix('\r').unwrap_or(l))).collect()
+    }
+
+    /// The text without formatting, paragraphs separated by line breaks.
+    pub fn text(&self) -> String {
+        self.paragraphs.iter().map(|p| p.text()).collect::<Vec<_>>().join("\n")
+    }
+
+    pub fn style_of<'a>(&'a self, r: &'a RunStyle) -> ResolvedStyle<'a> {
+        ResolvedStyle {
+            font_family: r.font_family.as_deref().unwrap_or(&self.font_family),
+            size: r.size.unwrap_or(self.size),
+            color: r.color.as_deref().unwrap_or(&self.color),
+            bold: r.bold.unwrap_or(self.bold),
+            italic: r.italic.unwrap_or(self.italic),
+        }
+    }
+
+    pub fn align_of(&self, p: &Paragraph) -> TextAlign {
+        p.align.unwrap_or(self.align)
+    }
+
+    /// Largest font size on a line; the box size counts too, like the strut
+    /// of a CSS line box.
+    pub fn line_size(&self, p: &Paragraph) -> f64 {
+        p.runs.iter().filter_map(|r| r.style.size).fold(self.size, f64::max)
+    }
+
+    /// Height of the box in cells.
+    pub fn height(&self) -> f64 {
+        self.paragraphs.iter().map(|p| self.line_size(p) * LINE_SPACING).sum::<f64>().max(self.size * LINE_SPACING)
+    }
+
+    /// Rough width of the widest line, used until the browser measures it.
+    pub fn estimated_width(&self) -> f64 {
+        let line = |p: &Paragraph| -> f64 {
+            p.runs
+                .iter()
+                .map(|r| {
+                    let st = self.style_of(&r.style);
+                    r.text.chars().count() as f64 * st.size * if st.bold { 0.62 } else { 0.56 }
+                })
+                .sum()
+        };
+        let w = self.paragraphs.iter().map(line).fold(0.0, f64::max);
+        (w * 1000.0).round() / 1000.0
+    }
+
+    /// Share of a width change that moves the left edge. A text box keeps its
+    /// top-left corner (on the grid) and grows to the right; a station label
+    /// keeps the edge it is aligned to, so it stays centered under (or beside)
+    /// its station.
+    fn anchor_share(&self) -> f64 {
+        if self.station_id.is_none() {
+            return 0.0;
+        }
+        match self.align {
+            TextAlign::Start => 0.0,
+            TextAlign::Middle => 0.5,
+            TextAlign::End => 1.0,
+        }
+    }
+
+    /// Change the width, keeping the corner (or, for a label, the aligned edge) in place.
+    pub fn set_width(&mut self, width: f64) {
+        let width = if width.is_finite() { (width.max(0.0) * 1000.0).round() / 1000.0 } else { 0.0 };
+        let shift = (self.width - width) * self.anchor_share();
+        if shift != 0.0 {
+            let along = Vec2::new(shift, 0.0).rotate_around(Vec2::default(), self.rotation);
+            self.pos = self.pos.add(along).rounded(1000.0);
+        }
+        self.width = width;
+    }
+
+    /// Put the box so that its alignment edge is at `anchor.x` and its middle
+    /// at `anchor.y` (a station label next to its station).
+    pub fn place_at(&mut self, anchor: Vec2) {
+        self.pos = Vec2::new(anchor.x - self.width * self.anchor_share(), anchor.y - self.height() / 2.0).rounded(1000.0);
+    }
+
+    /// Remove the overrides of a box property from every run (or of the
+    /// alignment from every paragraph), so the box value applies to all text.
+    pub fn clear_overrides(&mut self, key: &str) {
+        for p in &mut self.paragraphs {
+            if key == "align" {
+                p.align = None;
+            }
+            for r in &mut p.runs {
+                r.style.clear(key);
+            }
+        }
+    }
+
+    /// Tidy the formatting: overrides equal to the box value are dropped,
+    /// neighbouring runs with the same formatting are merged and empty runs
+    /// are removed. There is always at least one paragraph.
+    pub fn normalize(&mut self) {
+        if self.paragraphs.is_empty() {
+            self.paragraphs.push(Paragraph::default());
+        }
+        let boxed = RunStyle {
+            font_family: Some(self.font_family.clone()),
+            size: Some(self.size),
+            color: Some(self.color.clone()),
+            bold: Some(self.bold),
+            italic: Some(self.italic),
+        };
+        for p in &mut self.paragraphs {
+            if p.align == Some(self.align) {
+                p.align = None;
+            }
+            let mut out: Vec<TextRun> = Vec::new();
+            for mut r in std::mem::take(&mut p.runs) {
+                if r.text.is_empty() {
+                    continue;
+                }
+                let st = &mut r.style;
+                if st.font_family == boxed.font_family {
+                    st.font_family = None;
+                }
+                if st.size.is_some_and(|v| !v.is_finite() || v <= 0.0) || st.size == boxed.size {
+                    st.size = None;
+                }
+                if st.color == boxed.color {
+                    st.color = None;
+                }
+                if st.bold == boxed.bold {
+                    st.bold = None;
+                }
+                if st.italic == boxed.italic {
+                    st.italic = None;
+                }
+                match out.last_mut() {
+                    Some(last) if last.style == r.style => last.text.push_str(&r.text),
+                    _ => out.push(r),
+                }
+            }
+            p.runs = out;
         }
     }
 }

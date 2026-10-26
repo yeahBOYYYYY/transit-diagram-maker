@@ -20,6 +20,19 @@ const s = store.state
 const tool = computed(() => s.tool)
 
 const zoomPct = computed(() => Math.round(s.view.zoom * 100))
+
+/** Text options: the formatting of the text being edited, or the defaults for new text. */
+const textOpts = computed(() => {
+  void s.revision
+  void s.textEdit?.selection
+  void s.textEdit?.version
+  return (s.textEdit && store.textFormat()) || prefs.text
+})
+type TextKey = 'font_family' | 'size' | 'color' | 'bold' | 'italic' | 'align' | 'direction'
+function setText(key: TextKey, value: unknown): void {
+  if (s.textEdit) store.formatText({ [key]: value })
+  else (prefs.text as Record<TextKey, unknown>)[key] = value
+}
 const pillSelected = computed(() => {
   void s.revision
   return selectedPill(store) !== null
@@ -33,7 +46,46 @@ const pillSelected = computed(() => {
     </div>
     <div class="sep-v" />
 
-    <template v-if="tool === 'select'">
+    <template v-if="s.textEdit || tool === 'text'">
+      <div class="opt" data-keeps-text-edit data-testid="text-options">
+        <span class="dim opt">Font<HelpTip :text="HELP['text.font']" /></span>
+        <FontSelect :model-value="textOpts.font_family" @update:model-value="(v) => setText('font_family', v)" />
+        <NumberField :model-value="textOpts.size" label="Size" :min="0.1" :step="0.05" :width="40" unit="cells" :help="HELP['text.size']" data-testid="text-size" @update:model-value="(v) => setText('size', v)" />
+        <ColorField :model-value="textOpts.color" label="Color" :help="HELP['text.color']" @update:model-value="(v) => setText('color', v)" />
+        <button class="icon-btn" :class="{ on: textOpts.bold }" title="Bold (Ctrl+B while editing)" data-testid="text-bold" @mousedown.prevent @click="setText('bold', !textOpts.bold)">
+          <UiIcon name="bold" :size="16" />
+        </button>
+        <button class="icon-btn" :class="{ on: textOpts.italic }" title="Italic (Ctrl+I while editing)" data-testid="text-italic" @mousedown.prevent @click="setText('italic', !textOpts.italic)">
+          <UiIcon name="italic" :size="16" />
+        </button>
+        <span class="dim opt">Align<HelpTip :text="HELP['text.align']" /></span>
+        <Segmented
+          :model-value="textOpts.align"
+          data-testid="text-align"
+          :options="[
+            { value: 'start', icon: 'align-start', title: 'Left' },
+            { value: 'middle', icon: 'align-middle', title: 'Center' },
+            { value: 'end', icon: 'align-end', title: 'Right' },
+          ]"
+          @mousedown.prevent
+          @update:model-value="(v) => setText('align', v)"
+        />
+        <span class="dim opt">Direction<HelpTip :text="HELP['text.direction']" /></span>
+        <Segmented
+          :model-value="textOpts.direction"
+          :options="[
+            { value: 'ltr', icon: 'dir-ltr', title: 'Left to right' },
+            { value: 'rtl', icon: 'dir-rtl', title: 'Right to left' },
+          ]"
+          @mousedown.prevent
+          @update:model-value="(v) => setText('direction', v)"
+        />
+      </div>
+      <span v-if="s.textEdit" class="hint dim">Select part of the text to format it · Shift+Enter: new line · Enter: done · Escape: cancel</span>
+      <span v-else class="hint dim">Click to place text on a grid intersection · Alt: place it off the grid · Double-click a text to edit it</span>
+    </template>
+
+    <template v-else-if="tool === 'select'">
       <label class="opt">
         <span class="dim">Auto-Select<HelpTip :text="HELP['prefs.autoSelect']" /></span>
         <select v-model="prefs.autoSelect" data-testid="auto-select">
@@ -56,7 +108,7 @@ const pillSelected = computed(() => {
         <UiIcon name="rotate-cw" :size="16" />
       </button>
       <span v-if="pillSelected" class="hint dim">Double-click an arrow to extend the pill · double-click one of its cells to remove it</span>
-      <span v-else class="hint dim">Click a selected object to toggle rotate handles · Shift: add to selection · Dragged objects snap to the cells · Alt+drag: free move (stations leave their line)</span>
+      <span v-else class="hint dim">Click a selected object to toggle rotate handles · Shift: add to selection · Dragged objects snap to the grid · Alt+drag: free move and free rotation (stations leave their line)</span>
     </template>
 
     <template v-else-if="tool === 'hand'">
@@ -102,10 +154,8 @@ const pillSelected = computed(() => {
           <NumberField v-model="prefs.line.inner_width_pct" label="Width" :min="0" :max="100" :precision="0" unit="%" :width="36" :help="HELP['line.channel_width']" />
         </template>
         <template v-if="hasDashes(prefs.line.kind)">
-          <template v-if="prefs.line.kind === 'inner_dashed'">
-            <ColorField v-model="prefs.line.inner_color" label="Dashes" :help="HELP['line.dash_color']" />
-            <NumberField v-model="prefs.line.dash_width_pct" label="Width" :min="0" :max="100" :precision="0" unit="%" :width="36" :help="HELP['line.dash_width']" />
-          </template>
+          <ColorField v-model="prefs.line.inner_color" label="Dashes" :help="HELP['line.dash_color']" />
+          <NumberField v-model="prefs.line.dash_width_pct" label="Width" :min="0" :max="100" :precision="0" unit="%" :width="36" :help="HELP['line.dash_width']" />
           <NumberField v-model="prefs.line.dash_length" label="Dash" :min="0.1" :step="0.1" :precision="1" unit="cells" :width="36" :help="HELP['line.dash_length']" />
           <NumberField v-model="prefs.line.dash_gap" label="Gap" :min="0" :step="0.1" :precision="1" unit="cells" :width="36" :help="HELP['line.dash_gap']" />
           <NumberField v-model="prefs.line.dash_start_offset" label="Start offset" :min="0" :step="0.5" :precision="1" unit="cells" :width="36" :help="HELP['line.dash_start_offset']" />
@@ -157,36 +207,6 @@ const pillSelected = computed(() => {
       <span class="hint dim">{{ prefs.station.kind === 'pill' ? 'Drag across lines to paint a pill station' : 'Click on a line to place a station' }}</span>
     </template>
 
-    <template v-else-if="tool === 'text'">
-      <span class="dim opt">Font<HelpTip :text="HELP['text.font']" /></span>
-      <FontSelect v-model="prefs.text.font_family" />
-      <NumberField v-model="prefs.text.size" label="Size" :min="0.1" :step="0.05" :width="40" unit="cells" :help="HELP['text.size']" />
-      <ColorField v-model="prefs.text.color" label="Color" :help="HELP['text.color']" />
-      <button class="icon-btn" :class="{ on: prefs.text.bold }" title="Bold" @click="prefs.text.bold = !prefs.text.bold">
-        <UiIcon name="bold" :size="16" />
-      </button>
-      <button class="icon-btn" :class="{ on: prefs.text.italic }" title="Italic" @click="prefs.text.italic = !prefs.text.italic">
-        <UiIcon name="italic" :size="16" />
-      </button>
-      <span class="dim opt">Align<HelpTip :text="HELP['text.align']" /></span>
-      <Segmented
-        v-model="prefs.text.align"
-        :options="[
-          { value: 'start', icon: 'align-start', title: 'Left' },
-          { value: 'middle', icon: 'align-middle', title: 'Center' },
-          { value: 'end', icon: 'align-end', title: 'Right' },
-        ]"
-      />
-      <span class="dim opt">Direction<HelpTip :text="HELP['text.direction']" /></span>
-      <Segmented
-        v-model="prefs.text.direction"
-        :options="[
-          { value: 'ltr', icon: 'dir-ltr', title: 'Left to right' },
-          { value: 'rtl', icon: 'dir-rtl', title: 'Right to left' },
-        ]"
-      />
-      <span class="hint dim">Click to place text in a cell · Alt: place off the grid · Enter commits · Shift+Enter new line</span>
-    </template>
 
   </div>
 </template>

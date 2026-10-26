@@ -373,8 +373,18 @@ impl TransitEditor {
         self.inner.translate(&ids(ids_json)?, dx, dy, free).map_err(err)
     }
 
-    pub fn rotate(&mut self, ids_json: &str, deg: f64, px: f64, py: f64) -> Result<f64, JsError> {
-        self.inner.rotate(&ids(ids_json)?, deg, Vec2::new(px, py)).map_err(err)
+    /// `free` (Alt) turns text and pictograms by any whole number of degrees.
+    pub fn rotate(&mut self, ids_json: &str, deg: f64, px: f64, py: f64, free: bool) -> Result<f64, JsError> {
+        self.inner.rotate(&ids(ids_json)?, deg, Vec2::new(px, py), free).map_err(err)
+    }
+
+    /// `widths_json`: `[[id, width in cells], …]` measured by the browser.
+    /// Not recorded in the history; returns whether anything changed.
+    #[wasm_bindgen(js_name = fitTextWidths)]
+    pub fn fit_text_widths(&mut self, widths_json: &str) -> Result<bool, JsError> {
+        let widths: Vec<(f64, f64)> = parse(widths_json)?;
+        let widths: Vec<(u64, f64)> = widths.into_iter().map(|(id, w)| (id as u64, w)).collect();
+        Ok(self.inner.fit_text_widths(&widths))
     }
 }
 

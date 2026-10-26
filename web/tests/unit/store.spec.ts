@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { freshStore } from './helpers'
 import { prefs } from '../../src/stores/prefs'
 import { fontChoices } from '../../src/core/fonts'
+import { plainParagraphs, plainText } from '../../src/core/richtext'
+import type { EditorStore } from '../../src/stores/editor'
 
 describe('uploaded assets', () => {
   it('mirrors uploaded fonts and icons and offers them in the pickers', () => {
@@ -108,7 +110,7 @@ describe('editor store', () => {
     e.begin()
     const id = store.run((en) => en.addText({ text: 'Text' }))!
     store.startTextEdit(id, true)
-    expect(store.state.textEdit?.value).toBe('Text')
+    expect(plainText(store.state.textEdit!.paragraphs)).toBe('Text')
     store.finishTextEdit(false)
     expect(store.state.fragments).toHaveLength(0)
     expect(store.state.canUndo).toBe(false)
@@ -118,14 +120,53 @@ describe('editor store', () => {
     const store = freshStore()
     const id = store.run((e) => e.addText({ text: 'Old' }))!
     store.startTextEdit(id)
-    store.state.textEdit!.value = 'New name'
+    store.setTextDraft(plainParagraphs('New'), null)
+    store.setTextDraft(plainParagraphs('New name'), null)
+    expect(textOf(store, id), 'the draft shows on the canvas while typing').toBe('New name')
     store.finishTextEdit(true)
-    const n = store.node(id)
-    expect(n?.type === 'layer' && n.content.kind === 'text' && n.content.text).toBe('New name')
+    expect(textOf(store, id)).toBe('New name')
+    store.undo()
+    expect(textOf(store, id), 'one undo step for the whole edit').toBe('Old')
+    store.redo()
     store.startTextEdit(id)
-    store.state.textEdit!.value = '   '
+    store.setTextDraft(plainParagraphs('Changed'), null)
+    store.finishTextEdit(false)
+    expect(textOf(store, id), 'Escape restores the text').toBe('New name')
+    store.startTextEdit(id)
+    store.setTextDraft(plainParagraphs('   '), null)
     store.finishTextEdit(true)
     expect(store.node(id)).toBeNull()
+  })
+
+  it('formats the selected characters while editing and the whole box otherwise', () => {
+    const store = freshStore()
+    const id = store.run((e) => e.addText({ text: 'Red text', color: '#000000' }))!
+    store.startTextEdit(id)
+    store.state.textEdit!.selection = { start: { p: 0, o: 0 }, end: { p: 0, o: 3 } }
+    store.formatText({ color: '#ff0000', bold: true })
+    expect(store.textFormat()).toMatchObject({ color: '#ff0000', bold: true })
+    store.finishTextEdit(true)
+    const n = store.node(id)
+    const t = n?.type === 'layer' && n.content.kind === 'text' ? n.content : null
+    expect(t?.paragraphs[0].runs).toEqual([{ text: 'Red', color: '#ff0000', bold: true }, { text: ' text' }])
+    expect(t?.color).toBe('#000000')
+    // Outside the editor a property applies to all of the text.
+    store.formatText({ color: '#0000ff' }, id)
+    const m = store.node(id)
+    expect(m?.type === 'layer' && m.content.kind === 'text' && m.content.paragraphs[0].runs).toEqual([{ text: 'Red', bold: true }, { text: ' text' }])
+  })
+
+  it('aligns the paragraphs the selection touches', () => {
+    const store = freshStore()
+    const id = store.run((e) => e.addText({ text: 'One\nTwo\nThree', pos: { x: 2, y: 2 } }))!
+    store.startTextEdit(id)
+    store.state.textEdit!.selection = { start: { p: 1, o: 1 }, end: { p: 1, o: 1 } }
+    store.formatText({ align: 'end' })
+    store.finishTextEdit(true)
+    const n = store.node(id)
+    const t = n?.type === 'layer' && n.content.kind === 'text' ? n.content : null
+    expect(t?.paragraphs.map((p) => p.align ?? null)).toEqual([null, 'end', null])
+    expect(t?.pos, 'aligning never moves the box').toEqual({ x: 2, y: 2 })
   })
 
   it('opens documents and rejects invalid files', () => {
@@ -163,3 +204,8 @@ describe('editor store', () => {
     expect(store.state.overlay.preview).toBe('')
   })
 })
+
+function textOf(store: EditorStore, id: number): string | null {
+  const n = store.node(id)
+  return n?.type === 'layer' && n.content.kind === 'text' ? plainText(n.content.paragraphs) : null
+}

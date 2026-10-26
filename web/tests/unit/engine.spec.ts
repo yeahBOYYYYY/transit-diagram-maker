@@ -48,7 +48,7 @@ describe('Engine bridge', () => {
 
   it('round-trips .transit.svg files and exports SVG', () => {
     const e = new Engine()
-    e.createLine([{ x: 0, y: 0 }, { x: 5, y: 0 }], { kind: 'dashed' })
+    e.createLine([{ x: 0, y: 0 }, { x: 5, y: 0 }], { kind: 'inner_dashed' })
     e.addStation('tick', { x: 2, y: 0 }, { tick_side: -1 })
     e.addText({ text: 'Hello', pos: { x: 1, y: 3 } })
     const saved = e.saveTransit()

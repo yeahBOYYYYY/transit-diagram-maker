@@ -142,7 +142,7 @@ test.describe('drawing tools', () => {
 
   test('line style options from the options bar are applied', async ({ page }) => {
     await page.keyboard.press('p')
-    await page.selectOption('[data-testid=line-style]', 'dashed')
+    await page.selectOption('[data-testid=line-style]', 'inner_dashed')
     await drawLine(page, [[0, 0], [8, 0]])
     const svg = await state(page, (s) => s.fragments[0].svg)
     expect(svg).toContain('stroke-dasharray')

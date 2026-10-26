@@ -1,5 +1,16 @@
 # Bugs & Teaks
 
+## 25/10/2026 - Commit 9d6d10a
+
+1. The `README.md` file is not good. Instead of straight up saying the technical layout of the project it should firstly put emphasis on the UI, maybe have a couple of screenshots or demo video, then have requirements and usage explanation, then have an explanation about the technical detail and the actual project layout! Look at other big GitHub repos about this!!!!
+2. Set "hollow" line style "width" default to be 33%. I don't like the "Dashed" line style, remove it. Set "Inner Dashed" line style defaults to be the following {Width: 30%, Dash: 1 cell, Gap: 1 cell, offsets: 0 cells}.
+3. Make text boxes snap by corner to grid intersections ALWAYS (unless using the ALT key to disable snapping, in which case it moves like all objects in precision of 0.1).
+4. When aligning text it shouldn't move as much, seems like a bug.
+5. Text should be able to have different fonts/sizes/colors for different part of the text, it should act just like text boxes in Word.
+6. When holding ALT (or other disable snapping keyboard shortcuts) it should also disable snapping for rotations and allow for free rotations.
+7. Add more preferences, pretty much for any magic number across the entire program! Use tabs in the preferences window to make it organized.
+8. Add option in the menu/preferences to restore defaults, if you accidentally changed something, check our how other big production editing apps to that!
+
 ## 24/10/2026 - Commit 7d6e338
 
 1. Getting to the "Erase tool" has funky behavior, it should much other programs like Photoshop or Gimp or Inkscape in terms of feeling.

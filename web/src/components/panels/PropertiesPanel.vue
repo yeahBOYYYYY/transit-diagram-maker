@@ -13,6 +13,7 @@ import { STROKE_KINDS, hasChannel, hasDashes } from '../../core/lineStyles'
 import type { Engine } from '../../core/engine'
 import { findItem } from '../../core/tree'
 import { useEditor } from '../../stores/editor'
+import { prefs } from '../../stores/prefs'
 import FontSelect from '../ui/FontSelect.vue'
 import { moveSelectionTo, rotateSelection, selectionOnGrid } from '../../stores/commands'
 
@@ -35,7 +36,7 @@ function live(fn: (e: Engine) => void): void {
     fn(en)
   })
   if (idle) clearTimeout(idle)
-  idle = setTimeout(done, 600)
+  idle = setTimeout(done, prefs.panelEditPause)
 }
 function done(): void {
   if (idle) clearTimeout(idle)
@@ -111,6 +112,23 @@ function applyStyleToLine(): void {
 function patch(obj: Record<string, unknown>): void {
   const l = layer.value
   if (l) live((e) => e.updateContent(l.id, obj))
+}
+
+/** Formatting of the selected text (of the selected characters while it is edited). */
+const textFmt = computed(() => {
+  void s.revision
+  void s.textEdit?.selection
+  void s.textEdit?.version
+  const l = layer.value
+  return l?.content.kind === 'text' ? store.textFormat(l.id) : null
+})
+
+/** While the text is edited, format the selection; otherwise all of the text (one undo step while scrubbing). */
+function setText(key: 'font_family' | 'size' | 'color' | 'bold' | 'italic' | 'align' | 'direction', value: unknown): void {
+  const l = layer.value
+  if (!l) return
+  if (s.textEdit?.id === l.id) store.formatText({ [key]: value })
+  else live((e) => e.updateContent(l.id, { [key]: value }))
 }
 
 function setStationKind(kind: StationKind): void {
@@ -237,7 +255,7 @@ const childCount = computed(() => (group.value ? (findItem(s.tree, group.value.i
             </div>
           </template>
           <template v-if="hasDashes(lineSeg.seg.style.kind)">
-            <div v-if="lineSeg.seg.style.kind === 'inner_dashed'" class="field">
+            <div class="field">
               <span class="lbl">Dashes<HelpTip :text="HELP['line.dash_color']" /></span>
               <ColorField :model-value="lineSeg.seg.style.inner_color" @update:model-value="(v) => setStyle('inner_color', v)" />
               <NumberField :model-value="lineSeg.seg.style.dash_width_pct" label="Width" :min="0" :max="100" :precision="0" unit="%" :help="HELP['line.dash_width']" @update:model-value="(v) => setStyle('dash_width_pct', v)" @commit="done" />
@@ -325,60 +343,59 @@ const childCount = computed(() => (group.value ? (findItem(s.tree, group.value.i
         </template>
 
         <!-- text -->
-        <template v-if="layer && layer.content.kind === 'text'">
+        <template v-if="layer && layer.content.kind === 'text' && textFmt">
           <div class="section-title">Character</div>
-          <div class="field">
-            <span class="lbl">Text<HelpTip :text="HELP['text.text']" /></span>
-          </div>
-          <textarea
-            class="text-input"
-            rows="2"
-            :value="layer.content.text"
-            data-testid="prop-text"
-            @keydown.stop
-            @change="patch({ text: ($event.target as HTMLTextAreaElement).value }); done()"
-          />
-          <div class="field">
-            <span class="lbl">Font<HelpTip :text="HELP['text.font']" /></span>
-            <FontSelect :model-value="layer.content.font_family" @update:model-value="(v) => (patch({ font_family: v }), done())" />
-            <button class="icon-btn" :class="{ on: layer.content.bold }" title="Bold" @click="patch({ bold: !(layer.content as any).bold }); done()">
-              <UiIcon name="bold" :size="15" />
-            </button>
-            <button class="icon-btn" :class="{ on: layer.content.italic }" title="Italic" @click="patch({ italic: !(layer.content as any).italic }); done()">
-              <UiIcon name="italic" :size="15" />
-            </button>
-          </div>
-          <div class="field">
-            <span class="lbl">Color<HelpTip :text="HELP['text.color']" /></span>
-            <ColorField :model-value="layer.content.color" @update:model-value="(v) => patch({ color: v })" />
-          </div>
-          <div class="field">
-            <span class="lbl">Align<HelpTip :text="HELP['text.align']" /></span>
-            <Segmented
-              :model-value="layer.content.align"
-              :options="[
-                { value: 'start', icon: 'align-start', title: 'Left' },
-                { value: 'middle', icon: 'align-middle', title: 'Center' },
-                { value: 'end', icon: 'align-end', title: 'Right' },
-              ]"
-              @update:model-value="(v) => (patch({ align: v }), done())"
-            />
-          </div>
-          <div class="field">
-            <span class="lbl">Direction<HelpTip :text="HELP['text.direction']" /></span>
-            <Segmented
-              :model-value="layer.content.direction"
-              data-testid="prop-text-direction"
-              :options="[
-                { value: 'ltr', icon: 'dir-ltr', title: 'Left to right' },
-                { value: 'rtl', icon: 'dir-rtl', title: 'Right to left' },
-              ]"
-              @update:model-value="(v) => (patch({ direction: v }), done())"
-            />
-          </div>
-          <div class="grid2">
-            <NumberField :model-value="layer.content.size" label="Size" :min="0.05" :step="0.05" unit="cells" :help="HELP['text.size']" @update:model-value="(v) => patch({ size: v })" @commit="done" />
-            <NumberField :model-value="layer.content.rotation" label="Angle" :min="-180" :max="180" :step="45" :precision="0" unit="°" :help="HELP['text.rotation']" @update:model-value="(v) => patch({ rotation: v })" @commit="done" />
+          <div class="stack" data-keeps-text-edit>
+            <div class="field">
+              <button v-if="s.textEdit?.id !== layer.id" class="ps-btn" data-testid="prop-edit-text" @click="store.startTextEdit(layer.id)">Edit text</button>
+              <span v-else class="dim small">Editing on the canvas: changes apply to the selected characters.</span>
+              <HelpTip :text="HELP['text.edit']" />
+            </div>
+            <div class="field">
+              <span class="lbl">Font<HelpTip :text="HELP['text.font']" /></span>
+              <FontSelect :model-value="textFmt.font_family" @update:model-value="(v) => (setText('font_family', v), done())" />
+              <button class="icon-btn" :class="{ on: textFmt.bold }" title="Bold" data-testid="prop-text-bold" @mousedown.prevent @click="setText('bold', !textFmt.bold); done()">
+                <UiIcon name="bold" :size="15" />
+              </button>
+              <button class="icon-btn" :class="{ on: textFmt.italic }" title="Italic" @mousedown.prevent @click="setText('italic', !textFmt.italic); done()">
+                <UiIcon name="italic" :size="15" />
+              </button>
+            </div>
+            <div class="field">
+              <span class="lbl">Color<HelpTip :text="HELP['text.color']" /></span>
+              <ColorField :model-value="textFmt.color" @update:model-value="(v) => setText('color', v)" />
+            </div>
+            <div class="field">
+              <span class="lbl">Align<HelpTip :text="HELP['text.align']" /></span>
+              <Segmented
+                :model-value="textFmt.align"
+                data-testid="prop-text-align"
+                :options="[
+                  { value: 'start', icon: 'align-start', title: 'Left' },
+                  { value: 'middle', icon: 'align-middle', title: 'Center' },
+                  { value: 'end', icon: 'align-end', title: 'Right' },
+                ]"
+                @mousedown.prevent
+                @update:model-value="(v) => (setText('align', v), done())"
+              />
+            </div>
+            <div class="field">
+              <span class="lbl">Direction<HelpTip :text="HELP['text.direction']" /></span>
+              <Segmented
+                :model-value="textFmt.direction"
+                data-testid="prop-text-direction"
+                :options="[
+                  { value: 'ltr', icon: 'dir-ltr', title: 'Left to right' },
+                  { value: 'rtl', icon: 'dir-rtl', title: 'Right to left' },
+                ]"
+                @mousedown.prevent
+                @update:model-value="(v) => (setText('direction', v), done())"
+              />
+            </div>
+            <div class="grid2">
+              <NumberField :model-value="textFmt.size" label="Size" :min="0.05" :step="0.05" unit="cells" :help="HELP['text.size']" data-testid="prop-text-size" @update:model-value="(v) => setText('size', v)" @commit="done" />
+              <NumberField :model-value="layer.content.rotation" label="Angle" :min="-180" :max="180" :step="45" :precision="1" unit="°" :help="HELP['text.rotation']" @update:model-value="(v) => patch({ rotation: v })" @commit="done" />
+            </div>
           </div>
         </template>
 
@@ -399,7 +416,7 @@ const childCount = computed(() => (group.value ? (findItem(s.tree, group.value.i
           </div>
           <div class="grid2">
             <NumberField :model-value="layer.content.size" label="Size" :min="0.1" :step="0.1" unit="cells" :help="HELP['icon.size']" @update:model-value="(v) => patch({ size: v })" @commit="done" />
-            <NumberField :model-value="layer.content.rotation" label="Angle" :min="-180" :max="180" :step="45" :precision="0" unit="°" :help="HELP['icon.rotation']" @update:model-value="(v) => patch({ rotation: v })" @commit="done" />
+            <NumberField :model-value="layer.content.rotation" label="Angle" :min="-180" :max="180" :step="45" :precision="1" unit="°" :help="HELP['icon.rotation']" @update:model-value="(v) => patch({ rotation: v })" @commit="done" />
           </div>
         </template>
       </template>

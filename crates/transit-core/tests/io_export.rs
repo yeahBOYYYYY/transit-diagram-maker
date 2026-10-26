@@ -9,7 +9,7 @@ fn sample() -> Editor {
     let red = ed.create_line(&[c(0, 0), c(6, 0), c(9, 3)], LineStyle::default()).unwrap();
     let blue = LineStyle {
         color: "#0098d4".into(),
-        kind: StrokeKind::Dashed,
+        kind: StrokeKind::InnerDashed,
         start_cap: Cap::Butt,
         dash_start_offset: 1.5,
         dash_end_offset: 0.5,
@@ -20,8 +20,8 @@ fn sample() -> Editor {
     ed.add_station(StationKind::Dot, c(1, 0), &StationOptions::default()).unwrap();
     ed.add_station(StationKind::Tick, c(3, -2), &StationOptions::default()).unwrap();
     ed.add_pill(&[c(3, 0), c(3, 1)], &StationOptions::default()).unwrap();
-    ed.add_text(TextBox { text: "Metro \"Map\" & <Co>".into(), rotation: 45.0, ..TextBox::default() }).unwrap();
-    ed.add_text(TextBox { text: "תחנה מרכזית".into(), direction: TextDirection::Rtl, ..TextBox::default() }).unwrap();
+    ed.add_text(TextBox { rotation: 45.0, ..TextBox::with_text("Metro \"Map\" & <Co>") }).unwrap();
+    ed.add_text(TextBox { direction: TextDirection::Rtl, ..TextBox::with_text("תחנה מרכזית") }).unwrap();
     ed.add_icon(Icon { icon: "ferry".into(), pos: Vec2::new(10.0, 5.0), ..Icon::default() }).unwrap();
     let g = ed.new_group(Some("Empty folder")).unwrap();
     ed.set_locked(g, true).unwrap();
@@ -64,7 +64,7 @@ fn saved_file_is_an_svg_picture_with_editor_data() {
 #[test]
 fn hidden_layers_are_saved_but_not_painted() {
     let mut ed = Editor::new();
-    let t = ed.add_text(TextBox { text: "Hidden".into(), ..TextBox::default() }).unwrap();
+    let t = ed.add_text(TextBox::with_text("Hidden")).unwrap();
     ed.set_visible(t, false).unwrap();
     let text = io::to_transit(ed.document());
     assert!(text.contains(&format!(r#"<g id="layer-{t}" data-name="Hidden" display="none">"#)), "{text}");
@@ -74,9 +74,35 @@ fn hidden_layers_are_saved_but_not_painted() {
 #[test]
 fn multi_line_text_and_special_characters_survive() {
     let mut ed = Editor::new();
-    let t = TextBox { text: "  Line one\nLine \"two\" & <three>\r\n\tend ".into(), font_family: "A \"B\" & C".into(), ..TextBox::default() };
+    let t = TextBox { font_family: "A \"B\" & C".into(), ..TextBox::with_text("  Line one\nLine \"two\" & <three>\r\n\tend ") };
     ed.add_text(t).unwrap();
     let back = io::from_transit(&io::to_transit(ed.document())).unwrap();
+    assert_eq!(&back, ed.document());
+}
+
+#[test]
+fn rich_text_survives() {
+    let mut ed = Editor::new();
+    let mut t = TextBox { width: 4.25, ..TextBox::with_text("") };
+    t.paragraphs = vec![
+        Paragraph {
+            align: Some(TextAlign::End),
+            runs: vec![
+                TextRun::plain("Plain "),
+                TextRun {
+                    text: "styled <b>".into(),
+                    style: RunStyle { font_family: Some("Serif".into()), size: Some(1.5), color: Some("#ff0000".into()), bold: Some(true), italic: Some(true) },
+                },
+            ],
+        },
+        Paragraph::default(),
+        Paragraph::plain(" last "),
+    ];
+    let id = ed.add_text(t).unwrap();
+    ed.fit_text_widths(&[(id, 4.25)]);
+    let saved = io::to_transit(ed.document());
+    assert!(saved.contains(r#"<transit:p align="end"><transit:run>Plain </transit:run>"#), "{saved}");
+    let back = io::from_transit(&saved).unwrap();
     assert_eq!(&back, ed.document());
 }
 
@@ -113,20 +139,12 @@ fn rejects_duplicate_ids_and_bad_values() {
 }
 
 #[test]
-fn hollow_dashed_lines_from_older_files_load_as_inner_dashed() {
-    let doc = io::from_transit(&file(r#"<g><transit:segment id="1" name="a" line="2" points="0,0 3,0" kind="hollow_dashed"/></g>"#)).unwrap();
-    let Node::Layer(l) = &doc.root[0] else { panic!() };
-    let Content::Line(seg) = &l.content else { panic!() };
-    assert_eq!(seg.style.kind, StrokeKind::InnerDashed);
-}
-
-#[test]
 fn repairs_id_counter_settings_and_bad_lines() {
     let text = file_with(
         r#"<transit:settings line-width="0.8" tick-width="-3"/>"#,
         r#"<g><transit:segment id="40" name="a" line="41" points="0,0 3,1"/></g>
            <g><transit:segment id="42" name="b" line="43" points="0,0"/></g>
-           <g><transit:text id="44" pos="1.234,2" rotation="50">t</transit:text></g>
+           <g><transit:text id="44" pos="1.23456,2" rotation="50.04"><transit:p><transit:run>t</transit:run></transit:p></transit:text></g>
            <rect width="5" height="5"/><g><path d="M0 0"/></g>"#,
     );
     let doc = io::from_transit(&text).unwrap();
@@ -140,7 +158,8 @@ fn repairs_id_counter_settings_and_bad_lines() {
     assert_eq!(seg.style, LineStyle::default(), "missing style attributes get defaults");
     let Node::Layer(t) = &doc.root[1] else { panic!() };
     let Content::Text(t) = &t.content else { panic!() };
-    assert_eq!((t.pos, t.rotation), (Vec2::new(1.2, 2.0), 45.0));
+    assert_eq!((t.pos, t.rotation, t.text()), (Vec2::new(1.235, 2.0), 50.0, "t".to_string()));
+    assert!(t.width > 0.0, "a missing width is estimated");
 }
 
 #[test]
@@ -242,7 +261,7 @@ fn uploaded_assets_are_saved_in_the_file_and_exported() {
     assert_eq!(family, "\"City Sans\", sans-serif");
     let name = ed.add_icon_asset("Star", STAR).unwrap();
     assert_eq!(name, "custom-1");
-    ed.add_text(TextBox { text: "Hi".into(), font_family: family.clone(), ..TextBox::default() }).unwrap();
+    ed.add_text(TextBox { font_family: family.clone(), ..TextBox::with_text("Hi") }).unwrap();
     let icon = ed.add_icon(Icon { icon: name.clone(), color: "#ff0000".into(), ..Icon::default() }).unwrap();
     assert_eq!(ed.layer(icon).unwrap().name, "Star");
 

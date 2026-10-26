@@ -24,6 +24,8 @@ import type {
   Vec2,
 } from './types'
 
+import { plainParagraphs } from './richtext'
+
 const j = JSON.stringify
 
 export class Engine {
@@ -177,8 +179,10 @@ export class Engine {
   moveStationTo(id: Id, x: number, y: number): Cell {
     return JSON.parse(this.ed.moveStationTo(id, x, y))
   }
-  addText(t: Partial<TextBox>): Id {
-    return this.ed.addText(j(t))
+  /** `text` is a shortcut for unformatted paragraphs, one per line. */
+  addText(t: Partial<TextBox> & { text?: string }): Id {
+    const { text, ...rest } = t
+    return this.ed.addText(j(text === undefined ? rest : { ...rest, paragraphs: plainParagraphs(text) }))
   }
   addIcon(i: Partial<Icon>): Id {
     return this.ed.addIcon(j(i))
@@ -229,7 +233,12 @@ export class Engine {
   translate(ids: Id[], dx: number, dy: number, free = false): void {
     this.ed.translate(j(ids), dx, dy, free)
   }
-  rotate(ids: Id[], deg: number, pivot: { x: number; y: number }): number {
-    return this.ed.rotate(j(ids), deg, pivot.x, pivot.y)
+  /** `free` (Alt) turns text and pictograms by any whole number of degrees; grid content keeps 45° steps. */
+  rotate(ids: Id[], deg: number, pivot: { x: number; y: number }, free = false): number {
+    return this.ed.rotate(j(ids), deg, pivot.x, pivot.y, free)
+  }
+  /** Store text box widths measured by the browser (cells); not an undo step. Returns whether anything changed. */
+  fitTextWidths(widths: [Id, number][]): boolean {
+    return this.ed.fitTextWidths(j(widths))
   }
 }
