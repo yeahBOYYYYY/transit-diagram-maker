@@ -69,26 +69,35 @@ test.describe('text boxes', () => {
     }
   })
 
-  test('text snaps its corner to grid intersections; Alt moves and turns it freely', async ({ page }) => {
+  test('text snaps its nearest corner to a grid intersection; Alt moves and turns it freely', async ({ page }) => {
     await addText(page, 2, 2, 'Depot')
     const start = (await textBox(page)).pos
     expect(Number.isInteger(start.x) && Number.isInteger(start.y)).toBe(true)
     const a = await cellPos(page, start.x, start.y)
-    // Drag by 1.3 cells: the corner lands on the nearest intersection.
+    // Drag by 1.3 cells: whichever corner of the box is nearest to an
+    // intersection lands on it.
     await page.mouse.move(a.x, a.y)
     await page.mouse.down()
     await page.mouse.move(a.x + 1.3 * 24, a.y + 0.2 * 24, { steps: 6 })
     await page.mouse.up()
-    expect((await textBox(page)).pos).toEqual({ x: start.x + 1, y: start.y })
+    const t = await textBox(page)
+    const height = await state(page, (s) => s.fragments.find((f: any) => f.kind === 'text').bounds.h / 24)
+    const onGrid = (v: number) => Math.abs(v - Math.round(v)) < 1e-6
+    const corners = [0, t.width].flatMap((dx) => [0, height].map((dy) => [t.pos.x + dx, t.pos.y + dy]))
+    expect(corners.some(([x, y]) => onGrid(x) && onGrid(y)), JSON.stringify({ pos: t.pos, w: t.width, height })).toBe(true)
+    expect(Math.abs(t.pos.x - (start.x + 1.3))).toBeLessThan(1)
+    expect(Math.abs(t.pos.y - (start.y + 0.2))).toBeLessThan(1)
     // With Alt it moves in tenths.
-    const b = await cellPos(page, start.x + 1, start.y)
+    const b = await cellPos(page, t.pos.x, t.pos.y)
     await page.keyboard.down('Alt')
     await page.mouse.move(b.x, b.y)
     await page.mouse.down()
     await page.mouse.move(b.x + 0.3 * 24, b.y, { steps: 6 })
     await page.mouse.up()
     await page.keyboard.up('Alt')
-    expect((await textBox(page)).pos).toEqual({ x: start.x + 1.3, y: start.y })
+    const moved = (await textBox(page)).pos
+    expect(moved.x).toBeCloseTo(t.pos.x + 0.3, 1)
+    expect(moved.y).toBeCloseTo(t.pos.y, 1)
     // Rotate handles with Alt turn by any angle.
     const text = page.locator('[data-testid=doc-layer] text')
     await text.click()

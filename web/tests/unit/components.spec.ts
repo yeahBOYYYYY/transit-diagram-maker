@@ -325,6 +325,20 @@ describe('ToolsPanel', () => {
     await w.find('[data-tool=hand]').trigger('click')
     expect(store.state.tool).toBe('hand')
   })
+
+  it('edits, swaps and resets the line and inner colors like foreground and background colors', async () => {
+    freshStore()
+    const w = mountIt(ToolsPanel)
+    await w.find('[data-testid=tool-color-line]').setValue('#0098d4')
+    await w.find('[data-testid=tool-color-inner]').setValue('#ffd300')
+    expect([prefs.line.color, prefs.line.inner_color]).toEqual(['#0098d4', '#ffd300'])
+    await w.find('[data-testid=tool-colors-swap]').trigger('click')
+    expect([prefs.line.color, prefs.line.inner_color]).toEqual(['#ffd300', '#0098d4'])
+    expect(w.find('.fg').attributes('style')).toContain('#ffd300')
+    expect(w.find('[data-testid=tool-colors-swap]').attributes('title')).toContain('(X)')
+    await w.find('[data-testid=tool-colors-reset]').trigger('click')
+    expect([prefs.line.color, prefs.line.inner_color]).toEqual(['#e03c31', '#ffffff'])
+  })
 })
 
 describe('AboutDialog', () => {
@@ -336,6 +350,13 @@ describe('AboutDialog', () => {
     expect(text).toContain('github.com/yeahBOYYYYY/transit-diagram-maker')
     expect(text).toMatch(/Version \d+\.\d+\.\d+/)
     expect(text).not.toMatch(/Rust|WebAssembly|Vue/)
+  })
+
+  it('links the GitHub repository from the About and Preferences dialogs', () => {
+    freshStore()
+    const repo = 'https://github.com/yeahBOYYYYY/transit-diagram-maker'
+    expect(mountIt(AboutDialog).find('[data-testid=about-github]').attributes('href')).toBe(repo)
+    expect(mountIt(PreferencesDialog).find('[data-testid=prefs-github]').attributes('href')).toBe(repo)
   })
 })
 

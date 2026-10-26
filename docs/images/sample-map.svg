@@ -2,39 +2,39 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="-408 -288 794.88 552" width="794.88" height="552">
   <title>Transit diagram</title>
   <rect x="-408" y="-288" width="794.88" height="552" fill="#ffffff"/>
-  <g id="group-3" data-name="Line 1">
-    <g id="layer-2" data-name="Segment 1"><path d="M-372 -84L-146.912 -84A36 36 0 0 1 -121.456 -73.456L1.456 49.456A36 36 0 0 0 26.912 60L300 60" fill="none" stroke="#e03c31" stroke-width="24" stroke-linejoin="round"/><path d="M-370.8 -72L-372 -72A12 12 0 0 1 -384 -84L-384 -84A12 12 0 0 1 -372 -96L-370.8 -96ZM298.8 48L300 48A12 12 0 0 1 312 60L312 60A12 12 0 0 1 300 72L298.8 72Z" fill="#e03c31"/></g>
-    <g id="group-12" data-name="Station 1">
-      <g id="layer-10" data-name="Station 1"><path d="M-276 -84h0.01" fill="#000000" stroke="#000000" stroke-width="29.76" stroke-linecap="round" stroke-linejoin="round"/><path d="M-276 -84h0.01" fill="#ffffff" stroke="#ffffff" stroke-width="19.2" stroke-linecap="round" stroke-linejoin="round"/></g>
-      <g id="layer-11" data-name="Station 1"><text font-size="18" font-family="Helvetica, Arial, sans-serif" fill="#1a1a1a" style="white-space:pre"><tspan data-line="" x="-276.012" y="-108.9" text-anchor="middle">Station 1</tspan></text></g>
+  <g id="group-3" data-name="Red Line">
+    <g id="layer-2" data-name="Shinjuku to Alexanderplatz"><path d="M-372 -84L-146.912 -84A36 36 0 0 1 -121.456 -73.456L1.456 49.456A36 36 0 0 0 26.912 60L300 60" fill="none" stroke="#e03c31" stroke-width="24" stroke-linejoin="round"/><path d="M-370.8 -72L-372 -72A12 12 0 0 1 -384 -84L-384 -84A12 12 0 0 1 -372 -96L-370.8 -96ZM298.8 48L300 48A12 12 0 0 1 312 60L312 60A12 12 0 0 1 300 72L298.8 72Z" fill="#e03c31"/></g>
+    <g id="group-12" data-name="Shinjuku">
+      <g id="layer-10" data-name="Shinjuku"><path d="M-276 -84h0.01" fill="#000000" stroke="#000000" stroke-width="29.76" stroke-linecap="round" stroke-linejoin="round"/><path d="M-276 -84h0.01" fill="#ffffff" stroke="#ffffff" stroke-width="19.2" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <g id="layer-11" data-name="Shinjuku"><text font-size="18" font-family="Helvetica, Arial, sans-serif" fill="#1a1a1a" style="white-space:pre"><tspan data-line="" x="-276.012" y="-108.9" text-anchor="middle">Shinjuku</tspan></text></g>
     </g>
-    <g id="group-15" data-name="Station 2">
-      <g id="layer-13" data-name="Station 2"><path d="M-180 -84h0.01" fill="#000000" stroke="#000000" stroke-width="29.76" stroke-linecap="round" stroke-linejoin="round"/><path d="M-180 -84h0.01" fill="#ffffff" stroke="#ffffff" stroke-width="19.2" stroke-linecap="round" stroke-linejoin="round"/></g>
-      <g id="layer-14" data-name="Station 2"><text font-size="18" font-family="Helvetica, Arial, sans-serif" fill="#1a1a1a" style="white-space:pre"><tspan data-line="" x="-180.012" y="-108.9" text-anchor="middle">Station 2</tspan></text></g>
+    <g id="group-15" data-name="Châtelet">
+      <g id="layer-13" data-name="Châtelet"><path d="M-180 -84h0.01" fill="#000000" stroke="#000000" stroke-width="29.76" stroke-linecap="round" stroke-linejoin="round"/><path d="M-180 -84h0.01" fill="#ffffff" stroke="#ffffff" stroke-width="19.2" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <g id="layer-14" data-name="Châtelet"><text font-size="18" font-family="Helvetica, Arial, sans-serif" fill="#1a1a1a" style="white-space:pre"><tspan data-line="" x="-180.024" y="-108.9" text-anchor="middle">Châtelet</tspan></text></g>
     </g>
-    <g id="group-18" data-name="Station 3">
-      <g id="layer-16" data-name="Station 3"><path d="M228 60h0.01" fill="#000000" stroke="#000000" stroke-width="29.76" stroke-linecap="round" stroke-linejoin="round"/><path d="M228 60h0.01" fill="#ffffff" stroke="#ffffff" stroke-width="19.2" stroke-linecap="round" stroke-linejoin="round"/></g>
-      <g id="layer-17" data-name="Station 3"><text font-size="18" font-family="Helvetica, Arial, sans-serif" fill="#1a1a1a" style="white-space:pre"><tspan data-line="" x="228.012" y="35.1" text-anchor="middle">Station 3</tspan></text></g>
-    </g>
-  </g>
-  <g id="group-6" data-name="Line 2">
-    <g id="layer-5" data-name="Segment 1"><path d="M-36 -228L-36 228" fill="none" stroke="#0098d4" stroke-width="24" stroke-linejoin="round"/><path d="M-48 -226.8L-48 -228A12 12 0 0 1 -36 -240L-36 -240A12 12 0 0 1 -24 -228L-24 -226.8ZM-24 226.8L-24 228A12 12 0 0 1 -36 240L-36 240A12 12 0 0 1 -48 228L-48 226.8Z" fill="#0098d4"/><path d="M-36 -228L-36 228" fill="none" stroke="#ffffff" stroke-width="7.2" stroke-dasharray="24 24"/></g>
-    <g id="group-24" data-name="Station 5">
-      <g id="layer-22" data-name="Station 5"><path d="M-25.2 -168L-10.8 -168L-10.8 -159.6L-25.2 -159.6Z" fill="#0098d4"/></g>
-      <g id="layer-23" data-name="Station 5"><text font-size="18" font-family="Helvetica, Arial, sans-serif" fill="#1a1a1a" style="white-space:pre"><tspan data-line="" x="20.4" y="-157.5" text-anchor="start">Station 5</tspan></text></g>
+    <g id="group-18" data-name="Alexanderplatz">
+      <g id="layer-16" data-name="Alexanderplatz"><path d="M228 60h0.01" fill="#000000" stroke="#000000" stroke-width="29.76" stroke-linecap="round" stroke-linejoin="round"/><path d="M228 60h0.01" fill="#ffffff" stroke="#ffffff" stroke-width="19.2" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <g id="layer-17" data-name="Alexanderplatz"><text font-size="18" font-family="Helvetica, Arial, sans-serif" fill="#1a1a1a" style="white-space:pre"><tspan data-line="" x="227.544" y="96.3" text-anchor="middle">Alexanderplatz</tspan></text></g>
     </g>
   </g>
-  <g id="group-9" data-name="Line 3">
-    <g id="layer-8" data-name="Segment 1"><path d="M-324 180L-170.912 180A36 36 0 0 0 -145.456 169.456L-94.544 118.544A36 36 0 0 1 -69.088 108L120 108A36 36 0 0 0 156 72L156 -156" fill="none" stroke="#00843d" stroke-width="24" stroke-linejoin="round"/><path d="M-322.8 192L-324 192A12 12 0 0 1 -336 180L-336 180A12 12 0 0 1 -324 168L-322.8 168ZM144 -154.8L144 -156A12 12 0 0 1 156 -168L156 -168A12 12 0 0 1 168 -156L168 -154.8Z" fill="#00843d"/><path d="M-324 180L-170.912 180A36 36 0 0 0 -145.456 169.456L-94.544 118.544A36 36 0 0 1 -69.088 108L120 108A36 36 0 0 0 156 72L156 -156" fill="none" stroke="#ffffff" stroke-width="7.92" stroke-linejoin="round"/><path d="M-323.604 183.96L-324 183.96A3.96 3.96 0 0 1 -327.96 180L-327.96 180A3.96 3.96 0 0 1 -324 176.04L-323.604 176.04ZM152.04 -155.604L152.04 -156A3.96 3.96 0 0 1 156 -159.96L156 -159.96A3.96 3.96 0 0 1 159.96 -156L159.96 -155.604Z" fill="#ffffff"/></g>
-    <g id="group-21" data-name="Station 4">
-      <g id="layer-19" data-name="Station 4"><path d="M-36 60h0.01M-36 60L-36 84M-36 84h0.01M-36 84L-36 108M-36 108h0.01" fill="#000000" stroke="#000000" stroke-width="29.76" stroke-linecap="round" stroke-linejoin="round"/><path d="M-36 60h0.01M-36 60L-36 84M-36 84h0.01M-36 84L-36 108M-36 108h0.01" fill="#ffffff" stroke="#ffffff" stroke-width="19.2" stroke-linecap="round" stroke-linejoin="round"/></g>
-      <g id="layer-20" data-name="Station 4"><text font-size="18" font-family="Helvetica, Arial, sans-serif" fill="#1a1a1a" style="white-space:pre"><tspan data-line="" x="-36.012" y="35.1" text-anchor="middle">Station 4</tspan></text></g>
+  <g id="group-6" data-name="Blue Line">
+    <g id="layer-5" data-name="King&#39;s Cross to Grand Central"><path d="M-36 -228L-36 228" fill="none" stroke="#0098d4" stroke-width="24" stroke-linejoin="round"/><path d="M-48 -226.8L-48 -228A12 12 0 0 1 -36 -240L-36 -240A12 12 0 0 1 -24 -228L-24 -226.8ZM-24 226.8L-24 228A12 12 0 0 1 -36 240L-36 240A12 12 0 0 1 -48 228L-48 226.8Z" fill="#0098d4"/><path d="M-36 -228L-36 228" fill="none" stroke="#ffffff" stroke-width="7.2" stroke-dasharray="24 24"/></g>
+    <g id="group-24" data-name="King&#39;s Cross">
+      <g id="layer-22" data-name="King&#39;s Cross"><path d="M-25.2 -168L-10.8 -168L-10.8 -159.6L-25.2 -159.6Z" fill="#0098d4"/></g>
+      <g id="layer-23" data-name="King&#39;s Cross"><text font-size="18" font-family="Helvetica, Arial, sans-serif" fill="#1a1a1a" style="white-space:pre"><tspan data-line="" x="20.4" y="-157.5" text-anchor="start">King&#39;s Cross</tspan></text></g>
     </g>
-    <g id="group-27" data-name="Station 6">
-      <g id="layer-25" data-name="Station 6"><path d="M145.2 -48L130.8 -48L130.8 -56.4L145.2 -56.4Z" fill="#00843d"/></g>
-      <g id="layer-26" data-name="Station 6"><text font-size="18" font-family="Helvetica, Arial, sans-serif" fill="#1a1a1a" style="white-space:pre"><tspan data-line="" x="99.6" y="-45.9" text-anchor="end">Station 6</tspan></text></g>
+  </g>
+  <g id="group-9" data-name="Green Line">
+    <g id="layer-8" data-name="Grand Central to Sants"><path d="M-324 180L-170.912 180A36 36 0 0 0 -145.456 169.456L-94.544 118.544A36 36 0 0 1 -69.088 108L120 108A36 36 0 0 0 156 72L156 -156" fill="none" stroke="#00843d" stroke-width="24" stroke-linejoin="round"/><path d="M-322.8 192L-324 192A12 12 0 0 1 -336 180L-336 180A12 12 0 0 1 -324 168L-322.8 168ZM144 -154.8L144 -156A12 12 0 0 1 156 -168L156 -168A12 12 0 0 1 168 -156L168 -154.8Z" fill="#00843d"/><path d="M-324 180L-170.912 180A36 36 0 0 0 -145.456 169.456L-94.544 118.544A36 36 0 0 1 -69.088 108L120 108A36 36 0 0 0 156 72L156 -156" fill="none" stroke="#ffffff" stroke-width="7.92" stroke-linejoin="round"/><path d="M-323.604 183.96L-324 183.96A3.96 3.96 0 0 1 -327.96 180L-327.96 180A3.96 3.96 0 0 1 -324 176.04L-323.604 176.04ZM152.04 -155.604L152.04 -156A3.96 3.96 0 0 1 156 -159.96L156 -159.96A3.96 3.96 0 0 1 159.96 -156L159.96 -155.604Z" fill="#ffffff"/></g>
+    <g id="group-21" data-name="Grand Central">
+      <g id="layer-19" data-name="Grand Central"><path d="M-36 60h0.01M-36 60L-36 84M-36 84h0.01M-36 84L-36 108M-36 108h0.01" fill="#000000" stroke="#000000" stroke-width="29.76" stroke-linecap="round" stroke-linejoin="round"/><path d="M-36 60h0.01M-36 60L-36 84M-36 84h0.01M-36 84L-36 108M-36 108h0.01" fill="#ffffff" stroke="#ffffff" stroke-width="19.2" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <g id="layer-20" data-name="Grand Central"><text font-size="18" font-family="Helvetica, Arial, sans-serif" fill="#1a1a1a" style="white-space:pre"><tspan data-line="" x="-57.336" y="91.5" text-anchor="end">Grand Central</tspan></text></g>
+    </g>
+    <g id="group-27" data-name="Sants">
+      <g id="layer-25" data-name="Sants"><path d="M145.2 -48L130.8 -48L130.8 -56.4L145.2 -56.4Z" fill="#00843d"/></g>
+      <g id="layer-26" data-name="Sants"><text font-size="18" font-family="Helvetica, Arial, sans-serif" fill="#1a1a1a" style="white-space:pre"><tspan data-line="" x="99.6" y="-45.9" text-anchor="end">Sants</tspan></text></g>
     </g>
   </g>
   <g id="layer-28" data-name="Step-free access"><g transform="translate(348 60) rotate(0) scale(1.24) translate(-12 -12)"><rect width="24" height="24" rx="5" fill="#1d4f91"/><circle cx="11" cy="4.6" r="2" fill="#ffffff"/><path d="M11 8v6.5h5.2l2.3 5" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 11.2h4" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/><path d="M8.2 11.3a5 5 0 1 0 7.1 6.4" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/></g></g>
-  <g id="layer-29" data-name="Metro Network"><text font-size="18" font-family="Helvetica, Arial, sans-serif" fill="#1a1a1a" style="white-space:pre"><tspan data-line="" x="158.34" y="-232.08" text-anchor="middle"><tspan font-size="33.6" font-weight="bold">Metro</tspan><tspan font-size="33.6" fill="#0098d4"> Network</tspan></tspan><tspan data-line="" x="158.34" y="-206.58" text-anchor="middle"><tspan fill="#666666" font-style="italic">Made with Transit Diagram Maker</tspan></tspan></text></g>
+  <g id="layer-29" data-name="World Metro"><text font-size="18" font-family="Helvetica, Arial, sans-serif" fill="#1a1a1a" style="white-space:pre"><tspan data-line="" x="158.34" y="-232.08" text-anchor="middle"><tspan font-size="33.6" font-weight="bold">World</tspan><tspan font-size="33.6" fill="#0098d4"> Metro</tspan></tspan><tspan data-line="" x="158.34" y="-206.58" text-anchor="middle"><tspan fill="#666666" font-style="italic">Made with Transit Diagram Maker</tspan></tspan></text></g>
 </svg>

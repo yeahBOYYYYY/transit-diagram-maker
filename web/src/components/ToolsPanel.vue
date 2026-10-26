@@ -6,19 +6,21 @@ import UiIcon from './ui/UiIcon.vue'
 import { ACTIONS } from '../core/actions'
 import { displayCombo } from '../core/shortcuts'
 import { useEditor, type ToolId } from '../stores/editor'
-import { prefs } from '../stores/prefs'
+import { defaultPrefs, prefs } from '../stores/prefs'
+import { runAction } from '../stores/commands'
+import type { ActionId } from '../core/actions'
 
 const store = useEditor()
 
 const TOOLS: ToolId[] = ['select', 'hand', 'pen', 'eraser', 'station', 'text']
 
-function title(tool: ToolId): string {
-  const id = `tool.${tool}` as const
+function title(id: ActionId): string {
   const key = displayCombo(prefs.shortcuts[id] ?? '')
   return key ? `${ACTIONS[id].label} (${key})` : ACTIONS[id].label
 }
 
 const activeColor = computed(() => prefs.line.color)
+const defaults = defaultPrefs().line
 </script>
 
 <template>
@@ -30,16 +32,31 @@ const activeColor = computed(() => prefs.line.color)
       type="button"
       class="tool"
       :class="{ on: store.state.tool === t }"
-      :title="title(t)"
+      :title="title(`tool.${t}`)"
       :data-tool="t"
       @click="store.setTool(t)"
     >
       <UiIcon :name="t" :size="20" />
     </button>
     <div class="sep" />
-    <div class="swatches" title="Line color and inner color (set in the pen options)">
-      <div class="fg" data-swatch :style="{ background: activeColor }" />
-      <div class="bg" data-swatch :style="{ background: prefs.line.inner_color }" />
+    <!-- Like the foreground and background colors of Photoshop: the line
+         color on top, the inner color (hollow and dashed lines) below. -->
+    <div class="swatches" data-testid="tool-colors">
+      <label class="fg" data-swatch title="Line color (click to choose)" :style="{ background: activeColor }">
+        <input type="color" data-testid="tool-color-line" :value="prefs.line.color" @input="prefs.line.color = ($event.target as HTMLInputElement).value" />
+      </label>
+      <label class="bg" data-swatch title="Inner color of hollow and dashed lines (click to choose)" :style="{ background: prefs.line.inner_color }">
+        <input type="color" data-testid="tool-color-inner" :value="prefs.line.inner_color" @input="prefs.line.inner_color = ($event.target as HTMLInputElement).value" />
+      </label>
+      <button type="button" class="swap" data-testid="tool-colors-swap" :title="title('color.swap')" @click="runAction(store, 'color.swap')">
+        <svg viewBox="0 0 10 10" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.2">
+          <path d="M2 7.5V4a2 2 0 0 1 2-2h3.5" />
+          <path d="M6 0.5 7.8 2 6 3.5M0.5 6 2 7.8 3.5 6" />
+        </svg>
+      </button>
+      <button type="button" class="reset" data-testid="tool-colors-reset" :title="title('color.reset')" @click="runAction(store, 'color.reset')">
+        <span class="mini-bg" :style="{ background: defaults.inner_color }" /><span class="mini-fg" :style="{ background: defaults.color }" />
+      </button>
     </div>
   </aside>
 </template>
@@ -102,6 +119,54 @@ const activeColor = computed(() => prefs.line.color)
   height: 20px;
   border: 1px solid #000;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+}
+.fg input,
+.bg input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.swap,
+.reset {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #cfcfcf;
+  cursor: pointer;
+}
+.swap:hover,
+.reset:hover {
+  color: #fff;
+}
+.swap {
+  right: 0;
+  top: 0;
+}
+.reset {
+  left: 0;
+  bottom: 0;
+}
+.mini-fg,
+.mini-bg {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border: 1px solid #cfcfcf;
+}
+.mini-fg {
+  left: 0;
+  top: 0;
+}
+.mini-bg {
+  right: 0;
+  bottom: 0;
 }
 .fg {
   left: 3px;

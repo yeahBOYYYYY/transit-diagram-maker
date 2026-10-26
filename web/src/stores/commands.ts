@@ -6,7 +6,7 @@ import { findItem, isEffectivelyLocked, leafIds } from '../core/tree'
 import type { Engine } from '../core/engine'
 import { TRANSIT_EXT, baseName, canSaveInPlace, docNameOf, downloadText, fontDataUrl, pickFile, pickSaveHandle, pickTransitFile, writeHandle } from '../core/files'
 import type { EditorStore, ToolId } from './editor'
-import { prefs, resetWorkspace } from './prefs'
+import { defaultPrefs, prefs, resetWorkspace } from './prefs'
 import { CELL_PX } from '../core/viewport'
 
 export interface CommandContext {
@@ -289,6 +289,18 @@ export function runAction(store: EditorStore, id: ActionId): void {
     case 'help.about':
       s.dialog = 'about'
       return
+    case 'color.swap': {
+      const { color, inner_color } = prefs.line
+      prefs.line.color = inner_color
+      prefs.line.inner_color = color
+      return
+    }
+    case 'color.reset': {
+      const d = defaultPrefs().line
+      prefs.line.color = d.color
+      prefs.line.inner_color = d.inner_color
+      return
+    }
   }
 }
 

@@ -525,6 +525,19 @@ impl TextBox {
         self.pos = Vec2::new(anchor.x - self.width * self.anchor_share(), anchor.y - self.height() / 2.0).rounded(1000.0);
     }
 
+    /// The position for a box moved to `pos` that puts whichever of its four
+    /// corners is closest to a grid intersection exactly on it.
+    pub fn snap_corner(&self, pos: Vec2) -> Vec2 {
+        let (w, h) = (self.width, self.height());
+        let best = [(0.0, 0.0), (w, 0.0), (0.0, h), (w, h)]
+            .iter()
+            .map(|&(x, y)| pos.add(Vec2::new(x, y).rotate_around(Vec2::default(), self.rotation)))
+            .map(|c| c.rounded(1.0).sub(c))
+            .min_by(|a, b| a.len().total_cmp(&b.len()))
+            .unwrap_or_default();
+        pos.add(best).rounded(1000.0)
+    }
+
     /// Remove the overrides of a box property from every run (or of the
     /// alignment from every paragraph), so the box value applies to all text.
     pub fn clear_overrides(&mut self, key: &str) {

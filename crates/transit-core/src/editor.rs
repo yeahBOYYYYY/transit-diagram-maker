@@ -629,6 +629,11 @@ impl Editor {
                 }
                 StationShape::Tick { color, .. } => ("#000000".into(), "#ffffff".into(), color.clone()),
             };
+            // A new tick takes the color of its line.
+            let color = match (&st.shape, kind) {
+                (StationShape::Tick { .. }, _) | (_, StationKind::Dot | StationKind::Pill) => color,
+                _ => st.line_ids.first().and_then(|l| line_style(&snapshot.root, *l)).map_or(color, |s| s.color),
+            };
             let cells = st.shape.cells();
             let cell = cells.first().copied().unwrap_or(Cell::new(0, 0));
             st.shape = match kind {
@@ -824,8 +829,10 @@ impl Editor {
                 }
                 _ => None,
             };
-            let line_color = match &content {
-                Content::Line(seg) if patch.pointer("/style/color").is_some() => Some((seg.line_id, seg.style.color.clone())),
+            let line_color = match (&layer.content, &content) {
+                (Content::Line(old), Content::Line(seg)) if patch.pointer("/style/color").is_some() => {
+                    Some((seg.line_id, old.style.color.clone(), seg.style.color.clone()))
+                }
                 _ => None,
             };
             if let Content::Line(seg) = &content {
@@ -838,14 +845,8 @@ impl Editor {
             if let Some(name) = rename {
                 layer.name = name;
             }
-            if let Some((line_id, color)) = line_color {
-                tree::walk_layers_mut(&mut d.root, &mut |l| {
-                    if let Content::Line(s) = &mut l.content {
-                        if s.line_id == line_id {
-                            s.style.color = color.clone();
-                        }
-                    }
-                });
+            if let Some((line_id, old, color)) = line_color {
+                recolor_line(&mut d.root, line_id, &old, &color);
             }
             Ok(())
         })
@@ -858,6 +859,7 @@ impl Editor {
             return Err(EditError::Invalid("patch must be an object".into()));
         }
         self.apply(|d| {
+            let old = line_style(&d.root, line_id).map(|s| s.color);
             let mut found = false;
             let mut result = Ok(());
             tree::walk_layers_mut(&mut d.root, &mut |l| {
@@ -876,6 +878,9 @@ impl Editor {
             result?;
             if !found {
                 return Err(EditError::NotFound(line_id));
+            }
+            if let (Some(old), Some(new)) = (old, line_style(&d.root, line_id).map(|s| s.color)) {
+                recolor_line(&mut d.root, line_id, &old, &new);
             }
             Ok(())
         })
@@ -1156,15 +1161,16 @@ impl Editor {
             if angle == 0.0 || !angle.is_finite() {
                 return Ok(0.0);
             }
-            let route = d.settings.route_mode;
             let rot_cell = |c: Cell| Cell::containing(c.center().rotate_around(pivot, angle));
+            // Line cells turn run by run so 45° steps keep the shape.
+            let cells = grid_rotation(d, &leaves, pivot, angle, steps);
+            let map_cell = |c: Cell| cells.get(&c).copied().unwrap_or_else(|| rot_cell(c));
             let old_anchors = station_anchors(d);
             for id in &leaves {
                 let Some(layer) = tree::find_layer_mut(&mut d.root, *id) else { continue };
                 match &mut layer.content {
                     Content::Line(seg) => {
-                        let pts: Vec<Cell> = seg.points.iter().map(|c| rot_cell(*c)).collect();
-                        let norm = geom::normalize_path(&pts, route);
+                        let norm = geom::compress(&seg.points.iter().map(|c| map_cell(*c)).collect::<Vec<_>>());
                         if norm.len() >= 2 {
                             seg.points = norm;
                         }
@@ -1172,34 +1178,49 @@ impl Editor {
                     Content::Station(st) => {
                         st.offset = st.offset.rotate_around(Vec2::default(), angle).snapped();
                         match &mut st.shape {
-                            StationShape::Dot { cell, .. } => *cell = rot_cell(*cell),
+                            StationShape::Dot { cell, .. } => *cell = map_cell(*cell),
                             StationShape::Tick { cell, dir, .. } => {
-                                *cell = rot_cell(*cell);
+                                *cell = map_cell(*cell);
                                 *dir = dir.rotated(steps);
                             }
-                            StationShape::Pill { cells, .. } => {
+                            StationShape::Pill { cells: pill, .. } => {
+                                // Cells off the line keep their place relative to one on it.
+                                let on_line = pill.iter().find(|c| cells.contains_key(c)).copied();
                                 let mut out: Vec<Cell> = Vec::new();
-                                for c in cells.iter() {
-                                    let r = rot_cell(*c);
+                                for c in pill.iter() {
+                                    let r = match on_line {
+                                        Some(a) if !cells.contains_key(c) => {
+                                            let (dx, dy) = rotate_offset(c.x - a.x, c.y - a.y, steps);
+                                            cells[&a].offset(dx, dy)
+                                        }
+                                        _ => map_cell(*c),
+                                    };
                                     if !out.contains(&r) {
                                         out.push(r);
                                     }
                                 }
-                                *cells = out;
+                                *pill = out;
                             }
                         }
                     }
-                    Content::Text(t) => {
-                        let pos = t.pos.rotate_around(pivot, angle);
-                        let label_follows = t.station_id.is_some_and(|s| leaves.contains(&s));
-                        t.pos = if free || label_follows { pos.snapped() } else { pos.rounded(1.0) };
-                        t.rotation = if free { free_rotation(t.rotation + angle) } else { snap_rotation(t.rotation + angle) };
-                    }
+                    Content::Text(_) => {}
                     Content::Icon(i) => {
                         i.pos = i.pos.rotate_around(pivot, angle).snapped();
                         i.rotation = if free { free_rotation(i.rotation + angle) } else { snap_rotation(i.rotation + angle) };
                     }
                 }
+            }
+            let new_anchors = station_anchors(d);
+            for id in &leaves {
+                let Some(Content::Text(t)) = tree::find_layer_mut(&mut d.root, *id).map(|l| &mut l.content) else { continue };
+                // A label turning with its station keeps its place beside it.
+                let station = t.station_id.filter(|s| leaves.contains(s));
+                t.pos = match station.and_then(|s| Some((old_anchors.get(&s)?, new_anchors.get(&s)?))) {
+                    Some((old, new)) => new.add(t.pos.sub(*old).rotate_around(Vec2::default(), angle)).snapped(),
+                    None if free => t.pos.rotate_around(pivot, angle).snapped(),
+                    None => t.pos.rotate_around(pivot, angle).rounded(1.0),
+                };
+                t.rotation = if free { free_rotation(t.rotation + angle) } else { snap_rotation(t.rotation + angle) };
             }
             snap_stations(d, &leaves);
             move_orphan_labels(d, &leaves, &old_anchors);
@@ -1243,6 +1264,66 @@ impl Editor {
 }
 
 // ------------------------------------------------------------------ helpers
+
+/// Where every cell of the selected lines goes when they rotate by `steps`
+/// × 45° around `pivot`. Each connected network of lines is walked from its
+/// cell closest to the pivot, and every unit step turns by the same angle, so
+/// a run of n cells stays n cells long even when it turns between straight
+/// and diagonal (a plain geometric rotation would stretch it by √2).
+fn grid_rotation(d: &Document, leaves: &[Id], pivot: Vec2, angle: f64, steps: i32) -> HashMap<Cell, Cell> {
+    let mut links: HashMap<Cell, Vec<(Cell, Dir8)>> = HashMap::new();
+    for id in leaves {
+        let Some(Content::Line(seg)) = tree::find_layer(&d.root, *id).map(|l| &l.content) else { continue };
+        let cells = geom::expand(&seg.points);
+        for c in &cells {
+            links.entry(*c).or_default();
+        }
+        for w in cells.windows(2) {
+            if let Some(dir) = Dir8::between(w[0], w[1]) {
+                links.entry(w[0]).or_default().push((w[1], dir));
+                links.entry(w[1]).or_default().push((w[0], dir.opposite()));
+            }
+        }
+    }
+    let mut seeds: Vec<Cell> = links.keys().copied().collect();
+    seeds.sort_by(|a, b| {
+        let (da, db) = (a.center().sub(pivot).len(), b.center().sub(pivot).len());
+        da.total_cmp(&db).then((a.y, a.x).cmp(&(b.y, b.x)))
+    });
+    let mut out: HashMap<Cell, Cell> = HashMap::new();
+    for seed in seeds {
+        if out.contains_key(&seed) {
+            continue;
+        }
+        out.insert(seed, Cell::containing(seed.center().rotate_around(pivot, angle)));
+        let mut queue = std::collections::VecDeque::from([seed]);
+        while let Some(c) = queue.pop_front() {
+            let at = out[&c];
+            for &(next, dir) in &links[&c] {
+                if let std::collections::hash_map::Entry::Vacant(e) = out.entry(next) {
+                    e.insert(at.step(dir.rotated(steps)));
+                    queue.push_back(next);
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Turn a cell offset by `steps` × 45° the way `grid_rotation` turns a path:
+/// its diagonal and straight parts each turn and keep their length.
+fn rotate_offset(dx: i32, dy: i32, steps: i32) -> (i32, i32) {
+    let k = dx.abs().min(dy.abs());
+    let mut out = (0, 0);
+    for (len, dir) in [(k, Dir8::from_delta(dx.signum(), dy.signum())), (dx.abs().max(dy.abs()) - k, Dir8::from_delta(if dx.abs() > k { dx.signum() } else { 0 }, if dy.abs() > k { dy.signum() } else { 0 }))] {
+        if let (true, Some(dir)) = (len > 0, dir) {
+            let (ux, uy) = dir.rotated(steps).delta();
+            out = (out.0 + ux * len, out.1 + uy * len);
+        }
+    }
+    out
+}
+
 
 fn content_anchor(c: &Content) -> Option<Vec2> {
     match c {
@@ -1356,9 +1437,29 @@ fn segments_end(nodes: &[Node], group_id: Id) -> usize {
         .unwrap_or(0)
 }
 
+/// Give every segment of a line the color `new`, along with its tick stations
+/// that still had the line's `old` color (ticks follow their line's color
+/// unless they were given one of their own).
+fn recolor_line(nodes: &mut [Node], line_id: Id, old: &str, new: &str) {
+    tree::walk_layers_mut(nodes, &mut |l| match &mut l.content {
+        Content::Line(s) if s.line_id == line_id => s.style.color = new.to_string(),
+        Content::Station(st) if st.line_ids.contains(&line_id) => {
+            if let StationShape::Tick { color, .. } = &mut st.shape {
+                if color.eq_ignore_ascii_case(old) {
+                    *color = new.to_string();
+                }
+            }
+        }
+        _ => {}
+    });
+}
+
 /// Turn the segments of line `from` (within `nodes`) into segments of line
 /// `to`. They keep their own style but take the line's color.
 fn join_line(nodes: &mut [Node], from: Id, to: Id, color: &str) {
+    if let Some(old) = line_style(nodes, from).map(|s| s.color) {
+        recolor_line(nodes, from, &old, color);
+    }
     tree::walk_layers_mut(nodes, &mut |l| {
         if let Content::Line(s) = &mut l.content {
             if s.line_id == from {
@@ -1677,8 +1778,8 @@ fn translate_layers(d: &mut Document, leaves: &[Id], dx: f64, dy: f64, free: boo
                 } else if t.station_id.is_some_and(|s| leaves.contains(&s)) {
                     followers.push(*id);
                 } else {
-                    // The corner of a text box always lands on a grid intersection.
-                    t.pos = t.pos.add(delta).rounded(1.0);
+                    // A corner of a text box always lands on a grid intersection.
+                    t.pos = t.snap_corner(t.pos.add(delta));
                 }
             }
             Content::Icon(i) => i.pos = i.pos.add(icon_delta).snapped(),

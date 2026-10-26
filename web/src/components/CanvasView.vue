@@ -28,10 +28,12 @@ function boundsOf(ids: Id[]): Map<Id, Rect> {
   const out = new Map<Id, Rect>()
   const frags = new Map(s.fragments.map((f) => [f.id, f]))
   for (const id of ids) {
-    // Stations are drawn as stroked skeletons, which getBBox measures without
-    // the stroke; the engine's bounds are exact for them.
+    // Lines and stations are stroked paths, which getBBox measures without
+    // the stroke, and getBBox measures text by its font's glyphs; the engine's
+    // bounds are exact for them (a text box is its measured width by its
+    // lines' height, whatever the font).
     const f = frags.get(id)
-    if (f?.kind === 'station' && f.bounds) {
+    if (f?.kind !== 'icon' && f?.bounds) {
       out.set(id, f.bounds)
       continue
     }

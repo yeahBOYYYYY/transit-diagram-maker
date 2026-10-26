@@ -3,7 +3,7 @@
 //! (cell units × `DocSettings::cell_px`).
 
 use crate::assets::{Assets, FontAsset};
-use crate::geom::{dash_array, fmt_num, rounded_polyline, rounded_polyline_len, Cell, Rect, Vec2};
+use crate::geom::{dash_array, fmt_num, rounded_polyline, rounded_polyline_len, rounded_polyline_points, Cell, Rect, Vec2};
 use crate::icons;
 use crate::model::*;
 use crate::tree;
@@ -53,6 +53,36 @@ fn cap_path(c: Vec2, d: Vec2, h: f64, rr: f64) -> String {
     }
     let _ = write!(s, "L{} {}Z", n(p6.x), n(p6.y));
     s
+}
+
+/// Points whose bounds are the bounds of `cap_path` with the same arguments.
+fn cap_points(c: Vec2, d: Vec2, h: f64, rr: f64) -> Vec<Vec2> {
+    let nrm = d.perp();
+    let mut out = vec![c.add(nrm.scale(h)), c.sub(nrm.scale(h))];
+    for side in [1.0, -1.0] {
+        let center = c.add(nrm.scale(side * (h - rr))).add(d.scale(h - rr));
+        out.extend((0..=8).map(|k| {
+            let t = std::f64::consts::FRAC_PI_2 * k as f64 / 8.0;
+            center.add(nrm.scale(side * rr * t.cos())).add(d.scale(rr * t.sin()))
+        }));
+    }
+    out
+}
+
+/// Exact bounds of `line_svg` for the same input: the stroked body with its
+/// rounded corners plus both caps.
+fn line_bounds(points: &[Cell], style: &LineStyle, settings: &DocSettings) -> Option<Rect> {
+    let g = settings.cell_px;
+    let pts: Vec<Vec2> = points.iter().map(|c| c.center().scale(g)).collect();
+    if pts.len() < 2 {
+        return Rect::from_points(pts);
+    }
+    let h = settings.line_width * g / 2.0;
+    let body = Rect::from_points(rounded_polyline_points(&pts, settings.corner_radius * g))?.inflate(h);
+    let (first, last) = (pts[0], pts[pts.len() - 1]);
+    let start = cap_points(first, first.sub(pts[1]).normalized(), h, cap_roundness(style.start_cap, settings) * h);
+    let end = cap_points(last, last.sub(pts[pts.len() - 2]).normalized(), h, cap_roundness(style.end_cap, settings) * h);
+    Some(start.into_iter().chain(end).fold(body, |r, p| r.union(Rect { x: p.x, y: p.y, w: 0.0, h: 0.0 })))
 }
 
 fn cap_roundness(cap: Cap, settings: &DocSettings) -> f64 {
@@ -337,9 +367,7 @@ fn rotated_rect_bounds(center: Vec2, rect: Rect, deg: f64) -> Rect {
 pub fn content_bounds(c: &Content, settings: &DocSettings) -> Option<Rect> {
     let g = settings.cell_px;
     match c {
-        Content::Line(seg) => {
-            Rect::from_points(seg.points.iter().map(|p| p.center().scale(g))).map(|r| r.inflate(settings.line_width * g / 2.0))
-        }
+        Content::Line(seg) => line_bounds(&seg.points, &seg.style, settings),
         Content::Station(st) => {
             let r = match &st.shape {
                 StationShape::Tick { cell, dir, side, along, width, length, .. } => {

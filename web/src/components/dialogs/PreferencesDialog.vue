@@ -10,6 +10,7 @@ import { useEditor } from '../../stores/editor'
 import { defaultPrefs, prefs, resetPrefs, type Prefs } from '../../stores/prefs'
 import { HELP } from '../../core/help'
 import HelpTip from '../ui/HelpTip.vue'
+import GitHubLink from '../ui/GitHubLink.vue'
 
 const store = useEditor()
 const s = store.state
@@ -90,6 +91,7 @@ const PANELS = [
         >
           {{ t.label }}
         </button>
+        <GitHubLink class="repo" :size="20" caption="GitHub" data-testid="prefs-github" />
       </nav>
 
       <section class="page" role="tabpanel" :data-testid="`prefs-page-${tab}`">
@@ -217,6 +219,10 @@ const PANELS = [
 .tabs button:hover {
   color: var(--c-text-bright);
   background: var(--c-hover);
+}
+.repo {
+  margin-top: auto;
+  align-self: flex-start;
 }
 .tabs button.on {
   color: var(--c-text-bright);

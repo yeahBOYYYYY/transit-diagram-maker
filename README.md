@@ -31,7 +31,7 @@ into separate segments.
 placed on and follow it when it moves. A pill can be painted across several parallel lines and
 grown cell by cell. Every station gets a name label that stays next to it.
 
-**Text like in a word processor.** Text boxes snap their corner to the grid. Select part of a
+**Text like in a word processor.** Text boxes snap whichever corner is nearest to the grid. Select part of a
 text to give it its own font, size, color, bold or italic, align every line on its own, and
 write right to left for languages such as Hebrew and Arabic.
 
@@ -101,6 +101,10 @@ On WSL with the repository on a Windows drive, start the dev server with
 
 - **Snapping:** everything snaps to the grid while you drag. Hold **Alt** to move in tenths of a
   cell and to rotate text and pictograms by any angle (stations then leave their line).
+- **Line colors:** the two swatches under the tools are the line color and the inner color of
+  hollow and dashed lines, like the foreground and background colors of Photoshop. Click one to
+  choose a color, press `X` to swap them and `D` to go back to the defaults. Tick stations take
+  the color of their line and change with it.
 - **Formatting text:** double-click a text to edit it, select some characters and change the
   font, size, color, bold (`Ctrl+B`) or italic (`Ctrl+I`) in the options bar or the
   Properties panel. Alignment applies to the lines the selection touches.
@@ -167,7 +171,3 @@ the visual baselines with `npx playwright test --update-snapshots`.
 
 Branches: `main` holds releases and `dev` is the integration branch. New work goes on
 `feature/*` and fixes on `bugfix/*`, both branched from `dev` and merged back with `--no-ff`.
-
-## License
-
-[MIT](Cargo.toml)

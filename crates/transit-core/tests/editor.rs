@@ -1,5 +1,5 @@
 use serde_json::json;
-use transit_core::geom::expand;
+use transit_core::geom::{self, expand};
 use transit_core::tree;
 use transit_core::*;
 
@@ -684,7 +684,9 @@ fn duplicate_line_with_station_gets_fresh_ids_and_references() {
 fn translate_moves_text_with_grid_content_onto_grid_intersections() {
     let mut ed = Editor::new();
     let l = line(&mut ed, &[c(0, 0), c(3, 0)]);
-    let t = ed.add_text(TextBox { pos: Vec2::new(1.0, 1.0), ..TextBox::default() }).unwrap();
+    // A whole number of cells wide and tall, so every corner snaps alike.
+    let t = ed.add_text(TextBox { pos: Vec2::new(1.0, 1.0), size: 2.5, ..TextBox::default() }).unwrap();
+    ed.fit_text_widths(&[(t, 2.0)]);
     ed.translate(&[l.group_id, t], 1.6, -0.4, false).unwrap();
     assert_eq!(segment(&ed, l.layer_id).points, vec![c(2, 0), c(5, 0)]);
     assert_eq!(text(&ed, t).pos, Vec2::new(3.0, 1.0), "keeps its place next to the line");
@@ -693,7 +695,9 @@ fn translate_moves_text_with_grid_content_onto_grid_intersections() {
 #[test]
 fn moved_text_snaps_its_corner_to_grid_intersections() {
     let mut ed = Editor::new();
-    let t = ed.add_text(TextBox { pos: Vec2::new(1.2, 5.7), ..TextBox::default() }).unwrap();
+    // A whole number of cells wide and tall, so every corner snaps alike.
+    let t = ed.add_text(TextBox { pos: Vec2::new(1.2, 5.7), size: 2.5, ..TextBox::default() }).unwrap();
+    ed.fit_text_widths(&[(t, 2.0)]);
     ed.translate(&[t], 0.3, 0.0, false).unwrap();
     assert_eq!(text(&ed, t).pos, Vec2::new(2.0, 6.0), "nearest intersection");
     ed.translate(&[t], 0.4, -0.4, false).unwrap();
@@ -708,6 +712,26 @@ fn moved_text_snaps_its_corner_to_grid_intersections() {
     ed.translate(&[i, t], 1.0, 1.0, false).unwrap();
     assert_eq!(text(&ed, t).pos, Vec2::new(5.0, 7.0));
     assert_eq!(icon(&ed, i).pos, Vec2::new(3.5, 3.5));
+}
+
+#[test]
+fn moved_text_snaps_whichever_corner_is_closest() {
+    let mut ed = Editor::new();
+    let t = ed.add_text(TextBox { pos: Vec2::new(0.0, 0.0), ..TextBox::with_text("Kings Cross") }).unwrap();
+    ed.fit_text_widths(&[(t, 2.6)]);
+    let h = text(&ed, t).height();
+    // The right edge (at 3.0 + 2.6 = 5.6) is closer to a grid line than the left.
+    ed.translate(&[t], 3.0, 0.0, false).unwrap();
+    let p = text(&ed, t).pos;
+    assert!((p.x + 2.6 - 6.0).abs() < 1e-9 || (p.x - 3.0).abs() < 1e-9, "{p:?}");
+    ed.translate(&[t], 0.3, 0.0, false).unwrap();
+    let p = text(&ed, t).pos;
+    assert!((p.x + 2.6 - 6.0).abs() < 1e-9, "the right corners snap: {p:?}");
+    // Dragged down, the bottom corners may snap instead of the top ones.
+    let off = 1.0 - h.fract();
+    ed.translate(&[t], 0.3, 2.0 + off - 0.05, false).unwrap();
+    let p = text(&ed, t).pos;
+    assert!(((p.y + h) - (p.y + h).round()).abs() < 1e-9, "the bottom corner is on a grid line: {p:?}");
 }
 
 #[test]
@@ -802,6 +826,61 @@ fn rotate_line_45_degrees_stays_on_grid() {
     let pts = &segment(&ed, l.layer_id).points;
     assert_eq!(pts[0], c(0, 0));
     assert_eq!(Dir8::between(pts[0], *pts.last().unwrap()), Some(Dir8::SE));
+}
+
+/// Runs (direction, length in cells) of a polyline.
+fn runs(points: &[Cell]) -> Vec<(Dir8, i32)> {
+    points.windows(2).map(|w| (Dir8::between(w[0], w[1]).unwrap(), (w[1].x - w[0].x).abs().max((w[1].y - w[0].y).abs()))).collect()
+}
+
+#[test]
+fn rotate_45_degrees_keeps_the_shape_of_a_bent_line() {
+    let mut ed = Editor::new();
+    let l = line(&mut ed, &[c(-10, -5), c(-9, -5), c(-6, -8), c(-5, -8), c(-4, -7)]);
+    let before = runs(&segment(&ed, l.layer_id).points);
+    for (deg, steps) in [(45.0, 1), (90.0, 3), (90.0, 5), (90.0, 7)] {
+        ed.rotate(&[l.group_id], deg, Vec2::new(-7.5, -6.5), false).unwrap();
+        let turned: Vec<(Dir8, i32)> = before.iter().map(|(d, n)| (d.rotated(steps), *n)).collect();
+        assert_eq!(runs(&segment(&ed, l.layer_id).points), turned, "after turning to {}°", steps * 45);
+    }
+}
+
+#[test]
+fn rotate_45_degrees_keeps_stations_on_their_cell_of_the_line() {
+    let mut ed = Editor::new();
+    let l = line(&mut ed, &[c(0, 0), c(4, 0), c(6, 2)]);
+    let s = ed.add_station(StationKind::Dot, c(5, 1), &StationOptions::default()).unwrap();
+    ed.rotate(&[l.group_id], 45.0, Vec2::new(0.5, 0.5), false).unwrap();
+    assert_eq!(segment(&ed, l.layer_id).points, vec![c(0, 0), c(4, 4), c(4, 6)]);
+    match &station(&ed, s.station_id).shape {
+        StationShape::Dot { cell, .. } => assert_eq!(*cell, c(4, 5)),
+        other => panic!("{other:?}"),
+    }
+}
+
+fn tick_color(ed: &Editor, id: Id) -> String {
+    match &station(ed, id).shape {
+        StationShape::Tick { color, .. } => color.clone(),
+        other => panic!("not a tick: {other:?}"),
+    }
+}
+
+#[test]
+fn ticks_follow_the_color_of_their_line() {
+    let mut ed = Editor::new();
+    let l = ed.create_line(&[c(0, 0), c(8, 0)], LineStyle { color: "#E3000F".into(), ..LineStyle::default() }).unwrap();
+    let a = ed.add_station(StationKind::Tick, c(2, 0), &StationOptions::default()).unwrap();
+    let own = StationOptions { tick_color: Some("#000000".into()), ..StationOptions::default() };
+    let b = ed.add_station(StationKind::Tick, c(5, 0), &own).unwrap();
+    let dot = ed.add_station(StationKind::Dot, c(7, 0), &StationOptions::default()).unwrap();
+    assert_eq!(tick_color(&ed, a.station_id), "#E3000F");
+    ed.update_content(l.layer_id, &json!({ "style": { "color": "#0077c8" } })).unwrap();
+    assert_eq!(tick_color(&ed, a.station_id), "#0077c8");
+    assert_eq!(tick_color(&ed, b.station_id), "#000000", "a tick with a color of its own keeps it");
+    ed.update_line_style(l.line_id, &json!({ "color": "#00a650" })).unwrap();
+    assert_eq!(tick_color(&ed, a.station_id), "#00a650");
+    ed.set_station_kind(dot.station_id, StationKind::Tick).unwrap();
+    assert_eq!(tick_color(&ed, dot.station_id), "#00a650", "a station turned into a tick takes the line color");
 }
 
 #[test]
@@ -965,6 +1044,22 @@ fn position_is_the_anchor_of_each_object() {
     assert_eq!(ed.position(&[t]), Some(Vec2::new(-1.0, 7.5)));
     assert_eq!(ed.position(&[l.group_id, t]), Some(Vec2::new(-1.0, 1.5)), "top-left-most anchor");
     assert_eq!(ed.position(&[]), None);
+}
+
+#[test]
+fn line_bounds_cover_every_bend() {
+    let mut ed = Editor::new();
+    let l = line(&mut ed, &[c(-10, 3), c(-10, 1), c(-6, -1), c(-6, 3)]);
+    let b = ed.bounds(&[l.group_id]).unwrap();
+    let st = ed.settings();
+    let (g, h) = (st.cell_px, st.line_width * st.cell_px / 2.0);
+    // The bend at the top is rounded: the box hugs the stroke around the curve.
+    let pts: Vec<Vec2> = segment(&ed, l.layer_id).points.iter().map(|p| p.center().scale(g)).collect();
+    let top = geom::rounded_polyline_points(&pts, st.corner_radius * g).iter().map(|p| p.y).fold(f64::MAX, f64::min);
+    assert!((b.y - (top - h)).abs() < 0.01, "{b:?}");
+    assert!(top - h < -0.5 * g + h, "the bend rises above the start and end cells");
+    assert!((b.x - (-10.0 * g)).abs() < 1e-6 && (b.x + b.w - (-5.0 * g)).abs() < 1e-6, "{b:?}");
+    assert!((b.y + b.h - 4.0 * g).abs() < 1e-6, "{b:?}");
 }
 
 #[test]

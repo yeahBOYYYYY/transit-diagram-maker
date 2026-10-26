@@ -462,6 +462,25 @@ pub fn rounded_polyline(pts: &[Vec2], radius: f64) -> String {
     d
 }
 
+/// Points along the path `rounded_polyline` draws for the same input, with
+/// every rounded corner sampled, so their bounds are the path's bounds.
+pub fn rounded_polyline_points(pts: &[Vec2], radius: f64) -> Vec<Vec2> {
+    let mut out: Vec<Vec2> = pts.first().copied().into_iter().collect();
+    for i in 1..pts.len() {
+        match corner(pts, i, radius) {
+            Some(c) => {
+                let u = pts[i].sub(pts[i - 1]).normalized();
+                let side = if c.sweep == 1 { -1.0 } else { 1.0 };
+                let center = c.a.add(u.perp().scale(side * c.r));
+                let deg = c.theta.to_degrees() * if c.sweep == 1 { 1.0 } else { -1.0 };
+                out.extend((0..=8).map(|k| c.a.rotate_around(center, deg * k as f64 / 8.0)));
+            }
+            None => out.push(pts[i]),
+        }
+    }
+    out
+}
+
 /// Length of the path `rounded_polyline` draws for the same input.
 pub fn rounded_polyline_len(pts: &[Vec2], radius: f64) -> f64 {
     let mut len = 0.0;

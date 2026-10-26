@@ -210,7 +210,9 @@ describe('text tool and pictograms', () => {
   it('dragged pictograms and text move from cell to cell, or freely with Alt', () => {
     const { store, tools } = setup()
     const i = store.run((e) => e.addIcon({ pos: { x: 2.5, y: 2.5 } }))!
-    const t = store.run((e) => e.addText({ pos: { x: 6.2, y: 1.3 } }))!
+    // A whole number of cells wide and tall, so every corner of the text snaps alike.
+    const t = store.run((e) => e.addText({ pos: { x: 6.2, y: 1.3 }, size: 2.5 }))!
+    store.run((e) => e.fitTextWidths([[t, 2]]))
     const pos = (id: Id) => {
       const n = store.node(id)
       return n?.type === 'layer' && (n.content.kind === 'icon' || n.content.kind === 'text') ? n.content.pos : null
@@ -225,7 +227,7 @@ describe('text tool and pictograms', () => {
     expect(pos(i)).toEqual({ x: 2.5, y: 2.5 })
     drag(i, [2.5, 2.5], [4.3, 3.1])
     expect(pos(i)).toEqual({ x: 4.5, y: 3.5 })
-    // Text off the grid puts its corner on the nearest grid intersection.
+    // Text off the grid puts a corner on the nearest grid intersection.
     drag(t, [6.2, 1.3], [7.2, 1.3])
     expect(pos(t)).toEqual({ x: 7, y: 1 })
     // Alt moves text in tenths of a cell too.

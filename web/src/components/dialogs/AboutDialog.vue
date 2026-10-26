@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ModalDialog from './ModalDialog.vue'
 import { APP } from '../../core/about'
+import GitHubLink from '../ui/GitHubLink.vue'
 import { useEditor } from '../../stores/editor'
 
 const store = useEditor()
@@ -27,6 +28,7 @@ const store = useEditor()
           <dt>License</dt>
           <dd>{{ APP.license }}</dd>
         </dl>
+        <GitHubLink class="repo" :size="22" caption="View the source on GitHub" data-testid="about-github" />
       </div>
     </div>
   </ModalDialog>
@@ -64,5 +66,8 @@ dd {
 }
 a {
   color: var(--c-accent);
+}
+.repo {
+  margin-top: 14px;
 }
 </style>

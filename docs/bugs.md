@@ -1,5 +1,18 @@
 # Bugs & Teaks
 
+## 26/10/2026 - Commit a26fb2d
+
+1. Text should be able to snap with every corner of it's bounding box, not just a predefined one (like top left).
+2. Tick stations should inherit their color from the line by default (quality of life improvement).
+3. Rotation and bounding box of complex lines doesn't work well.
+   1. When a line has a shape like `(-10, 3) → (-10, 1) → (-6, -1) → (-6, 3)` the bounding box will clip inside the curve as it tries to bound only the start and finish cells.
+   2. If you take a line like `(-10, -5) → (-9, -5) → (-6, -8) → (-5, -8) → (-4, -7)` and rotate it 45/135/225/315 degrees it will lose it's shape!
+4. Make the GitHub logo bigger and also put it in the preferences and about sections for better awareness.
+5. Bounding box of text elements should be the same even if the text spawns with a station (currently for some reason naturally spawning text boxes bound weirdly, unlike regular text boxes places manually).
+6. Instead of the current "License" paragraph at the end of "README.md", add a "LICENSE.md" with MIT license.
+7. Improve the screenshots in the "README.md" file by having actual station names from across the world, and use better naming for the layers. Also "Station 4" text is clipping into the blue line, which is a bad look.
+8. After the last tool in the tools panel there are two boxes with colors, the top one being the color of the pen tool, and the bottom one is constantly white, this feature is widely used to allow fast bi-switching of colors, but this isn't implemented here, fix it!
+
 ## 25/10/2026 - Commit 9d6d10a
 
 1. The `README.md` file is not good. Instead of straight up saying the technical layout of the project it should firstly put emphasis on the UI, maybe have a couple of screenshots or demo video, then have requirements and usage explanation, then have an explanation about the technical detail and the actual project layout! Look at other big GitHub repos about this!!!!
