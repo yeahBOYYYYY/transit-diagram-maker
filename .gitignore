@@ -1,0 +1,12 @@
+/target
+**/node_modules
+web/dist
+web/src/wasm/pkg
+web/test-results
+web/playwright-report
+*.log
+.DS_Store
+web/.vite
+# insta snapshots awaiting review
+*.snap.new
+*.pending-snap

@@ -1,0 +1,165 @@
+/* Dark "creative suite" theme. */
+:root {
+  --c-frame: #2b2b2b;
+  --c-menubar: #2f2f2f;
+  --c-panel: #383838;
+  --c-panel-alt: #323232;
+  --c-panel-header: #2a2a2a;
+  --c-border: #1f1f1f;
+  --c-border-soft: #444;
+  --c-hover: #474747;
+  --c-active: #1f1f1f;
+  --c-row-selected: #4f5357;
+  --c-input: #262626;
+  --c-input-border: #4a4a4a;
+  --c-text: #d6d6d6;
+  --c-text-dim: #9a9a9a;
+  --c-text-bright: #f2f2f2;
+  --c-accent: #31a8ff;
+  --c-accent-dim: #1f6fb0;
+  --c-danger: #ff5f57;
+  --c-pasteboard: #1e1e1e;
+  --font-ui: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --fs-ui: 12px;
+  --fs-small: 11px;
+  --radius: 3px;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--c-frame);
+  color: var(--c-text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-ui);
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  color: var(--c-text-bright);
+  background: var(--c-input);
+  border: 1px solid var(--c-input-border);
+  border-radius: var(--radius);
+  outline: none;
+  user-select: text;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--c-accent);
+}
+
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+select {
+  height: 22px;
+  padding: 0 4px;
+}
+
+.ps-btn {
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--c-input-border);
+  background: #454545;
+  cursor: pointer;
+}
+.ps-btn:hover {
+  background: #505050;
+}
+.ps-btn.primary {
+  background: var(--c-accent-dim);
+  border-color: var(--c-accent);
+  color: #fff;
+}
+.ps-btn.primary:hover {
+  background: #2683cc;
+}
+.ps-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 22px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--c-text);
+  cursor: pointer;
+  padding: 0;
+}
+.icon-btn:hover:not(:disabled) {
+  background: var(--c-hover);
+}
+.icon-btn.on {
+  background: var(--c-active);
+  border-color: #555;
+}
+.icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.sep-v {
+  width: 1px;
+  align-self: stretch;
+  margin: 6px 6px;
+  background: var(--c-border-soft);
+}
+
+.dim {
+  color: var(--c-text-dim);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--c-panel-alt);
+}
+::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 5px;
+  border: 2px solid var(--c-panel-alt);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #666;
+}
+
+/* Picking a color with the eyedropper of a color field. */
+body.picking-color,
+body.picking-color * {
+  cursor: crosshair !important;
+}

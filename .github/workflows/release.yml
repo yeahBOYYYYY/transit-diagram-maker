@@ -1,0 +1,72 @@
+name: Release
+
+# Every push to main runs the full CI and then publishes a GitHub release tagged
+# v<version>, with the version taken from web/package.json (which must match the
+# Cargo workspace version). If that tag already exists the release is skipped,
+# so bump the version to cut a new one.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    name: Publish release
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Read version
+        id: version
+        run: |
+          web_version=$(node -p "require('./web/package.json').version")
+          cargo_version=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version *= *"\(.*\)"/\1/p' Cargo.toml)
+          if [ "$web_version" != "$cargo_version" ]; then
+            echo "::error::web/package.json version ($web_version) differs from the Cargo workspace version ($cargo_version)"
+            exit 1
+          fi
+          echo "tag=v$web_version" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/v$web_version" >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Tag v$web_version already exists; bump the version to publish a new release."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/download-artifact@v4
+        if: steps.version.outputs.exists == 'false'
+        with:
+          name: web-dist
+          path: dist
+
+      - name: Package the web app
+        if: steps.version.outputs.exists == 'false'
+        run: |
+          name="transit-diagram-maker-${{ steps.version.outputs.tag }}"
+          (cd dist && zip -r "../$name.zip" .)
+          tar -czf "$name.tar.gz" -C dist .
+
+      - name: Create the release
+        if: steps.version.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
+            --title "Transit Diagram Maker $TAG" \
+            --generate-notes \
+            transit-diagram-maker-"$TAG".zip \
+            transit-diagram-maker-"$TAG".tar.gz

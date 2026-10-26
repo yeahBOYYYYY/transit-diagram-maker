@@ -1,0 +1,5 @@
+---
+source: crates/transit-core/tests/render_snapshots.rs
+expression: "line(LineStyle\n{\n    kind: StrokeKind::Hollow, inner_color: \"#ffffff\".into(),\n    ..LineStyle::default()\n})"
+---
+<path d="M12 12L93.088 12A36 36 0 0 1 118.544 22.544L156 60" fill="none" stroke="#e03c31" stroke-width="24" stroke-linejoin="round"/><path d="M13.2 24L12 24A12 12 0 0 1 0 12L0 12A12 12 0 0 1 12 0L13.2 0ZM163.637 50.666L164.485 51.515A12 12 0 0 1 164.485 68.485L164.485 68.485A12 12 0 0 1 147.515 68.485L146.666 67.637Z" fill="#e03c31"/><path d="M12 12L93.088 12A36 36 0 0 1 118.544 22.544L156 60" fill="none" stroke="#ffffff" stroke-width="7.92" stroke-linejoin="round"/><path d="M12.396 15.96L12 15.96A3.96 3.96 0 0 1 8.04 12L8.04 12A3.96 3.96 0 0 1 12 8.04L12.396 8.04ZM158.52 56.92L158.8 57.2A3.96 3.96 0 0 1 158.8 62.8L158.8 62.8A3.96 3.96 0 0 1 153.2 62.8L152.92 62.52Z" fill="#ffffff"/>

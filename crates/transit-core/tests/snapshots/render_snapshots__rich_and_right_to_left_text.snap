@@ -1,0 +1,6 @@
+---
+source: crates/transit-core/tests/render_snapshots.rs
+expression: "format!(\"{}\\n{}\", render::text_svg(&t, &s), render::text_svg(&rtl, &s))"
+---
+<text font-size="18" font-family="Helvetica, Arial, sans-serif" fill="#1a1a1a" transform="rotate(45 24 24)" style="white-space:pre"><tspan data-line="" x="24" y="58.2" text-anchor="end">Plain <tspan font-family="Serif" font-size="36" fill="#ff0000" font-weight="bold" font-style="italic">styled &lt;b&gt; &amp; &quot;quoted&quot;</tspan></tspan><tspan data-line="" x="24" y="84.3" text-anchor="middle">second line</tspan></text>
+<text font-size="18" font-family="Helvetica, Arial, sans-serif" fill="#1a1a1a" direction="rtl" style="white-space:pre"><tspan data-line="" x="24" y="137.1" text-anchor="end">תחנה מרכזית</tspan></text>
