@@ -196,7 +196,7 @@ describe('PropertiesPanel', () => {
     const s = store.run((e) => e.addStation('dot', { x: 3, y: 0 }, {}))!
     store.select([s.station_id])
     const w = mountIt(PropertiesPanel)
-    expect(w.text()).toContain('Coupled to: Line 1')
+    expect(w.text()).toMatch(/Lines\s*Line 1/)
     await w.findAll('button[role=radio]').find((b) => b.text() === 'Tick')!.trigger('click')
     const n = store.node(s.station_id)
     expect(n?.type === 'layer' && n.content.kind === 'station' && n.content.shape).toBe('tick')

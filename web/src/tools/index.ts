@@ -26,6 +26,8 @@ export interface PointerInfo {
   handle: string | null
   /** Cell a "grow" handle points into. */
   handleCell?: Cell | null
+  /** Which point of a shape a "resize" handle moves (see `shapeHandles`). */
+  handleIndex?: number | null
 }
 
 export interface Tool {
@@ -74,6 +76,84 @@ export function pillGrowTargets(cells: Cell[]): { cell: Cell; dx: number; dy: nu
   return [...out.values()]
 }
 
+/** The shape the selection consists of, if it is exactly one shape layer. */
+export function selectedShape(store: EditorStore): { id: Id; shape: Shape } | null {
+  const s = store.state
+  if (s.selection.length !== 1) return null
+  const n = store.node(s.selection[0])
+  return n?.type === 'layer' && n.content.kind === 'shape' ? { id: n.id, shape: n.content } : null
+}
+
+/** Corners of a rectangle around its center, in the order of `shapeHandles`. */
+const CORNERS: [number, number][] = [[-1, -1], [1, -1], [1, 1], [-1, 1]]
+
+/** `v` turned by `deg` degrees (clockwise on screen). */
+function turn(v: Vec2, deg: number): Vec2 {
+  const r = (deg * Math.PI) / 180
+  return { x: v.x * Math.cos(r) - v.y * Math.sin(r), y: v.x * Math.sin(r) + v.y * Math.cos(r) }
+}
+
+/**
+ * Points (cells) a selected shape is resized by: the two ends of a line, the
+ * four corners of a rectangle (clockwise from the top left, turned with it)
+ * and the corners of the box around a circle.
+ */
+export function shapeHandles(sh: Shape): Vec2[] {
+  if (sh.shape === 'line') return [sh.from, sh.to]
+  if (sh.shape === 'circle') return CORNERS.map(([x, y]) => ({ x: sh.center.x + x * sh.radius, y: sh.center.y + y * sh.radius }))
+  const c = { x: sh.pos.x + sh.width / 2, y: sh.pos.y + sh.height / 2 }
+  return CORNERS.map(([x, y]) => {
+    const d = turn({ x: (x * sh.width) / 2, y: (y * sh.height) / 2 }, sh.rotation)
+    return { x: c.x + d.x, y: c.y + d.y }
+  })
+}
+
+/**
+ * The patch that drags handle `index` of `sh` to `p` (cells), like the corner
+ * handles of other editors: a rectangle keeps its opposite corner and puts
+ * the dragged one on a grid intersection (a turned one keeps whole-cell
+ * sides), a line keeps its other end and stays in the 8 directions, and a
+ * circle keeps its center and changes its radius in steps of 0.1 cell. With
+ * `free` (Alt) sizes and ends follow the pointer in tenths; `square` (Shift)
+ * makes a rectangle square and keeps a free line in the 8 directions.
+ */
+export function resizeShape(sh: Shape, index: number, p: Vec2, free: boolean, square: boolean): Record<string, unknown> {
+  if (sh.shape === 'circle') {
+    return { radius: Math.max(0.1, tenth(Math.max(Math.abs(p.x - sh.center.x), Math.abs(p.y - sh.center.y)))) }
+  }
+  if (sh.shape === 'line') {
+    const fixed = index === 0 ? sh.to : sh.from
+    let d: Vec2
+    if (free) {
+      d = { x: tenth(p.x) - fixed.x, y: tenth(p.y) - fixed.y }
+      if (square) {
+        const e = eightWay({ x: Math.round(d.x * 10), y: Math.round(d.y * 10) })
+        d = { x: e.x / 10, y: e.y / 10 }
+      }
+    } else {
+      d = eightWay({ x: Math.round(p.x) - fixed.x, y: Math.round(p.y) - fixed.y })
+    }
+    if (d.x === 0 && d.y === 0) return {}
+    return { [index === 0 ? 'from' : 'to']: { x: tenth(fixed.x + d.x), y: tenth(fixed.y + d.y) } }
+  }
+  const [sx, sy] = CORNERS[index % 4]
+  const opposite = shapeHandles(sh)[(index + 2) % 4]
+  const target = !free && sh.rotation === 0 ? { x: Math.round(p.x), y: Math.round(p.y) } : p
+  const u = turn({ x: 1, y: 0 }, sh.rotation)
+  const v = turn({ x: 0, y: 1 }, sh.rotation)
+  const d = { x: target.x - opposite.x, y: target.y - opposite.y }
+  const min = free ? 0.1 : 1
+  const side = (len: number) => Math.max(min, free || sh.rotation === 0 ? tenth(len) : Math.round(len))
+  let width = side(sx * (d.x * u.x + d.y * u.y))
+  let height = side(sy * (d.x * v.x + d.y * v.y))
+  if (square) width = height = Math.max(width, height)
+  const c = {
+    x: opposite.x + (u.x * sx * width) / 2 + (v.x * sy * height) / 2,
+    y: opposite.y + (u.y * sx * width) / 2 + (v.y * sy * height) / 2,
+  }
+  return { pos: { x: tenth(c.x - width / 2), y: tenth(c.y - height / 2) }, width, height }
+}
+
 function clearOverlay(store: EditorStore): void {
   store.state.overlay = { preview: '', marquee: null, cells: [], cellsColor: prefs.selectionColor }
 }
@@ -104,8 +184,10 @@ function handTool(store: EditorStore): Tool {
 // --------------------------------------------------------------- select
 
 function selectTool(store: EditorStore, boundsOf: BoundsProvider): Tool {
-  type Mode = 'idle' | 'pending' | 'moving' | 'marquee' | 'rotating'
+  type Mode = 'idle' | 'pending' | 'moving' | 'marquee' | 'rotating' | 'resizing'
   let mode: Mode = 'idle'
+  /** The shape being resized and which of its handles is dragged. */
+  let resizing: { id: Id; shape: Shape; index: number } | null = null
   let start: PointerInfo | null = null
   let wasSelected = false
   let pivot: Vec2 = { x: 0, y: 0 }
@@ -127,6 +209,7 @@ function selectTool(store: EditorStore, boundsOf: BoundsProvider): Tool {
   return {
     cursor(p) {
       if (mode === 'moving') return 'move'
+      if (mode === 'resizing') return 'crosshair'
       if (mode === 'rotating' || p?.handle === 'rotate') return 'alias'
       return 'default'
     },
@@ -135,6 +218,13 @@ function selectTool(store: EditorStore, boundsOf: BoundsProvider): Tool {
       // Pill arrows act on double click only.
       if (p.handle === 'grow') return
       start = p
+      const shape = selectedShape(store)
+      if (p.handle === 'resize' && shape && p.handleIndex != null) {
+        resizing = { ...shape, index: p.handleIndex }
+        store.engine.value.begin()
+        mode = 'resizing'
+        return
+      }
       if (p.handle === 'rotate' && s.selection.length) {
         const c = selectionCenter()
         if (!c) return
@@ -168,6 +258,18 @@ function selectTool(store: EditorStore, boundsOf: BoundsProvider): Tool {
         if (d < prefs.dragThreshold || s.selection.length === 0) return
         store.engine.value.begin()
         mode = 'moving'
+      }
+      if (mode === 'resizing' && resizing) {
+        const { id, shape, index } = resizing
+        const patch = resizeShape(shape, index, p.cells, p.alt, p.shift)
+        store.run(
+          (e) => {
+            e.rebase()
+            if (Object.keys(patch).length) e.updateContent(id, patch)
+          },
+          { quiet: true },
+        )
+        return
       }
       if (mode === 'moving') {
         // The engine snaps the move to the cells (Alt: free, in tenths of a cell).
@@ -205,7 +307,7 @@ function selectTool(store: EditorStore, boundsOf: BoundsProvider): Tool {
       const e = store.engine.value
       if (mode === 'pending') {
         if (wasSelected && !p.shift) s.transformMode = s.transformMode === 'move' ? 'rotate' : 'move'
-      } else if (mode === 'moving' || mode === 'rotating') {
+      } else if (mode === 'moving' || mode === 'rotating' || mode === 'resizing') {
         e.commit()
         store.refresh()
         s.rotation = null
@@ -226,6 +328,7 @@ function selectTool(store: EditorStore, boundsOf: BoundsProvider): Tool {
       }
       mode = 'idle'
       start = null
+      resizing = null
     },
     dblclick(p) {
       const pill = selectedPill(store)
@@ -259,7 +362,7 @@ function selectTool(store: EditorStore, boundsOf: BoundsProvider): Tool {
         return true
       }
       if (ev.key === 'Escape') {
-        if (mode === 'moving' || mode === 'rotating') {
+        if (mode === 'moving' || mode === 'rotating' || mode === 'resizing') {
           store.engine.value.cancel()
           store.refresh()
           mode = 'idle'
@@ -270,7 +373,7 @@ function selectTool(store: EditorStore, boundsOf: BoundsProvider): Tool {
       return false
     },
     reset() {
-      if (mode === 'moving' || mode === 'rotating') {
+      if (mode === 'moving' || mode === 'rotating' || mode === 'resizing') {
         store.engine.value.commit()
         store.refresh()
       }
@@ -528,7 +631,7 @@ const tenth = (v: number) => Math.round(v * 10) / 10
  * The shape a drag from `a` to `b` draws, or null when it is too small. A
  * line goes between grid intersections in one of the 8 directions; a
  * rectangle covers every cell from `a` to `b`; a circle is centered on the
- * cell of `a` with a radius in half cells. With `free` (Alt) points and sizes
+ * cell of `a` with a radius in tenths of a cell, at least half a cell. With `free` (Alt) points and sizes
  * follow the pointer in tenths of a cell; `square` (Shift) makes rectangles
  * square and keeps free lines in the 8 directions.
  */
@@ -571,7 +674,7 @@ export function shapeFromDrag(kind: ShapeKind, a: DragPoint, b: DragPoint, free:
   }
   const center = free ? { x: tenth(a.cells.x), y: tenth(a.cells.y) } : { x: a.cell.x + 0.5, y: a.cell.y + 0.5 }
   const dist = Math.hypot(b.cells.x - center.x, b.cells.y - center.y)
-  const radius = free ? tenth(dist) : Math.max(0.5, Math.round(dist * 2) / 2)
+  const radius = free ? tenth(dist) : Math.max(0.5, tenth(dist))
   if (radius < 0.1) return null
   return { shape: 'circle', center, radius, ...st.circle }
 }

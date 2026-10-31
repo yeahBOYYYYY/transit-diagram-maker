@@ -522,7 +522,7 @@ fn read_shape(e: &El) -> Result<Shape> {
             from: e.vec2("from")?,
             to: e.vec2("to")?,
             thickness: e.num("thickness", 0.1)?,
-            cap: e.enumeration("cap")?,
+            cap: if e.get("cap").is_some() { e.enumeration("cap")? } else { Cap::Butt },
             dashed: e.bool("dashed", false)?,
             dash_length: e.num("dash-length", 0.5)?,
             dash_gap: e.num("dash-gap", 0.3)?,

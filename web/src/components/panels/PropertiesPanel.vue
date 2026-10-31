@@ -186,122 +186,129 @@ const toggleVisible = () => single.value && store.run((e) => e.setVisible(single
 const childCount = computed(() => (group.value ? (findItem(s.tree, group.value.id)?.children.length ?? 0) : 0))
 </script>
 
+
 <template>
+  <!--
+    One grid for the whole panel: label | input | the rest. Number fields
+    place their label, input and unit in those columns; other rows (.prop)
+    put a label in the first column and their controls across the others,
+    so every value starts at the same place.
+  -->
   <div class="props" data-testid="properties-panel">
-      <!-- nothing selected: document -->
-      <template v-if="s.selection.length === 0">
-        <div class="section-title">Document</div>
-        <div class="stack">
-          <NumberField :model-value="s.settings.line_width" label="Line width" :min="0.05" :max="4" :step="0.05" unit="cells" :help="HELP['settings.line_width']" @update:model-value="(v) => setSetting('line_width', v)" @commit="done" />
-          <NumberField :model-value="s.settings.corner_radius" label="Curve" :min="0" :max="50" :step="0.25" unit="cells" :help="HELP['settings.corner_radius']" @update:model-value="(v) => setSetting('corner_radius', v)" @commit="done" />
-          <NumberField :model-value="s.settings.cap_roundness" label="Cap roundness" :min="0" :max="1" :step="0.05" :help="HELP['settings.cap_roundness']" @update:model-value="(v) => setSetting('cap_roundness', v)" @commit="done" />
-          <NumberField :model-value="s.settings.station_outer_radius" label="Station outer" :min="0.05" :max="10" :step="0.02" unit="cells" :help="HELP['settings.station_outer_radius']" @update:model-value="(v) => setSetting('station_outer_radius', v)" @commit="done" />
-          <NumberField :model-value="s.settings.station_inner_radius" label="Station inner" :min="0" :max="10" :step="0.02" unit="cells" :help="HELP['settings.station_inner_radius']" @update:model-value="(v) => setSetting('station_inner_radius', v)" @commit="done" />
-        </div>
-        <button class="ps-btn more" @click="s.dialog = 'document'">All document settings…</button>
-        <p class="dim tip">Select a layer on the canvas or in the Layers panel to edit its properties.</p>
-      </template>
+    <!-- nothing selected: document -->
+    <template v-if="s.selection.length === 0">
+      <div class="section-title">Document</div>
+      <NumberField :model-value="s.settings.line_width" label="Line width" :min="0.05" :max="4" :step="0.05" unit="cells" :help="HELP['settings.line_width']" @update:model-value="(v) => setSetting('line_width', v)" @commit="done" />
+      <NumberField :model-value="s.settings.corner_radius" label="Curve radius" :min="0" :max="50" :step="0.25" unit="cells" :help="HELP['settings.corner_radius']" @update:model-value="(v) => setSetting('corner_radius', v)" @commit="done" />
+      <NumberField :model-value="s.settings.cap_roundness" label="Cap roundness" :min="0" :max="1" :step="0.05" :help="HELP['settings.cap_roundness']" @update:model-value="(v) => setSetting('cap_roundness', v)" @commit="done" />
+      <NumberField :model-value="s.settings.station_outer_radius" label="Station radius" :min="0.05" :max="10" :step="0.02" unit="cells" :help="HELP['settings.station_outer_radius']" @update:model-value="(v) => setSetting('station_outer_radius', v)" @commit="done" />
+      <NumberField :model-value="s.settings.station_inner_radius" label="Station fill" :min="0" :max="10" :step="0.02" unit="cells" :help="HELP['settings.station_inner_radius']" @update:model-value="(v) => setSetting('station_inner_radius', v)" @commit="done" />
+      <button class="ps-btn wide start" @click="s.dialog = 'document'">All document settings…</button>
+      <p class="dim tip wide">Select a layer on the canvas or in the Layers panel to edit its properties.</p>
+    </template>
 
-      <!-- multiple selection -->
-      <template v-else-if="s.selection.length > 1">
-        <div class="section-title">{{ s.selection.length }} items selected</div>
-        <div class="row">
-          <button class="ps-btn" @click="rotateSelection(store, -45)"><UiIcon name="rotate-ccw" :size="14" /></button>
-          <button class="ps-btn" @click="rotateSelection(store, 45)"><UiIcon name="rotate-cw" :size="14" /></button>
-          <button class="ps-btn" @click="store.run((e) => e.group(s.selection))">Group</button>
-        </div>
-        <div v-if="position" class="grid2" data-testid="prop-position">
-          <NumberField :model-value="position.x" label="X" :step="positionStep" :precision="1" unit="cells" :help="HELP.position" @update:model-value="(v) => setPosition('x', v)" @commit="done" />
-          <NumberField :model-value="position.y" label="Y" :step="positionStep" :precision="1" unit="cells" :help="HELP.position" @update:model-value="(v) => setPosition('y', v)" @commit="done" />
-        </div>
-      </template>
+    <!-- multiple selection -->
+    <template v-else-if="s.selection.length > 1">
+      <div class="section-title">{{ s.selection.length }} items selected</div>
+      <div class="wide buttons">
+        <button class="ps-btn" title="Rotate 45° counter clockwise" @click="rotateSelection(store, -45)"><UiIcon name="rotate-ccw" :size="14" /></button>
+        <button class="ps-btn" title="Rotate 45° clockwise" @click="rotateSelection(store, 45)"><UiIcon name="rotate-cw" :size="14" /></button>
+        <button class="ps-btn" @click="store.run((e) => e.group(s.selection))">Group</button>
+      </div>
+      <div v-if="position" class="rows" data-testid="prop-position">
+        <NumberField :model-value="position.x" label="X" :step="positionStep" :precision="1" unit="cells" :help="HELP.position" @update:model-value="(v) => setPosition('x', v)" @commit="done" />
+        <NumberField :model-value="position.y" label="Y" :step="positionStep" :precision="1" unit="cells" :help="HELP.position" @update:model-value="(v) => setPosition('y', v)" @commit="done" />
+      </div>
+    </template>
 
-      <!-- single node -->
-      <template v-else-if="single">
-        <div class="header-row">
-          <span class="kind">{{ kindLabel }}</span>
-          <span class="name" :title="single.name">{{ single.name }}</span>
-          <button class="icon-btn" :title="single.visible ? 'Hide' : 'Show'" @click="toggleVisible">
-            <UiIcon :name="single.visible ? 'eye' : 'eye-off'" :size="15" />
-          </button>
-          <button class="icon-btn" :class="{ on: single.locked }" :title="single.locked ? 'Unlock' : 'Lock'" @click="toggleLocked">
-            <UiIcon :name="single.locked ? 'lock' : 'unlock'" :size="14" />
-          </button>
-        </div>
+    <!-- single node -->
+    <template v-else-if="single">
+      <div class="header-row wide">
+        <span class="kind">{{ kindLabel }}</span>
+        <span class="name" :title="single.name">{{ single.name }}</span>
+        <button class="icon-btn" :title="single.visible ? 'Hide' : 'Show'" @click="toggleVisible">
+          <UiIcon :name="single.visible ? 'eye' : 'eye-off'" :size="15" />
+        </button>
+        <button class="icon-btn" :class="{ on: single.locked }" :title="single.locked ? 'Unlock' : 'Lock'" @click="toggleLocked">
+          <UiIcon :name="single.locked ? 'lock' : 'unlock'" :size="14" />
+        </button>
+      </div>
 
-        <div v-if="group" class="dim small">{{ childCount }} item{{ childCount === 1 ? '' : 's' }} in group</div>
-        <div v-if="position" class="grid2" data-testid="prop-position">
-          <NumberField :model-value="position.x" label="X" :step="positionStep" :precision="1" unit="cells" :help="HELP.position" @update:model-value="(v) => setPosition('x', v)" @commit="done" />
-          <NumberField :model-value="position.y" label="Y" :step="positionStep" :precision="1" unit="cells" :help="HELP.position" @update:model-value="(v) => setPosition('y', v)" @commit="done" />
-        </div>
+      <div v-if="group" class="dim small wide">{{ childCount }} item{{ childCount === 1 ? '' : 's' }} in the group</div>
+      <div v-if="position" class="rows" data-testid="prop-position">
+        <NumberField :model-value="position.x" label="X" :step="positionStep" :precision="1" unit="cells" :help="HELP.position" @update:model-value="(v) => setPosition('x', v)" @commit="done" />
+        <NumberField :model-value="position.y" label="Y" :step="positionStep" :precision="1" unit="cells" :help="HELP.position" @update:model-value="(v) => setPosition('y', v)" @commit="done" />
+      </div>
 
-        <!-- line style (segment or line group) -->
-        <template v-if="lineSeg">
-          <div class="section-title">
-            {{ layer ? 'Segment appearance' : 'Line appearance' }}<HelpTip :text="HELP['line.style_scope']" />
-            <span class="dim small">· {{ layer ? `1 of ${lineSegmentCount}` : lineSegmentCount }} segment{{ lineSegmentCount === 1 ? '' : 's' }}</span>
-          </div>
-          <div class="field">
-            <span class="lbl">Color<HelpTip :text="HELP['line.color']" /></span>
-            <ColorField :model-value="lineSeg.seg.style.color" @update:model-value="(v) => setStyle('color', v)" />
-          </div>
-          <div class="field">
-            <span class="lbl">Style<HelpTip :text="HELP['line.kind']" /></span>
+      <!-- line style (segment or line group) -->
+      <template v-if="lineSeg">
+        <div class="section-title">
+          {{ layer ? 'Segment appearance' : 'Line appearance' }}<HelpTip :text="HELP['line.style_scope']" />
+          <span class="count dim">{{ layer ? (lineSegmentCount === 1 ? 'The only segment' : `1 of ${lineSegmentCount} segments`) : `${lineSegmentCount} segment${lineSegmentCount === 1 ? '' : 's'}` }}</span>
+        </div>
+        <div class="prop">
+          <span class="lbl">Color<HelpTip :text="HELP['line.color']" /></span>
+          <div class="ctl"><ColorField :model-value="lineSeg.seg.style.color" @update:model-value="(v) => setStyle('color', v)" /></div>
+        </div>
+        <div class="prop">
+          <span class="lbl">Style<HelpTip :text="HELP['line.kind']" /></span>
+          <div class="ctl">
             <select :value="lineSeg.seg.style.kind" data-testid="prop-line-style" @change="setStyle('kind', ($event.target as HTMLSelectElement).value as StrokeKind); done()">
               <option v-for="k in STROKE_KINDS" :key="k.value" :value="k.value">{{ k.label }}</option>
             </select>
           </div>
-          <template v-if="hasChannel(lineSeg.seg.style.kind)">
-            <div class="field">
-              <span class="lbl">Channel<HelpTip :text="HELP['line.channel']" /></span>
-              <ColorField :model-value="lineSeg.seg.style.inner_color" @update:model-value="(v) => setStyle('inner_color', v)" />
-              <NumberField :model-value="lineSeg.seg.style.inner_width_pct" label="Width" :min="0" :max="100" :precision="0" unit="%" :help="HELP['line.channel_width']" @update:model-value="(v) => setStyle('inner_width_pct', v)" @commit="done" />
-            </div>
-          </template>
-          <template v-if="hasDashes(lineSeg.seg.style.kind)">
-            <div class="field">
-              <span class="lbl">Dashes<HelpTip :text="HELP['line.dash_color']" /></span>
-              <ColorField :model-value="lineSeg.seg.style.inner_color" @update:model-value="(v) => setStyle('inner_color', v)" />
-              <NumberField :model-value="lineSeg.seg.style.dash_width_pct" label="Width" :min="0" :max="100" :precision="0" unit="%" :help="HELP['line.dash_width']" @update:model-value="(v) => setStyle('dash_width_pct', v)" @commit="done" />
-            </div>
-            <div class="grid2">
-              <NumberField :model-value="lineSeg.seg.style.dash_length" label="Dash" :min="0.1" :step="0.1" :precision="1" unit="cells" :help="HELP['line.dash_length']" @update:model-value="(v) => setStyle('dash_length', v)" @commit="done" />
-              <NumberField :model-value="lineSeg.seg.style.dash_gap" label="Gap" :min="0" :step="0.1" :precision="1" unit="cells" :help="HELP['line.dash_gap']" @update:model-value="(v) => setStyle('dash_gap', v)" @commit="done" />
-            </div>
-            <div class="stack">
-              <NumberField :model-value="lineSeg.seg.style.dash_start_offset" label="Start offset" :min="0" :step="0.5" :precision="1" unit="cells" :help="HELP['line.dash_start_offset']" data-testid="dash-start-offset" @update:model-value="(v) => setStyle('dash_start_offset', v)" @commit="done" />
-              <NumberField :model-value="lineSeg.seg.style.dash_end_offset" label="End offset" :min="0" :step="0.5" :precision="1" unit="cells" :help="HELP['line.dash_end_offset']" data-testid="dash-end-offset" @update:model-value="(v) => setStyle('dash_end_offset', v)" @commit="done" />
-            </div>
-          </template>
-          <div class="field">
-            <span class="lbl">Caps<HelpTip :text="HELP['line.caps']" /></span>
-            <select :value="lineSeg.seg.style.start_cap" title="Start cap" data-testid="start-cap" @change="setStyle('start_cap', ($event.target as HTMLSelectElement).value as 'butt' | 'round')">
-              <option value="round">Round start</option>
-              <option value="butt">Butt start</option>
-            </select>
-            <select :value="lineSeg.seg.style.end_cap" title="End cap" data-testid="end-cap" @change="setStyle('end_cap', ($event.target as HTMLSelectElement).value as 'butt' | 'round')">
-              <option value="round">Round end</option>
-              <option value="butt">Butt end</option>
-            </select>
+        </div>
+        <template v-if="hasChannel(lineSeg.seg.style.kind)">
+          <div class="prop">
+            <span class="lbl">Channel<HelpTip :text="HELP['line.channel']" /></span>
+            <div class="ctl"><ColorField :model-value="lineSeg.seg.style.inner_color" @update:model-value="(v) => setStyle('inner_color', v)" /></div>
           </div>
-          <button
-            v-if="layer && lineSegmentCount > 1"
-            class="ps-btn apply-line"
-            data-testid="apply-style-to-line"
-            @click="applyStyleToLine"
-          >
-            Apply this style to the whole line<HelpTip :text="HELP['line.apply_to_line']" />
-          </button>
-          <div v-if="layer" class="dim small">
-            Points<HelpTip :text="HELP['line.points']" />: {{ lineSeg.seg.points.map((p) => `(${p.x}, ${p.y})`).join(' → ') }}
-          </div>
+          <NumberField :model-value="lineSeg.seg.style.inner_width_pct" label="Channel width" :min="0" :max="100" :precision="0" unit="%" :help="HELP['line.channel_width']" @update:model-value="(v) => setStyle('inner_width_pct', v)" @commit="done" />
         </template>
+        <template v-if="hasDashes(lineSeg.seg.style.kind)">
+          <div class="prop">
+            <span class="lbl">Dashes<HelpTip :text="HELP['line.dash_color']" /></span>
+            <div class="ctl"><ColorField :model-value="lineSeg.seg.style.inner_color" @update:model-value="(v) => setStyle('inner_color', v)" /></div>
+          </div>
+          <NumberField :model-value="lineSeg.seg.style.dash_width_pct" label="Dash width" :min="0" :max="100" :precision="0" unit="%" :help="HELP['line.dash_width']" @update:model-value="(v) => setStyle('dash_width_pct', v)" @commit="done" />
+          <NumberField :model-value="lineSeg.seg.style.dash_length" label="Dash length" :min="0.1" :step="0.1" :precision="1" unit="cells" :help="HELP['line.dash_length']" @update:model-value="(v) => setStyle('dash_length', v)" @commit="done" />
+          <NumberField :model-value="lineSeg.seg.style.dash_gap" label="Gap" :min="0" :step="0.1" :precision="1" unit="cells" :help="HELP['line.dash_gap']" @update:model-value="(v) => setStyle('dash_gap', v)" @commit="done" />
+          <NumberField :model-value="lineSeg.seg.style.dash_start_offset" label="Start offset" :min="0" :step="0.5" :precision="1" unit="cells" :help="HELP['line.dash_start_offset']" data-testid="dash-start-offset" @update:model-value="(v) => setStyle('dash_start_offset', v)" @commit="done" />
+          <NumberField :model-value="lineSeg.seg.style.dash_end_offset" label="End offset" :min="0" :step="0.5" :precision="1" unit="cells" :help="HELP['line.dash_end_offset']" data-testid="dash-end-offset" @update:model-value="(v) => setStyle('dash_end_offset', v)" @commit="done" />
+        </template>
+        <div class="prop">
+          <span class="lbl">Start cap<HelpTip :text="HELP['line.caps']" /></span>
+          <div class="ctl">
+            <select :value="lineSeg.seg.style.start_cap" data-testid="start-cap" @change="setStyle('start_cap', ($event.target as HTMLSelectElement).value as 'butt' | 'round')">
+              <option value="round">Round</option>
+              <option value="butt">Butt</option>
+            </select>
+          </div>
+        </div>
+        <div class="prop">
+          <span class="lbl">End cap<HelpTip :text="HELP['line.caps']" /></span>
+          <div class="ctl">
+            <select :value="lineSeg.seg.style.end_cap" data-testid="end-cap" @change="setStyle('end_cap', ($event.target as HTMLSelectElement).value as 'butt' | 'round')">
+              <option value="round">Round</option>
+              <option value="butt">Butt</option>
+            </select>
+          </div>
+        </div>
+        <div v-if="layer" class="prop">
+          <span class="lbl">Points<HelpTip :text="HELP['line.points']" /></span>
+          <div class="ctl value">{{ lineSeg.seg.points.map((p) => `(${p.x}, ${p.y})`).join(' → ') }}</div>
+        </div>
+        <button v-if="layer && lineSegmentCount > 1" class="ps-btn wide start apply-line" data-testid="apply-style-to-line" @click="applyStyleToLine">
+          Apply this style to the whole line<HelpTip :text="HELP['line.apply_to_line']" />
+        </button>
+      </template>
 
-        <!-- station -->
-        <template v-if="layer && layer.content.kind === 'station'">
-          <div class="section-title">Station</div>
-          <div class="field">
-            <span class="lbl">Shape<HelpTip :text="HELP['station.shape']" /></span>
+      <!-- station -->
+      <template v-if="layer && layer.content.kind === 'station'">
+        <div class="section-title">Station</div>
+        <div class="prop">
+          <span class="lbl">Shape<HelpTip :text="HELP['station.shape']" /></span>
+          <div class="ctl">
             <Segmented
               :model-value="layer.content.shape"
               :options="[
@@ -312,27 +319,27 @@ const childCount = computed(() => (group.value ? (findItem(s.tree, group.value.i
               @update:model-value="setStationKind"
             />
           </div>
-          <template v-if="layer.content.shape === 'dot' || layer.content.shape === 'pill'">
-            <div class="field">
-              <span class="lbl">Outer<HelpTip :text="HELP['station.outer_color']" /></span>
-              <ColorField :model-value="layer.content.outer_color" @update:model-value="(v) => patch({ outer_color: v })" />
-            </div>
-            <div class="field">
-              <span class="lbl">Inner<HelpTip :text="HELP['station.inner_color']" /></span>
-              <ColorField :model-value="layer.content.inner_color" @update:model-value="(v) => patch({ inner_color: v })" />
-            </div>
-          </template>
-          <template v-else-if="layer.content.shape === 'tick'">
-            <div class="field">
-              <span class="lbl">Color<HelpTip :text="HELP['station.tick_color']" /></span>
-              <ColorField :model-value="layer.content.color" @update:model-value="(v) => patch({ color: v })" />
-            </div>
-            <div class="grid2">
-              <NumberField :model-value="layer.content.width" label="Width" :min="0.01" :step="0.05" unit="cells" :help="HELP['station.tick_width']" @update:model-value="(v) => patch({ width: v })" @commit="done" />
-              <NumberField :model-value="layer.content.length" label="Height" :min="0.01" :step="0.05" unit="cells" :help="HELP['station.tick_length']" @update:model-value="(v) => patch({ length: v })" @commit="done" />
-            </div>
-            <div class="field">
-              <span class="lbl">Side<HelpTip :text="HELP['station.tick_side']" /></span>
+        </div>
+        <template v-if="layer.content.shape === 'dot' || layer.content.shape === 'pill'">
+          <div class="prop">
+            <span class="lbl">Border<HelpTip :text="HELP['station.outer_color']" /></span>
+            <div class="ctl"><ColorField :model-value="layer.content.outer_color" @update:model-value="(v) => patch({ outer_color: v })" /></div>
+          </div>
+          <div class="prop">
+            <span class="lbl">Fill<HelpTip :text="HELP['station.inner_color']" /></span>
+            <div class="ctl"><ColorField :model-value="layer.content.inner_color" @update:model-value="(v) => patch({ inner_color: v })" /></div>
+          </div>
+        </template>
+        <template v-else-if="layer.content.shape === 'tick'">
+          <div class="prop">
+            <span class="lbl">Color<HelpTip :text="HELP['station.tick_color']" /></span>
+            <div class="ctl"><ColorField :model-value="layer.content.color" @update:model-value="(v) => patch({ color: v })" /></div>
+          </div>
+          <NumberField :model-value="layer.content.width" label="Width" :min="0.01" :step="0.05" unit="cells" :help="HELP['station.tick_width']" @update:model-value="(v) => patch({ width: v })" @commit="done" />
+          <NumberField :model-value="layer.content.length" label="Height" :min="0.01" :step="0.05" unit="cells" :help="HELP['station.tick_length']" @update:model-value="(v) => patch({ length: v })" @commit="done" />
+          <div class="prop">
+            <span class="lbl">Side<HelpTip :text="HELP['station.tick_side']" /></span>
+            <div class="ctl">
               <Segmented
                 :model-value="layer.content.side"
                 :options="[
@@ -342,166 +349,222 @@ const childCount = computed(() => (group.value ? (findItem(s.tree, group.value.i
                 @update:model-value="(v) => patch({ side: v })"
               />
             </div>
-          </template>
-          <div class="dim small">Coupled to<HelpTip :text="HELP['station.coupled']" />: {{ coupledLines }}</div>
-        </template>
-
-        <!-- text -->
-        <template v-if="layer && layer.content.kind === 'text' && textFmt">
-          <div class="section-title">Character</div>
-          <div class="stack" data-keeps-text-edit>
-            <div class="field">
-              <button v-if="s.textEdit?.id !== layer.id" class="ps-btn" data-testid="prop-edit-text" @click="store.startTextEdit(layer.id)">Edit text</button>
-              <span v-else class="dim small">Editing on the canvas: changes apply to the selected characters.</span>
-              <HelpTip :text="HELP['text.edit']" />
-            </div>
-            <div class="field">
-              <span class="lbl">Font<HelpTip :text="HELP['text.font']" /></span>
-              <FontSelect :model-value="textFmt.font_family" @update:model-value="(v) => (setText('font_family', v), done())" />
-              <button class="icon-btn" :class="{ on: textFmt.bold }" title="Bold" data-testid="prop-text-bold" @mousedown.prevent @click="setText('bold', !textFmt.bold); done()">
-                <UiIcon name="bold" :size="15" />
-              </button>
-              <button class="icon-btn" :class="{ on: textFmt.italic }" title="Italic" @mousedown.prevent @click="setText('italic', !textFmt.italic); done()">
-                <UiIcon name="italic" :size="15" />
-              </button>
-            </div>
-            <div class="field">
-              <span class="lbl">Color<HelpTip :text="HELP['text.color']" /></span>
-              <ColorField :model-value="textFmt.color" @update:model-value="(v) => setText('color', v)" />
-            </div>
-            <div class="field">
-              <span class="lbl">Align<HelpTip :text="HELP['text.align']" /></span>
-              <Segmented
-                :model-value="textFmt.align"
-                data-testid="prop-text-align"
-                :options="[
-                  { value: 'start', icon: 'align-start', title: 'Left' },
-                  { value: 'middle', icon: 'align-middle', title: 'Center' },
-                  { value: 'end', icon: 'align-end', title: 'Right' },
-                ]"
-                @mousedown.prevent
-                @update:model-value="(v) => (setText('align', v), done())"
-              />
-            </div>
-            <div class="field">
-              <span class="lbl">Direction<HelpTip :text="HELP['text.direction']" /></span>
-              <Segmented
-                :model-value="textFmt.direction"
-                data-testid="prop-text-direction"
-                :options="[
-                  { value: 'ltr', icon: 'dir-ltr', title: 'Left to right' },
-                  { value: 'rtl', icon: 'dir-rtl', title: 'Right to left' },
-                ]"
-                @mousedown.prevent
-                @update:model-value="(v) => (setText('direction', v), done())"
-              />
-            </div>
-            <div class="grid2">
-              <NumberField :model-value="textFmt.size" label="Size" :min="0.05" :step="0.05" unit="cells" :help="HELP['text.size']" data-testid="prop-text-size" @update:model-value="(v) => setText('size', v)" @commit="done" />
-              <NumberField :model-value="layer.content.rotation" label="Angle" :min="-180" :max="180" :step="45" :precision="1" unit="°" :help="HELP['text.rotation']" @update:model-value="(v) => patch({ rotation: v })" @commit="done" />
-            </div>
           </div>
         </template>
+        <div class="prop">
+          <span class="lbl">Lines<HelpTip :text="HELP['station.coupled']" /></span>
+          <div class="ctl value">{{ coupledLines }}</div>
+        </div>
+      </template>
 
-        <!-- shape -->
-        <template v-if="shape">
-          <div class="section-title">Appearance</div>
-          <template v-if="shape.shape === 'line'">
-            <div class="field">
-              <span class="lbl">Color<HelpTip :text="HELP['shape.line_color']" /></span>
-              <ColorField :model-value="shape.color" @update:model-value="(v) => patch({ color: v })" />
-            </div>
-            <div class="field">
-              <span class="lbl">Caps<HelpTip :text="HELP['shape.cap']" /></span>
+      <!-- text -->
+      <div v-if="layer && layer.content.kind === 'text' && textFmt" class="rows" data-keeps-text-edit>
+        <div class="section-title">Character</div>
+        <div class="prop">
+          <span class="lbl">Text<HelpTip :text="HELP['text.edit']" /></span>
+          <div class="ctl">
+            <button v-if="s.textEdit?.id !== layer.id" class="ps-btn" data-testid="prop-edit-text" @click="store.startTextEdit(layer.id)">Edit text</button>
+            <span v-else class="dim small">Editing on the canvas: changes apply to the selected characters.</span>
+          </div>
+        </div>
+        <div class="prop">
+          <span class="lbl">Font<HelpTip :text="HELP['text.font']" /></span>
+          <div class="ctl">
+            <FontSelect :model-value="textFmt.font_family" @update:model-value="(v) => (setText('font_family', v), done())" />
+            <button class="icon-btn" :class="{ on: textFmt.bold }" title="Bold" data-testid="prop-text-bold" @mousedown.prevent @click="setText('bold', !textFmt.bold); done()">
+              <UiIcon name="bold" :size="15" />
+            </button>
+            <button class="icon-btn" :class="{ on: textFmt.italic }" title="Italic" @mousedown.prevent @click="setText('italic', !textFmt.italic); done()">
+              <UiIcon name="italic" :size="15" />
+            </button>
+          </div>
+        </div>
+        <NumberField :model-value="textFmt.size" label="Size" :min="0.05" :step="0.05" unit="cells" :help="HELP['text.size']" data-testid="prop-text-size" @update:model-value="(v) => setText('size', v)" @commit="done" />
+        <div class="prop">
+          <span class="lbl">Color<HelpTip :text="HELP['text.color']" /></span>
+          <div class="ctl"><ColorField :model-value="textFmt.color" @update:model-value="(v) => setText('color', v)" /></div>
+        </div>
+        <div class="prop">
+          <span class="lbl">Align<HelpTip :text="HELP['text.align']" /></span>
+          <div class="ctl">
+            <Segmented
+              :model-value="textFmt.align"
+              data-testid="prop-text-align"
+              :options="[
+                { value: 'start', icon: 'align-start', title: 'Left' },
+                { value: 'middle', icon: 'align-middle', title: 'Center' },
+                { value: 'end', icon: 'align-end', title: 'Right' },
+              ]"
+              @mousedown.prevent
+              @update:model-value="(v) => (setText('align', v), done())"
+            />
+          </div>
+        </div>
+        <div class="prop">
+          <span class="lbl">Direction<HelpTip :text="HELP['text.direction']" /></span>
+          <div class="ctl">
+            <Segmented
+              :model-value="textFmt.direction"
+              data-testid="prop-text-direction"
+              :options="[
+                { value: 'ltr', icon: 'dir-ltr', title: 'Left to right' },
+                { value: 'rtl', icon: 'dir-rtl', title: 'Right to left' },
+              ]"
+              @mousedown.prevent
+              @update:model-value="(v) => (setText('direction', v), done())"
+            />
+          </div>
+        </div>
+        <NumberField :model-value="layer.content.rotation" label="Angle" :min="-180" :max="180" :step="45" :precision="1" unit="degrees" :help="HELP['text.rotation']" @update:model-value="(v) => patch({ rotation: v })" @commit="done" />
+      </div>
+
+      <!-- shape -->
+      <template v-if="shape">
+        <div class="section-title">Appearance</div>
+        <template v-if="shape.shape === 'line'">
+          <div class="prop">
+            <span class="lbl">Color<HelpTip :text="HELP['shape.line_color']" /></span>
+            <div class="ctl"><ColorField :model-value="shape.color" @update:model-value="(v) => patch({ color: v })" /></div>
+          </div>
+          <NumberField :model-value="shape.thickness" label="Width" :min="0.01" :step="0.05" unit="cells" :help="HELP['shape.thickness']" data-testid="prop-shape-thickness" @update:model-value="(v) => patch({ thickness: v })" @commit="done" />
+          <div class="prop">
+            <span class="lbl">Caps<HelpTip :text="HELP['shape.cap']" /></span>
+            <div class="ctl">
               <select :value="shape.cap" data-testid="prop-shape-cap" @change="patch({ cap: ($event.target as HTMLSelectElement).value }); done()">
                 <option value="round">Round</option>
                 <option value="butt">Butt</option>
               </select>
             </div>
-            <div class="stack">
-              <NumberField :model-value="shape.thickness" label="Width" :min="0.01" :step="0.05" unit="cells" :help="HELP['shape.thickness']" data-testid="prop-shape-thickness" @update:model-value="(v) => patch({ thickness: v })" @commit="done" />
-            </div>
-          </template>
-          <div v-else class="field">
-            <label class="lbl check">
-              <input type="checkbox" :checked="shape.filled" data-testid="prop-shape-filled" @change="patch({ filled: ($event.target as HTMLInputElement).checked }); done()" />
-              Fill<HelpTip :text="HELP['shape.fill']" />
-            </label>
-            <ColorField v-if="shape.filled" :model-value="shape.color" :help="HELP['shape.fill_color']" @update:model-value="(v) => patch({ color: v })" />
-          </div>
-          <div class="field">
-            <span class="lbl">Border<HelpTip :text="HELP['shape.border_color']" /></span>
-            <ColorField :model-value="shape.border_color" @update:model-value="(v) => patch({ border_color: v })" />
-          </div>
-          <div class="stack">
-            <NumberField :model-value="shape.border_width" label="Border width" :min="0" :step="0.05" unit="cells" :help="HELP['shape.border_width']" @update:model-value="(v) => patch({ border_width: v })" @commit="done" />
-          </div>
-          <template v-if="shape.shape === 'line'">
-            <div class="field">
-              <label class="lbl check">
-                <input type="checkbox" :checked="shape.dashed" data-testid="prop-shape-dashed" @change="patch({ dashed: ($event.target as HTMLInputElement).checked }); done()" />
-                Dashed<HelpTip :text="HELP['shape.dashed']" />
-              </label>
-            </div>
-            <div v-if="shape.dashed" class="grid2">
-              <NumberField :model-value="shape.dash_length" label="Dash" :min="0.05" :step="0.1" unit="cells" :help="HELP['shape.dash_length']" @update:model-value="(v) => patch({ dash_length: v })" @commit="done" />
-              <NumberField :model-value="shape.dash_gap" label="Gap" :min="0" :step="0.1" unit="cells" :help="HELP['shape.dash_gap']" @update:model-value="(v) => patch({ dash_gap: v })" @commit="done" />
-            </div>
-            <div class="section-title">Ends</div>
-            <div class="grid2" data-testid="prop-shape-ends">
-              <NumberField :model-value="shape.from.x" label="Start X" :step="1" :precision="1" unit="cells" :help="HELP['shape.ends']" @update:model-value="(v) => patch({ from: { x: v } })" @commit="done" />
-              <NumberField :model-value="shape.from.y" label="Start Y" :step="1" :precision="1" unit="cells" :help="HELP['shape.ends']" @update:model-value="(v) => patch({ from: { y: v } })" @commit="done" />
-              <NumberField :model-value="shape.to.x" label="End X" :step="1" :precision="1" unit="cells" :help="HELP['shape.ends']" @update:model-value="(v) => patch({ to: { x: v } })" @commit="done" />
-              <NumberField :model-value="shape.to.y" label="End Y" :step="1" :precision="1" unit="cells" :help="HELP['shape.ends']" @update:model-value="(v) => patch({ to: { y: v } })" @commit="done" />
-            </div>
-          </template>
-          <div v-else-if="shape.shape === 'rect'" class="grid2" data-testid="prop-shape-size">
-            <NumberField :model-value="shape.width" label="Width" :min="0.1" :step="1" :precision="1" unit="cells" :help="HELP['shape.width']" @update:model-value="(v) => patch({ width: v })" @commit="done" />
-            <NumberField :model-value="shape.height" label="Height" :min="0.1" :step="1" :precision="1" unit="cells" :help="HELP['shape.height']" @update:model-value="(v) => patch({ height: v })" @commit="done" />
-            <NumberField :model-value="shape.rotation" label="Angle" :min="-180" :max="180" :step="45" :precision="1" unit="°" :help="HELP['shape.rotation']" @update:model-value="(v) => patch({ rotation: v })" @commit="done" />
-          </div>
-          <div v-else class="grid2" data-testid="prop-shape-size">
-            <NumberField :model-value="shape.radius" label="Radius" :min="0.1" :step="0.5" :precision="1" unit="cells" :help="HELP['shape.radius']" @update:model-value="(v) => patch({ radius: v })" @commit="done" />
           </div>
         </template>
-
-        <!-- icon -->
-        <template v-if="layer && layer.content.kind === 'icon'">
-          <div class="section-title">Pictogram</div>
-          <div class="field">
-            <span class="lbl">Symbol<HelpTip :text="HELP['icon.icon']" /></span>
-            <IconPicker :model-value="layer.content.icon" />
+        <div v-else class="prop">
+          <span class="lbl">Fill<HelpTip :text="HELP['shape.fill']" /></span>
+          <div class="ctl">
+            <input type="checkbox" :checked="shape.filled" title="Fill the inside" data-testid="prop-shape-filled" @change="patch({ filled: ($event.target as HTMLInputElement).checked }); done()" />
+            <ColorField v-if="shape.filled" :model-value="shape.color" @update:model-value="(v) => patch({ color: v })" />
           </div>
-          <div class="field">
-            <span class="lbl">Glyph<HelpTip :text="HELP['icon.color']" /></span>
-            <ColorField :model-value="layer.content.color" @update:model-value="(v) => patch({ color: v })" />
+        </div>
+        <div class="prop">
+          <span class="lbl">Border<HelpTip :text="HELP['shape.border_color']" /></span>
+          <div class="ctl"><ColorField :model-value="shape.border_color" @update:model-value="(v) => patch({ border_color: v })" /></div>
+        </div>
+        <NumberField :model-value="shape.border_width" label="Border width" :min="0" :step="0.05" unit="cells" :help="HELP['shape.border_width']" @update:model-value="(v) => patch({ border_width: v })" @commit="done" />
+        <template v-if="shape.shape === 'line'">
+          <div class="prop">
+            <span class="lbl">Dashed<HelpTip :text="HELP['shape.dashed']" /></span>
+            <div class="ctl">
+              <input type="checkbox" :checked="shape.dashed" title="Draw the line as dashes" data-testid="prop-shape-dashed" @change="patch({ dashed: ($event.target as HTMLInputElement).checked }); done()" />
+            </div>
           </div>
-          <div class="field">
-            <span class="lbl">Tile<HelpTip :text="HELP['icon.background']" /></span>
-            <ColorField :model-value="layer.content.background" @update:model-value="(v) => patch({ background: v })" />
-          </div>
-          <div class="grid2">
-            <NumberField :model-value="layer.content.size" label="Size" :min="0.1" :step="0.1" unit="cells" :help="HELP['icon.size']" @update:model-value="(v) => patch({ size: v })" @commit="done" />
-            <NumberField :model-value="layer.content.rotation" label="Angle" :min="-180" :max="180" :step="45" :precision="1" unit="°" :help="HELP['icon.rotation']" @update:model-value="(v) => patch({ rotation: v })" @commit="done" />
+          <template v-if="shape.dashed">
+            <NumberField :model-value="shape.dash_length" label="Dash length" :min="0.05" :step="0.1" unit="cells" :help="HELP['shape.dash_length']" @update:model-value="(v) => patch({ dash_length: v })" @commit="done" />
+            <NumberField :model-value="shape.dash_gap" label="Gap" :min="0" :step="0.1" unit="cells" :help="HELP['shape.dash_gap']" @update:model-value="(v) => patch({ dash_gap: v })" @commit="done" />
+          </template>
+          <div class="section-title">Ends</div>
+          <div class="rows" data-testid="prop-shape-ends">
+            <NumberField :model-value="shape.from.x" label="Start X" :step="1" :precision="1" unit="cells" :help="HELP['shape.ends']" @update:model-value="(v) => patch({ from: { x: v } })" @commit="done" />
+            <NumberField :model-value="shape.from.y" label="Start Y" :step="1" :precision="1" unit="cells" :help="HELP['shape.ends']" @update:model-value="(v) => patch({ from: { y: v } })" @commit="done" />
+            <NumberField :model-value="shape.to.x" label="End X" :step="1" :precision="1" unit="cells" :help="HELP['shape.ends']" @update:model-value="(v) => patch({ to: { x: v } })" @commit="done" />
+            <NumberField :model-value="shape.to.y" label="End Y" :step="1" :precision="1" unit="cells" :help="HELP['shape.ends']" @update:model-value="(v) => patch({ to: { y: v } })" @commit="done" />
           </div>
         </template>
+        <div v-else-if="shape.shape === 'rect'" class="rows" data-testid="prop-shape-size">
+          <div class="section-title">Size</div>
+          <NumberField :model-value="shape.width" label="Width" :min="0.1" :step="1" :precision="1" unit="cells" :help="HELP['shape.width']" @update:model-value="(v) => patch({ width: v })" @commit="done" />
+          <NumberField :model-value="shape.height" label="Height" :min="0.1" :step="1" :precision="1" unit="cells" :help="HELP['shape.height']" @update:model-value="(v) => patch({ height: v })" @commit="done" />
+          <NumberField :model-value="shape.rotation" label="Angle" :min="-180" :max="180" :step="45" :precision="1" unit="degrees" :help="HELP['shape.rotation']" @update:model-value="(v) => patch({ rotation: v })" @commit="done" />
+        </div>
+        <div v-else class="rows" data-testid="prop-shape-size">
+          <div class="section-title">Size</div>
+          <NumberField :model-value="shape.radius" label="Radius" :min="0.1" :step="0.1" :precision="1" unit="cells" :help="HELP['shape.radius']" @update:model-value="(v) => patch({ radius: v })" @commit="done" />
+        </div>
       </template>
+
+      <!-- icon -->
+      <template v-if="layer && layer.content.kind === 'icon'">
+        <div class="section-title">Pictogram</div>
+        <div class="prop">
+          <span class="lbl">Symbol<HelpTip :text="HELP['icon.icon']" /></span>
+          <div class="ctl"><IconPicker :model-value="layer.content.icon" /></div>
+        </div>
+        <div class="prop">
+          <span class="lbl">Symbol color<HelpTip :text="HELP['icon.color']" /></span>
+          <div class="ctl"><ColorField :model-value="layer.content.color" @update:model-value="(v) => patch({ color: v })" /></div>
+        </div>
+        <div class="prop">
+          <span class="lbl">Tile color<HelpTip :text="HELP['icon.background']" /></span>
+          <div class="ctl"><ColorField :model-value="layer.content.background" @update:model-value="(v) => patch({ background: v })" /></div>
+        </div>
+        <NumberField :model-value="layer.content.size" label="Size" :min="0.1" :step="0.1" unit="cells" :help="HELP['icon.size']" @update:model-value="(v) => patch({ size: v })" @commit="done" />
+        <NumberField :model-value="layer.content.rotation" label="Angle" :min="-180" :max="180" :step="45" :precision="1" unit="degrees" :help="HELP['icon.rotation']" @update:model-value="(v) => patch({ rotation: v })" @commit="done" />
+      </template>
+    </template>
   </div>
 </template>
 
 <style scoped>
+/* label | input | the rest (units, or controls wider than an input) */
 .props {
   padding: 8px 10px 12px;
+  display: grid;
+  grid-template-columns: max-content auto minmax(0, 1fr);
+  column-gap: 8px;
+  row-gap: 7px;
+  align-items: center;
+}
+/* Groups of rows only exist for tests and focus handling; their rows join the grid. */
+.rows,
+.prop,
+.props > :deep(.num-field),
+.rows > :deep(.num-field) {
+  display: contents;
+}
+.props :deep(.num-field .lead),
+.lbl {
+  grid-column: 1;
+  display: inline-flex;
+  align-items: center;
+  color: var(--c-text-dim);
+}
+.props :deep(.num-field input) {
+  grid-column: 2;
+  width: 56px !important;
+}
+.props :deep(.num-field .unit) {
+  grid-column: 3;
+}
+.ctl {
+  grid-column: 2 / -1;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.value {
+  font-size: var(--fs-small);
+  line-height: 1.5;
+  word-break: break-word;
+  color: var(--c-text);
+}
+.section-title,
+.wide,
+.header-row {
+  grid-column: 1 / -1;
 }
 .section-title {
-  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  margin-top: 6px;
   padding-bottom: 4px;
   border-bottom: 1px solid var(--c-border-soft);
   font-weight: 600;
   color: var(--c-text-bright);
+}
+.count {
+  margin-left: auto;
+  font-weight: normal;
+  font-size: var(--fs-small);
 }
 .header-row {
   display: flex;
@@ -524,63 +587,16 @@ const childCount = computed(() => (group.value ? (findItem(s.tree, group.value.i
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.field {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.lbl {
-  display: inline-flex;
-  align-items: center;
-  width: 64px;
-  color: var(--c-text-dim);
-  flex: none;
-}
-.grid2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px 10px;
-}
-.stack {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-/* label | input | unit columns, so inputs line up with or without a unit */
-.stack :deep(.num-field) {
-  display: grid;
-  grid-template-columns: 1fr auto 34px;
-  column-gap: 4px;
-}
-.grid2 :deep(.num-field) {
-  justify-content: space-between;
-  min-width: 0;
-}
-.grid2 :deep(.num-field input) {
-  width: 40px;
-}
-.row {
+.buttons {
   display: flex;
   gap: 6px;
 }
 .small {
   font-size: var(--fs-small);
   line-height: 1.5;
-  word-break: break-word;
 }
-.text-input {
-  width: 100%;
-  resize: vertical;
-  padding: 4px 6px;
-}
-.check {
-  gap: 4px;
-  width: auto;
-}
-.more,
-.apply-line {
-  align-self: flex-start;
+.start {
+  justify-self: start;
 }
 .apply-line {
   display: inline-flex;

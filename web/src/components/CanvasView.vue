@@ -9,7 +9,7 @@ import { CELL_PX, cellAt, screenToWorld, unionRects, worldToScreen } from '../co
 import { useEditor } from '../stores/editor'
 import { prefs } from '../stores/prefs'
 import { actionForEvent, runAction } from '../stores/commands'
-import { createTools, iconPreview, pillGrowTargets, placeIconAt, placeIcon, selectedPill, type PointerInfo, type Tool } from '../tools'
+import { createTools, iconPreview, pillGrowTargets, placeIconAt, placeIcon, selectedPill, selectedShape, shapeHandles, type PointerInfo, type Tool } from '../tools'
 
 const store = useEditor()
 const s = store.state
@@ -101,6 +101,20 @@ const handles = computed(() => {
     { x: b.x + b.w + pad, y: b.y + b.h + pad },
     { x: b.x - pad, y: b.y + b.h + pad },
   ]
+})
+
+// Corner (or end) handles of a selected shape in move mode: drag one to resize it.
+const resizeHandles = computed(() => {
+  void s.revision
+  if (s.tool !== 'select' || s.transformMode !== 'move') return []
+  const sel = selectedShape(store)
+  if (!sel) return []
+  const sh = sel.shape
+  return shapeHandles(sh).map((p, i) => ({
+    ...worldToScreen(s.view, p.x * CELL_PX, p.y * CELL_PX),
+    i,
+    cursor: sh.shape === 'line' ? 'crosshair' : i % 2 === 0 ? 'nwse-resize' : 'nesw-resize',
+  }))
 })
 
 // Arrows around a selected pill station: double click one to grow into that cell.
@@ -202,6 +216,7 @@ function info(e: PointerEvent | MouseEvent): PointerInfo {
     hitId: hitTest(e.clientX, e.clientY, world),
     handle: handleEl?.getAttribute('data-handle') ?? null,
     handleCell: parseCell(handleEl?.getAttribute('data-cell')),
+    handleIndex: handleEl?.hasAttribute('data-index') ? Number(handleEl.getAttribute('data-index')) : null,
   }
 }
 
@@ -650,6 +665,21 @@ defineExpose({ boundsOf })
               <title>Double-click to extend the pill into this cell</title>
               <circle r="11" fill="transparent" />
               <path d="M-4.5 -6L5.5 0L-4.5 6Z" :fill="prefs.selectionColor" stroke="#fff" stroke-width="1.5" stroke-linejoin="round" />
+            </g>
+          </template>
+          <template v-else-if="resizeHandles.length">
+            <g
+              v-for="h in resizeHandles"
+              :key="h.i"
+              class="resize-handle"
+              data-handle="resize"
+              :data-index="h.i"
+              data-testid="resize-handle"
+              :style="{ cursor: h.cursor }"
+            >
+              <title>Drag to resize (Alt: off the grid, Shift: square)</title>
+              <rect :x="h.x - 7" :y="h.y - 7" width="14" height="14" fill="transparent" />
+              <rect :x="h.x - 4" :y="h.y - 4" width="8" height="8" fill="#fff" :stroke="prefs.selectionColor" stroke-width="1.5" />
             </g>
           </template>
           <template v-else>

@@ -124,7 +124,6 @@ function onScrubEnd(): void {
 .lead {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
 }
 .scrub {
   cursor: ew-resize;

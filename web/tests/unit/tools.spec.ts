@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { at, freshStore, key } from './helpers'
 import { plainParagraphs, plainText } from '../../src/core/richtext'
-import { createTools, pillGrowTargets, placeIconAt, placeIcon, selectedPill } from '../../src/tools'
+import { createTools, pillGrowTargets, placeIconAt, placeIcon, resizeShape, selectedPill, shapeFromDrag, shapeHandles } from '../../src/tools'
 import type { EditorStore } from '../../src/stores/editor'
 import type { Id, Rect } from '../../src/core/types'
 import { prefs } from '../../src/stores/prefs'
@@ -430,17 +430,56 @@ describe('shape tool', () => {
     expect(store.state.tree).toHaveLength(count)
   })
 
-  it('draws circles centered on a cell with a radius in half cells; Escape cancels', () => {
+  it('draws circles centered on a cell with a radius in tenths of a cell; Escape cancels', () => {
     const { store, tools } = setup()
     prefs.shape.kind = 'circle'
     expect(drag(store, tools.shape, [2.3, 2.8], [4.1, 2.6])).toContain('<circle')
-    expect(shapeOf(store)).toMatchObject({ shape: 'circle', center: { x: 2.5, y: 2.5 }, radius: 1.5 })
+    expect(shapeOf(store)).toMatchObject({ shape: 'circle', center: { x: 2.5, y: 2.5 }, radius: 1.6 })
     tools.shape.down?.(at(store, 8, 8))
     tools.shape.move?.(at(store, 10, 8), true)
     expect(tools.shape.key?.(key('Escape'))).toBe(true)
     expect(store.state.overlay.preview).toBe('')
     tools.shape.up?.(at(store, 10, 8))
     expect(store.state.tree).toHaveLength(1)
+  })
+})
+
+describe('resizing shapes', () => {
+  const pt = (x: number, y: number) => ({ cells: { x, y }, cell: { x: Math.floor(x), y: Math.floor(y) } })
+
+  it('drags a rectangle corner onto the grid, keeping the opposite corner', () => {
+    const rect = shapeFromDrag('rect', pt(1, 1), pt(3, 2), false, false)!
+    expect(shapeHandles(rect)).toEqual([{ x: 1, y: 1 }, { x: 4, y: 1 }, { x: 4, y: 3 }, { x: 1, y: 3 }])
+    expect(resizeShape(rect, 2, { x: 6.3, y: 5.8 }, false, false)).toEqual({ pos: { x: 1, y: 1 }, width: 5, height: 5 })
+    expect(resizeShape(rect, 0, { x: -0.4, y: 2.2 }, false, false)).toEqual({ pos: { x: 0, y: 2 }, width: 4, height: 1 })
+    expect(resizeShape(rect, 2, { x: 6.33, y: 5.81 }, true, false)).toEqual({ pos: { x: 1, y: 1 }, width: 5.3, height: 4.8 })
+    expect(resizeShape(rect, 2, { x: 9, y: 2 }, false, true)).toMatchObject({ width: 8, height: 8 })
+    // Never smaller than a cell (a tenth with Alt).
+    expect(resizeShape(rect, 2, { x: 0, y: 0 }, false, false)).toMatchObject({ width: 1, height: 1 })
+  })
+
+  it('moves one end of a line and changes a circle radius in tenths', () => {
+    const line = shapeFromDrag('line', pt(0, 0), pt(4, 0), false, false)!
+    expect(resizeShape(line, 1, { x: 3.2, y: 2.9 }, false, false)).toEqual({ to: { x: 3, y: 3 } })
+    expect(resizeShape(line, 0, { x: 1.04, y: 1.96 }, true, false)).toEqual({ from: { x: 1, y: 2 } })
+    const circle = shapeFromDrag('circle', pt(2.5, 2.5), pt(3.5, 2.5), false, false)!
+    expect(circle).toMatchObject({ radius: 1 })
+    expect(shapeHandles(circle)[2]).toEqual({ x: 3.5, y: 3.5 })
+    expect(resizeShape(circle, 2, { x: 4.03, y: 3.1 }, false, false)).toEqual({ radius: 1.5 })
+  })
+
+  it('the selection tool resizes with a handle as one undo step', () => {
+    const { store, tools } = setup()
+    const id = store.run((e) => e.addShape(shapeFromDrag('rect', pt(1, 1), pt(2, 2), false, false)!))!
+    store.select([id])
+    tools.select.down?.(at(store, 3, 3, { handle: 'resize', handleIndex: 2 }))
+    tools.select.move?.(at(store, 5.2, 4.1), true)
+    tools.select.up?.(at(store, 5.2, 4.1))
+    const n = store.node(id)
+    expect(n?.type === 'layer' && n.content).toMatchObject({ pos: { x: 1, y: 1 }, width: 4, height: 3 })
+    store.undo()
+    const back = store.node(id)
+    expect(back?.type === 'layer' && back.content).toMatchObject({ width: 2, height: 2 })
   })
 })
 

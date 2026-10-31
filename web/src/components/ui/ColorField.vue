@@ -48,8 +48,10 @@ onBeforeUnmount(() => isPicking.value && stopPicking())
 
 <template>
   <label class="color-field" :title="help ? undefined : title">
-    <span v-if="label" class="dim">{{ label }}</span>
-    <HelpTip v-if="help" :text="help" />
+    <span v-if="label || help" class="lead">
+      <span v-if="label" class="dim">{{ label }}</span>
+      <HelpTip v-if="help" :text="help" />
+    </span>
     <span class="swatch" data-swatch :style="{ background: modelValue }">
       <input
         type="color"
@@ -84,6 +86,10 @@ onBeforeUnmount(() => isPicking.value && stopPicking())
   display: inline-flex;
   align-items: center;
   gap: 5px;
+}
+.lead {
+  display: inline-flex;
+  align-items: center;
 }
 .swatch {
   position: relative;

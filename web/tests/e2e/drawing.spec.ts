@@ -177,4 +177,31 @@ test.describe('drawing tools', () => {
     await page.keyboard.press('Control+z')
     expect(await fragmentKinds(page)).toEqual(['shape', 'shape'])
   })
+
+  test('selected shapes resize from their corner handles in move mode', async ({ page }) => {
+    await page.keyboard.press('u')
+    await page.getByTestId('shape-kind').getByRole('radio', { name: 'Rectangle' }).click()
+    await dragCells(page, [1, 1], [2, 2])
+    await page.keyboard.press('v')
+    const handles = page.getByTestId('resize-handle')
+    await expect(handles).toHaveCount(4)
+    // Drag the bottom-right corner (an intersection) two cells right and one down.
+    const box = (await handles.nth(2).boundingBox())!
+    const to = await cellPos(page, 4, 3)
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(to.x + 6, to.y + 6, { steps: 6 })
+    await page.mouse.up()
+    const rect = await state(page, (s) => (window as any).__transit.node(s.selection[0]).content)
+    expect(rect).toMatchObject({ pos: { x: 1, y: 1 }, width: 4, height: 3 })
+    await page.keyboard.press('Control+z')
+    expect(await state(page, (s) => (window as any).__transit.node(s.selection[0]).content.width)).toBe(2)
+    // A line has a handle on each end; rotate mode has none.
+    await page.keyboard.press('u')
+    await page.getByTestId('shape-kind').getByRole('radio', { name: 'Line' }).click()
+    await dragCells(page, [0, 6], [6, 6])
+    expect(await state(page, (s) => (window as any).__transit.node(s.selection[0]).content.cap)).toBe('butt')
+    await page.keyboard.press('v')
+    await expect(handles).toHaveCount(2)
+  })
 })

@@ -70,8 +70,8 @@ async function upload(): Promise<void> {
     </p>
     <div class="section-title">New pictograms<HelpTip :text="HELP['icon.defaults']" /></div>
     <div class="defaults">
-      <ColorField v-model="prefs.icon.color" label="Glyph" :help="HELP['icon.color']" />
-      <ColorField v-model="prefs.icon.background" label="Tile" :help="HELP['icon.background']" />
+      <ColorField v-model="prefs.icon.color" label="Symbol color" :help="HELP['icon.color']" />
+      <ColorField v-model="prefs.icon.background" label="Tile color" :help="HELP['icon.background']" />
       <label class="opt">
         <input type="checkbox" :checked="prefs.icon.size === null" @change="prefs.icon.size = ($event.target as HTMLInputElement).checked ? null : 1.24" />
         <span class="dim">Match station size<HelpTip :text="HELP['icon.size_default']" /></span>
@@ -146,9 +146,14 @@ async function upload(): Promise<void> {
 }
 .defaults {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 12px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+}
+/* One label column, so the swatches and inputs line up. */
+.defaults :deep(.color-field .lead),
+.defaults :deep(.num-field .lead) {
+  width: 96px;
 }
 .opt {
   display: inline-flex;

@@ -64,7 +64,7 @@ export const HELP = {
 
   // Shapes
   'shape.kind':
-    'Line: a straight line from one grid intersection to another, in one of 8 directions. Rectangle: covers whole cells. Circle: centered on a cell, its radius in half cells. Hold Alt while drawing to use any point, size and angle.',
+    'Line: a straight line from one grid intersection to another, in one of 8 directions. Rectangle: covers whole cells. Circle: centered on a cell, its radius in steps of 0.1 cell. Hold Alt while drawing to use any point, size and angle.',
   'shape.line_color': 'Color of the line.',
   'shape.thickness': 'Width of the line, in cells.',
   'shape.cap': 'Shape of the line ends. Round ends stick out by half the line width; butt ends stop exactly at the end points.',
@@ -72,7 +72,6 @@ export const HELP = {
   'shape.dash_length': 'Length of each dash, in cells.',
   'shape.dash_gap': 'Space between two dashes, in cells.',
   'shape.fill': 'Fill the inside of the rectangle or circle. Without a fill only the border shows.',
-  'shape.fill_color': 'Color inside the rectangle or circle.',
   'shape.border_color': 'Color of the border.',
   'shape.border_width':
     'Width of the border, in cells. 0 draws no border. A rectangle or circle keeps its size: the border is drawn inside its edge. A line gets the border on both sides.',

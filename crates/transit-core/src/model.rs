@@ -671,7 +671,7 @@ pub struct Shape {
 impl Shape {
     pub fn line(from: Vec2, to: Vec2) -> Self {
         Shape {
-            geometry: ShapeGeometry::Line { from, to, thickness: 0.1, cap: Cap::Round, dashed: false, dash_length: 0.5, dash_gap: 0.3 },
+            geometry: ShapeGeometry::Line { from, to, thickness: 0.1, cap: Cap::Butt, dashed: false, dash_length: 0.5, dash_gap: 0.3 },
             color: "#1a1a1a".into(),
             filled: true,
             border_color: "#ffffff".into(),

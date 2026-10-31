@@ -58,7 +58,7 @@ const pillSelected = computed(() => {
 
     <template v-if="s.textEdit || tool === 'text'">
       <div class="opt" data-keeps-text-edit data-testid="text-options">
-        <span class="dim opt">Font<HelpTip :text="HELP['text.font']" /></span>
+        <span class="dim label">Font<HelpTip :text="HELP['text.font']" /></span>
         <FontSelect :model-value="textOpts.font_family" @update:model-value="(v) => setText('font_family', v)" />
         <NumberField :model-value="textOpts.size" label="Size" :min="0.1" :step="0.05" :width="40" unit="cells" :help="HELP['text.size']" data-testid="text-size" @update:model-value="(v) => setText('size', v)" />
         <ColorField :model-value="textOpts.color" label="Color" :help="HELP['text.color']" @update:model-value="(v) => setText('color', v)" />
@@ -68,7 +68,7 @@ const pillSelected = computed(() => {
         <button class="icon-btn" :class="{ on: textOpts.italic }" title="Italic (Ctrl+I while editing)" data-testid="text-italic" @mousedown.prevent @click="setText('italic', !textOpts.italic)">
           <UiIcon name="italic" :size="16" />
         </button>
-        <span class="dim opt">Align<HelpTip :text="HELP['text.align']" /></span>
+        <span class="dim label">Align<HelpTip :text="HELP['text.align']" /></span>
         <Segmented
           :model-value="textOpts.align"
           data-testid="text-align"
@@ -80,7 +80,7 @@ const pillSelected = computed(() => {
           @mousedown.prevent
           @update:model-value="(v) => setText('align', v)"
         />
-        <span class="dim opt">Direction<HelpTip :text="HELP['text.direction']" /></span>
+        <span class="dim label">Direction<HelpTip :text="HELP['text.direction']" /></span>
         <Segmented
           :model-value="textOpts.direction"
           :options="[
@@ -97,7 +97,7 @@ const pillSelected = computed(() => {
 
     <template v-else-if="tool === 'select'">
       <label class="opt">
-        <span class="dim">Auto-Select<HelpTip :text="HELP['prefs.autoSelect']" /></span>
+        <span class="dim label">Auto-select<HelpTip :text="HELP['prefs.autoSelect']" /></span>
         <select v-model="prefs.autoSelect" data-testid="auto-select">
           <option value="layer">Layer</option>
           <option value="group">Group</option>
@@ -123,13 +123,13 @@ const pillSelected = computed(() => {
 
     <template v-else-if="tool === 'hand'">
       <button class="ps-btn" @click="store.actualSize()">100%</button>
-      <button class="ps-btn" @click="store.fitToScreen()">Fit Screen</button>
-      <span class="dim">Zoom {{ zoomPct }}% · Ctrl + Scroll to zoom, drag to pan</span>
+      <button class="ps-btn" @click="store.fitToScreen()">Fit on Screen</button>
+      <span class="hint dim">Zoom: {{ zoomPct }}% · Drag to pan · Ctrl+scroll to zoom</span>
     </template>
 
     <template v-else-if="tool === 'pen'">
       <label class="opt">
-        <span class="dim">Draw into<HelpTip :text="HELP['line.target']" /></span>
+        <span class="dim label">Draw into<HelpTip :text="HELP['line.target']" /></span>
         <select v-model="s.penTarget" data-testid="pen-target">
           <option :value="null">New line</option>
           <option v-for="l in store.lines()" :key="l.lineId" :value="l.lineId">{{ l.name }}</option>
@@ -139,20 +139,20 @@ const pillSelected = computed(() => {
       <template v-if="s.penTarget === null">
         <ColorField v-model="prefs.line.color" label="Color" :help="HELP['line.color']" />
         <label class="opt">
-          <span class="dim">Style<HelpTip :text="HELP['line.kind']" /></span>
+          <span class="dim label">Style<HelpTip :text="HELP['line.kind']" /></span>
           <select v-model="prefs.line.kind" data-testid="line-style">
             <option v-for="k in STROKE_KINDS" :key="k.value" :value="k.value">{{ k.label }}</option>
           </select>
         </label>
         <label class="opt">
-          <span class="dim">Caps<HelpTip :text="HELP['line.caps']" /> Start</span>
+          <span class="dim label">Start cap<HelpTip :text="HELP['line.caps']" /></span>
           <select v-model="prefs.line.start_cap">
             <option value="round">Round</option>
             <option value="butt">Butt</option>
           </select>
         </label>
         <label class="opt">
-          <span class="dim">End</span>
+          <span class="dim">End cap</span>
           <select v-model="prefs.line.end_cap">
             <option value="round">Round</option>
             <option value="butt">Butt</option>
@@ -161,19 +161,19 @@ const pillSelected = computed(() => {
         <div v-if="prefs.line.kind !== 'plain'" class="sep-v" />
         <template v-if="hasChannel(prefs.line.kind)">
           <ColorField v-model="prefs.line.inner_color" label="Channel" :help="HELP['line.channel']" />
-          <NumberField v-model="prefs.line.inner_width_pct" label="Width" :min="0" :max="100" :precision="0" unit="%" :width="36" :help="HELP['line.channel_width']" />
+          <NumberField v-model="prefs.line.inner_width_pct" label="Channel width" :min="0" :max="100" :precision="0" unit="%" :width="36" :help="HELP['line.channel_width']" />
         </template>
         <template v-if="hasDashes(prefs.line.kind)">
           <ColorField v-model="prefs.line.inner_color" label="Dashes" :help="HELP['line.dash_color']" />
-          <NumberField v-model="prefs.line.dash_width_pct" label="Width" :min="0" :max="100" :precision="0" unit="%" :width="36" :help="HELP['line.dash_width']" />
-          <NumberField v-model="prefs.line.dash_length" label="Dash" :min="0.1" :step="0.1" :precision="1" unit="cells" :width="36" :help="HELP['line.dash_length']" />
+          <NumberField v-model="prefs.line.dash_width_pct" label="Dash width" :min="0" :max="100" :precision="0" unit="%" :width="36" :help="HELP['line.dash_width']" />
+          <NumberField v-model="prefs.line.dash_length" label="Dash length" :min="0.1" :step="0.1" :precision="1" unit="cells" :width="36" :help="HELP['line.dash_length']" />
           <NumberField v-model="prefs.line.dash_gap" label="Gap" :min="0" :step="0.1" :precision="1" unit="cells" :width="36" :help="HELP['line.dash_gap']" />
           <NumberField v-model="prefs.line.dash_start_offset" label="Start offset" :min="0" :step="0.5" :precision="1" unit="cells" :width="36" :help="HELP['line.dash_start_offset']" />
           <NumberField v-model="prefs.line.dash_end_offset" label="End offset" :min="0" :step="0.5" :precision="1" unit="cells" :width="36" :help="HELP['line.dash_end_offset']" />
         </template>
       </template>
-      <span v-else class="dim">Uses the line's style</span>
-      <span class="hint dim">Click to add points · click last point / Enter to finish · Backspace removes</span>
+      <span v-else class="dim">New segments use the line's style</span>
+      <span class="hint dim">Click to add points · Click the last point again or press Enter to finish · Backspace: remove the last point</span>
     </template>
 
     <template v-else-if="tool === 'eraser'">
@@ -182,7 +182,7 @@ const pillSelected = computed(() => {
     </template>
 
     <template v-else-if="tool === 'station'">
-      <span class="dim opt">Shape<HelpTip :text="HELP['station.shape']" /></span>
+      <span class="dim label">Shape<HelpTip :text="HELP['station.shape']" /></span>
       <Segmented
         v-model="prefs.station.kind"
         :options="[
@@ -193,12 +193,12 @@ const pillSelected = computed(() => {
       />
       <div class="sep-v" />
       <template v-if="prefs.station.kind !== 'tick'">
-        <ColorField v-model="prefs.station.outer_color" label="Outer" :help="HELP['station.outer_color']" />
-        <ColorField v-model="prefs.station.inner_color" label="Inner" :help="HELP['station.inner_color']" />
+        <ColorField v-model="prefs.station.outer_color" label="Border" :help="HELP['station.outer_color']" />
+        <ColorField v-model="prefs.station.inner_color" label="Fill" :help="HELP['station.inner_color']" />
       </template>
       <template v-else>
         <label class="opt">
-          <span class="dim">Side<HelpTip :text="HELP['station.tick_side']" /></span>
+          <span class="dim label">Side<HelpTip :text="HELP['station.tick_side']" /></span>
           <select v-model.number="prefs.station.tick_side">
             <option :value="1">Left</option>
             <option :value="-1">Right</option>
@@ -206,26 +206,26 @@ const pillSelected = computed(() => {
         </label>
         <label class="opt">
           <input type="checkbox" :checked="prefs.station.tick_color === null" @change="prefs.station.tick_color = ($event.target as HTMLInputElement).checked ? null : '#000000'" />
-          <span class="dim">Line color<HelpTip :text="HELP['station.tick_color']" /></span>
+          <span class="dim label">Line color<HelpTip :text="HELP['station.tick_color']" /></span>
         </label>
         <ColorField v-if="prefs.station.tick_color !== null" v-model="prefs.station.tick_color" />
       </template>
       <label class="opt">
         <input v-model="prefs.station.label" type="checkbox" />
-        <span class="dim">Name label<HelpTip :text="HELP['station.label']" /></span>
+        <span class="dim label">Name label<HelpTip :text="HELP['station.label']" /></span>
       </label>
       <span class="hint dim">{{ prefs.station.kind === 'pill' ? 'Drag across lines to paint a pill station' : 'Click on a line to place a station' }}</span>
     </template>
 
     <template v-else-if="tool === 'shape'">
-      <span class="dim opt">Shape<HelpTip :text="HELP['shape.kind']" /></span>
+      <span class="dim label">Shape<HelpTip :text="HELP['shape.kind']" /></span>
       <Segmented v-model="prefs.shape.kind" data-testid="shape-kind" :options="SHAPE_KINDS" />
       <div class="sep-v" />
       <template v-if="prefs.shape.kind === 'line'">
         <ColorField v-model="prefs.shape.line.color" label="Color" :help="HELP['shape.line_color']" />
         <NumberField v-model="prefs.shape.line.thickness" label="Width" :min="0.01" :step="0.05" unit="cells" :width="40" :help="HELP['shape.thickness']" data-testid="shape-thickness" />
         <label class="opt">
-          <span class="dim">Caps<HelpTip :text="HELP['shape.cap']" /></span>
+          <span class="dim label">Caps<HelpTip :text="HELP['shape.cap']" /></span>
           <select v-model="prefs.shape.line.cap">
             <option value="round">Round</option>
             <option value="butt">Butt</option>
@@ -235,19 +235,19 @@ const pillSelected = computed(() => {
       <template v-else>
         <label class="opt">
           <input v-model="shapePaint.filled" type="checkbox" data-testid="shape-filled" />
-          <span class="dim">Fill<HelpTip :text="HELP['shape.fill']" /></span>
+          <span class="dim label">Fill<HelpTip :text="HELP['shape.fill']" /></span>
         </label>
-        <ColorField v-if="shapePaint.filled" v-model="shapePaint.color" :help="HELP['shape.fill_color']" />
+        <ColorField v-if="shapePaint.filled" v-model="shapePaint.color" />
       </template>
       <ColorField v-model="shapePaint.border_color" label="Border" :help="HELP['shape.border_color']" />
       <NumberField v-model="shapePaint.border_width" label="Border width" :min="0" :step="0.05" unit="cells" :width="40" :help="HELP['shape.border_width']" />
       <template v-if="prefs.shape.kind === 'line'">
         <label class="opt">
           <input v-model="prefs.shape.line.dashed" type="checkbox" data-testid="shape-dashed" />
-          <span class="dim">Dashed<HelpTip :text="HELP['shape.dashed']" /></span>
+          <span class="dim label">Dashed<HelpTip :text="HELP['shape.dashed']" /></span>
         </label>
         <template v-if="prefs.shape.line.dashed">
-          <NumberField v-model="prefs.shape.line.dash_length" label="Dash" :min="0.05" :step="0.1" unit="cells" :width="36" :help="HELP['shape.dash_length']" />
+          <NumberField v-model="prefs.shape.line.dash_length" label="Dash length" :min="0.05" :step="0.1" unit="cells" :width="36" :help="HELP['shape.dash_length']" />
           <NumberField v-model="prefs.shape.line.dash_gap" label="Gap" :min="0" :step="0.1" unit="cells" :width="36" :help="HELP['shape.dash_gap']" />
         </template>
       </template>
@@ -296,7 +296,12 @@ const pillSelected = computed(() => {
 .opt {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
+}
+/* A label and its help icon. */
+.label {
+  display: inline-flex;
+  align-items: center;
 }
 .hint {
   margin-left: 6px;

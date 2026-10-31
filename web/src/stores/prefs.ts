@@ -129,7 +129,7 @@ export function defaultPrefs(): Prefs {
     icon: { icon: 'wheelchair', color: '#ffffff', background: '#1d4f91', size: null },
     shape: {
       kind: 'rect',
-      line: { color: '#1a1a1a', filled: true, border_color: '#ffffff', border_width: 0, thickness: 0.1, cap: 'round', dashed: false, dash_length: 0.5, dash_gap: 0.3 },
+      line: { color: '#1a1a1a', filled: true, border_color: '#ffffff', border_width: 0, thickness: 0.1, cap: 'butt', dashed: false, dash_length: 0.5, dash_gap: 0.3 },
       rect: { color: '#e6e6e6', filled: true, border_color: '#1a1a1a', border_width: 0.1 },
       circle: { color: '#ffffff', filled: true, border_color: '#000000', border_width: 0.22 },
     },

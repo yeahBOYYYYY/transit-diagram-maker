@@ -59,7 +59,8 @@ const bubble = computed(() => {
   display: inline-flex;
   align-items: center;
   flex: none;
-  margin: 0 2px;
+  /* The same small gap after every label, whatever lays the label out. */
+  margin: 0 0 0 3px;
   color: #7d7d7d;
   cursor: help;
   outline: none;
