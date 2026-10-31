@@ -10,3 +10,6 @@ web/.vite
 # insta snapshots awaiting review
 *.snap.new
 *.pending-snap
+
+# kept locally, not in the repository
+docs/
