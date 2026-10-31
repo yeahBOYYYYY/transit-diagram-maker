@@ -1365,8 +1365,8 @@ fn content_anchor(c: &Content) -> Option<Vec2> {
 }
 
 /// Keep a shape's numbers in range: positions and sizes in tenths of a cell
-/// (sizes at least a tenth), widths in hundredths, and a rectangle's
-/// rotation in (-45°, 45°] (a quarter turn swaps its width and height
+/// (sizes at least a tenth), widths and corner radii in hundredths, and a
+/// rectangle's rotation in (-45°, 45°] (a quarter turn swaps its width and height
 /// around the same center instead).
 pub fn tidy_shape(sh: &mut Shape) {
     let size = |v: f64| geom::snap_tenth(v).clamp(0.1, 1000.0);
@@ -1380,7 +1380,7 @@ pub fn tidy_shape(sh: &mut Shape) {
             *dash_length = fine(*dash_length, 0.05, 100.0);
             *dash_gap = fine(*dash_gap, 0.0, 100.0);
         }
-        ShapeGeometry::Rect { pos, width, height, rotation } => {
+        ShapeGeometry::Rect { pos, width, height, rotation, corner_radius } => {
             let (mut w, mut h) = (size(*width), size(*height));
             let center = pos.add(Vec2::new(w / 2.0, h / 2.0));
             let mut r = free_rotation(*rotation);
@@ -1398,6 +1398,7 @@ pub fn tidy_shape(sh: &mut Shape) {
             }
             *pos = center.sub(Vec2::new(w / 2.0, h / 2.0)).snapped();
             (*width, *height, *rotation) = (w, h, free_rotation(r));
+            *corner_radius = fine(*corner_radius, 0.0, 500.0);
         }
         ShapeGeometry::Circle { center, radius } => {
             *center = center.snapped();
@@ -1424,7 +1425,7 @@ fn rotate_shape(sh: &mut Shape, pivot: Vec2, angle: f64, steps: i32, free: bool)
             };
             *from = start;
         }
-        ShapeGeometry::Rect { pos, width, height, rotation } => {
+        ShapeGeometry::Rect { pos, width, height, rotation, .. } => {
             let half = Vec2::new(*width / 2.0, *height / 2.0);
             *pos = pos.add(half).rotate_around(pivot, angle).sub(half);
             *rotation = if free { free_rotation(*rotation + angle) } else { snap_rotation(*rotation + angle) };

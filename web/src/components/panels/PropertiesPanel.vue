@@ -449,6 +449,7 @@ const childCount = computed(() => (group.value ? (findItem(s.tree, group.value.i
           <div class="ctl"><ColorField :model-value="shape.border_color" @update:model-value="(v) => patch({ border_color: v })" /></div>
         </div>
         <NumberField :model-value="shape.border_width" label="Border width" :min="0" :step="0.05" unit="cells" :help="HELP['shape.border_width']" @update:model-value="(v) => patch({ border_width: v })" @commit="done" />
+        <NumberField v-if="shape.shape === 'rect'" :model-value="shape.corner_radius" label="Corner radius" :min="0" :step="0.1" unit="cells" :help="HELP['shape.corner_radius']" data-testid="prop-shape-corner-radius" @update:model-value="(v) => patch({ corner_radius: v })" @commit="done" />
         <template v-if="shape.shape === 'line'">
           <div class="prop">
             <span class="lbl">Dashed<HelpTip :text="HELP['shape.dashed']" /></span>

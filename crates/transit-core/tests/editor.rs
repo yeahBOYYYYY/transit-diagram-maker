@@ -1228,7 +1228,7 @@ fn rotated_shapes_stay_on_the_grid() {
     // A quarter turn swaps the rectangle's sides instead of storing 90°.
     let r = ed.add_shape(Shape::rect(v(0.0, 0.0), 2.0, 3.0)).unwrap();
     assert_eq!(ed.rotate(&[r], 90.0, v(1.2, 1.4), false).unwrap(), 90.0);
-    let ShapeGeometry::Rect { pos, width, height, rotation } = shape(&ed, r).geometry else { panic!() };
+    let ShapeGeometry::Rect { pos, width, height, rotation, .. } = shape(&ed, r).geometry else { panic!() };
     assert_eq!((width, height, rotation), (3.0, 2.0, 0.0));
     assert_eq!((pos.x.fract(), pos.y.fract()), (0.0, 0.0), "still covers whole cells: {pos:?}");
     ed.rotate(&[r], 45.0, v(1.0, 1.0), false).unwrap();
@@ -1279,3 +1279,20 @@ fn shape_bounds_cover_the_whole_shape() {
     let b = ed.bounds(&[l]).unwrap();
     assert!((b.x - 0.0).abs() < 1e-9 && (b.w - 4.0 * g).abs() < 1e-9 && (b.h - 1.0 * g).abs() < 1e-9, "{b:?}");
 }
+
+#[test]
+fn rectangles_have_rounded_corners() {
+    let mut ed = Editor::new();
+    let g = CELL_PX;
+    let r = ed.add_shape(Shape::rect(v(0.0, 0.0), 2.0, 2.0)).unwrap();
+    assert!(matches!(shape(&ed, r).geometry, ShapeGeometry::Rect { corner_radius, .. } if corner_radius == 0.0), "sharp by default");
+    ed.update_content(r, &json!({"corner_radius": 0.456})).unwrap();
+    assert!(matches!(shape(&ed, r).geometry, ShapeGeometry::Rect { corner_radius, .. } if corner_radius == 0.46));
+    ed.update_content(r, &json!({"corner_radius": -1})).unwrap();
+    assert!(matches!(shape(&ed, r).geometry, ShapeGeometry::Rect { corner_radius, .. } if corner_radius == 0.0));
+    // Turned by 45°, a fully rounded square is a circle and its bounds stay 2 cells wide.
+    ed.update_content(r, &json!({"corner_radius": 5, "rotation": 45})).unwrap();
+    let b = ed.bounds(&[r]).unwrap();
+    assert!((b.w - 2.0 * g).abs() < 1e-9 && (b.h - 2.0 * g).abs() < 1e-9, "{b:?}");
+}
+

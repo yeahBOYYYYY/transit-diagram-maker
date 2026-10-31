@@ -647,7 +647,16 @@ pub enum ShapeGeometry {
     /// A rectangle whose top-left corner is `pos`, normally covering whole
     /// cells. It is turned by `rotation` degrees around its center, kept in
     /// (-45, 45] (a quarter turn swaps the width and the height instead).
-    Rect { pos: Vec2, width: f64, height: f64, rotation: f64 },
+    /// `corner_radius` rounds its corners, in cells (0 for sharp corners);
+    /// it is drawn at most half the shorter side, so a resize keeps it.
+    Rect {
+        pos: Vec2,
+        width: f64,
+        height: f64,
+        rotation: f64,
+        #[serde(default)]
+        corner_radius: f64,
+    },
     /// A circle, normally centered on a cell center.
     Circle { center: Vec2, radius: f64 },
 }
@@ -681,7 +690,7 @@ impl Shape {
 
     pub fn rect(pos: Vec2, width: f64, height: f64) -> Self {
         Shape {
-            geometry: ShapeGeometry::Rect { pos, width, height, rotation: 0.0 },
+            geometry: ShapeGeometry::Rect { pos, width, height, rotation: 0.0, corner_radius: 0.0 },
             color: "#e6e6e6".into(),
             filled: true,
             border_color: "#1a1a1a".into(),
@@ -724,7 +733,7 @@ impl Shape {
     pub fn snap_points(&self) -> Vec<Vec2> {
         match &self.geometry {
             ShapeGeometry::Line { from, to, .. } => vec![*from, *to],
-            ShapeGeometry::Rect { pos, width, height, rotation } => {
+            ShapeGeometry::Rect { pos, width, height, rotation, .. } => {
                 let c = pos.add(Vec2::new(width / 2.0, height / 2.0));
                 [(0.0, 0.0), (*width, 0.0), (0.0, *height), (*width, *height)]
                     .iter()

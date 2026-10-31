@@ -79,6 +79,7 @@ export const HELP = {
   'shape.width': 'Width of the rectangle, in cells.',
   'shape.height': 'Height of the rectangle, in cells.',
   'shape.radius': 'Radius of the circle, in cells. 0.5 fills exactly one cell.',
+  'shape.corner_radius': 'Radius of the rounded corners of the rectangle, in cells. 0 gives sharp corners; it is never drawn larger than half the shorter side.',
   'shape.rotation': 'Rotation in degrees around the center of the rectangle. The rotate handles turn in steps of 45°; hold Alt to turn freely. A quarter turn swaps the width and the height.',
 
   // Eraser

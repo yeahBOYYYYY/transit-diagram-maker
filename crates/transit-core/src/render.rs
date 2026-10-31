@@ -374,11 +374,17 @@ pub fn shape_svg(sh: &Shape, settings: &DocSettings) -> String {
             s.push_str("/>");
             s
         }
-        ShapeGeometry::Rect { pos, width, height, rotation } => {
+        ShapeGeometry::Rect { pos, width, height, rotation, corner_radius } => {
             let (w, h) = (width * g, height * g);
             let b = b.min(w.min(h) / 2.0);
             let p = pos.scale(g);
             let mut s = format!(r#"<rect x="{}" y="{}" width="{}" height="{}" fill="{fill}""#, n(p.x + b / 2.0), n(p.y + b / 2.0), n(w - b), n(h - b));
+            // The stroke runs half a border inside the edge, so its corners
+            // are that much tighter than the outer ones.
+            let rx = (corner_radius.max(0.0) * g).min(w.min(h) / 2.0) - b / 2.0;
+            if rx > 0.0 {
+                let _ = write!(s, r#" rx="{}""#, n(rx));
+            }
             if b > 0.0 {
                 let _ = write!(s, r#" stroke="{border}" stroke-width="{}""#, n(b));
             }
@@ -415,9 +421,11 @@ fn shape_bounds(sh: &Shape, settings: &DocSettings) -> Option<Rect> {
             let nrm = d.perp().scale(h);
             Rect::from_points([a.add(nrm), a.sub(nrm), z.add(nrm), z.sub(nrm)])
         }
-        ShapeGeometry::Rect { pos, width, height, rotation } => {
+        ShapeGeometry::Rect { pos, width, height, rotation, corner_radius } => {
             let r = Rect { x: pos.x * g, y: pos.y * g, w: width * g, h: height * g };
-            Some(rotated_rect_bounds(r.center(), r, *rotation))
+            // A turned rounded rectangle reaches as far as its corner circles.
+            let rx = (corner_radius.max(0.0) * g).min(r.w.min(r.h) / 2.0);
+            Some(rotated_rect_bounds(r.center(), r.inflate(-rx), *rotation).inflate(rx))
         }
         ShapeGeometry::Circle { center, radius } => {
             let c = center.scale(g);

@@ -241,6 +241,7 @@ const pillSelected = computed(() => {
       </template>
       <ColorField v-model="shapePaint.border_color" label="Border" :help="HELP['shape.border_color']" />
       <NumberField v-model="shapePaint.border_width" label="Border width" :min="0" :step="0.05" unit="cells" :width="40" :help="HELP['shape.border_width']" />
+      <NumberField v-if="prefs.shape.kind === 'rect'" v-model="prefs.shape.rect.corner_radius" label="Corner radius" :min="0" :step="0.1" unit="cells" :width="40" :help="HELP['shape.corner_radius']" data-testid="shape-corner-radius" />
       <template v-if="prefs.shape.kind === 'line'">
         <label class="opt">
           <input v-model="prefs.shape.line.dashed" type="checkbox" data-testid="shape-dashed" />

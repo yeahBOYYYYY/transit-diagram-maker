@@ -55,7 +55,7 @@ export interface Prefs {
   shape: {
     kind: ShapeKind
     line: ShapePaint & { thickness: number; cap: Cap; dashed: boolean; dash_length: number; dash_gap: number }
-    rect: ShapePaint
+    rect: ShapePaint & { corner_radius: number }
     circle: ShapePaint
   }
 }
@@ -130,7 +130,7 @@ export function defaultPrefs(): Prefs {
     shape: {
       kind: 'rect',
       line: { color: '#1a1a1a', filled: true, border_color: '#ffffff', border_width: 0, thickness: 0.1, cap: 'butt', dashed: false, dash_length: 0.5, dash_gap: 0.3 },
-      rect: { color: '#e6e6e6', filled: true, border_color: '#1a1a1a', border_width: 0.1 },
+      rect: { color: '#e6e6e6', filled: true, border_color: '#1a1a1a', border_width: 0.1, corner_radius: 0 },
       circle: { color: '#ffffff', filled: true, border_color: '#000000', border_width: 0.22 },
     },
   }

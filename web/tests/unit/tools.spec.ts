@@ -413,6 +413,11 @@ describe('shape tool', () => {
     expect(shapeOf(store)).toMatchObject({ width: 6, height: 6 })
     drag(store, tools.shape, [0.33, 0.5], [2.04, 1.26], { alt: true })
     expect(shapeOf(store)).toMatchObject({ pos: { x: 0.3, y: 0.5 }, width: 1.7, height: 0.8 })
+    // Sharp corners by default; the tool option rounds the next rectangles.
+    expect(shapeOf(store)).toMatchObject({ corner_radius: 0 })
+    prefs.shape.rect.corner_radius = 0.5
+    expect(drag(store, tools.shape, [0.5, 0.5], [2.5, 1.5])).toContain('rx="10.8"')
+    expect(shapeOf(store)).toMatchObject({ corner_radius: 0.5 })
   })
 
   it('draws lines between grid intersections in 8 directions, or anywhere with Alt', () => {

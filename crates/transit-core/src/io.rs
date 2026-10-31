@@ -236,12 +236,13 @@ fn layer_tag(l: &Layer) -> String {
                     .flag("dashed", *dashed, false)
                     .attr("dash-length", num(*dash_length))
                     .attr("dash-gap", num(*dash_gap)),
-                ShapeGeometry::Rect { pos, width, height, rotation } => t
+                ShapeGeometry::Rect { pos, width, height, rotation, corner_radius } => t
                     .attr("shape", "rect")
                     .attr("pos", vec2(*pos))
                     .attr("width", num(*width))
                     .attr("height", num(*height))
-                    .attr("rotation", num(*rotation)),
+                    .attr("rotation", num(*rotation))
+                    .attr("corner-radius", num(*corner_radius)),
                 ShapeGeometry::Circle { center, radius } => t.attr("shape", "circle").attr("center", vec2(*center)).attr("radius", num(*radius)),
             }
             .empty()
@@ -527,7 +528,13 @@ fn read_shape(e: &El) -> Result<Shape> {
             dash_length: e.num("dash-length", 0.5)?,
             dash_gap: e.num("dash-gap", 0.3)?,
         },
-        "rect" => ShapeGeometry::Rect { pos: e.vec2("pos")?, width: e.num("width", 1.0)?, height: e.num("height", 1.0)?, rotation: e.num("rotation", 0.0)? },
+        "rect" => ShapeGeometry::Rect {
+            pos: e.vec2("pos")?,
+            width: e.num("width", 1.0)?,
+            height: e.num("height", 1.0)?,
+            rotation: e.num("rotation", 0.0)?,
+            corner_radius: e.num("corner-radius", 0.0)?,
+        },
         "circle" => ShapeGeometry::Circle { center: e.vec2("center")?, radius: e.num("radius", 0.5)? },
         other => return Err(e.bad("shape", other)),
     };

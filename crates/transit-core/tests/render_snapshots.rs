@@ -119,8 +119,9 @@ fn every_shape_kind() {
         *d = true;
         *cap = Cap::Butt;
     }
-    let rect = Shape { geometry: ShapeGeometry::Rect { pos: Vec2::new(1.0, 1.0), width: 3.0, height: 2.0, rotation: 45.0 }, ..Shape::rect(Vec2::default(), 1.0, 1.0) };
+    let rect = Shape { geometry: ShapeGeometry::Rect { pos: Vec2::new(1.0, 1.0), width: 3.0, height: 2.0, rotation: 45.0, corner_radius: 0.0 }, ..Shape::rect(Vec2::default(), 1.0, 1.0) };
     let outline = Shape { filled: false, ..Shape::circle(Vec2::new(2.5, 6.5), 1.5) };
-    let shapes = [Shape::line(Vec2::new(0.0, 0.0), Vec2::new(3.0, 3.0)), dashed, rect, Shape::circle(Vec2::new(0.5, 0.5), 0.5), outline];
+    let rounded = Shape { geometry: ShapeGeometry::Rect { pos: Vec2::new(5.0, 1.0), width: 4.0, height: 2.0, rotation: 0.0, corner_radius: 0.5 }, ..Shape::rect(Vec2::default(), 1.0, 1.0) };
+    let shapes = [Shape::line(Vec2::new(0.0, 0.0), Vec2::new(3.0, 3.0)), dashed, rect, rounded, Shape::circle(Vec2::new(0.5, 0.5), 0.5), outline];
     insta::assert_snapshot!(shapes.iter().map(|sh| render::shape_svg(sh, &s)).collect::<Vec<_>>().join("\n"));
 }

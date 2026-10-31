@@ -31,6 +31,9 @@ fn sample() -> Editor {
     ed.add_shape(dashed).unwrap();
     let mut rect = Shape::rect(Vec2::new(5.0, 7.0), 3.0, 2.0);
     rect.filled = false;
+    if let ShapeGeometry::Rect { corner_radius, .. } = &mut rect.geometry {
+        *corner_radius = 0.5;
+    }
     ed.add_shape(rect).unwrap();
     let circle = ed.add_shape(Shape::circle(Vec2::new(12.5, 0.5), 1.5)).unwrap();
     ed.rotate(&[circle], 30.0, Vec2::new(0.0, 0.0), true).unwrap();

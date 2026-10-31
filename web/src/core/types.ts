@@ -134,8 +134,8 @@ export type ShapeKind = 'line' | 'rect' | 'circle'
 export type ShapeGeometry =
   /** A straight line between two points (grid intersections unless drawn with Alt). */
   | { shape: 'line'; from: Vec2; to: Vec2; thickness: number; cap: Cap; dashed: boolean; dash_length: number; dash_gap: number }
-  /** `pos` is the top-left corner; it turns around its center, `rotation` in (-45, 45]. */
-  | { shape: 'rect'; pos: Vec2; width: number; height: number; rotation: number }
+  /** `pos` is the top-left corner; it turns around its center, `rotation` in (-45, 45]. `corner_radius` in cells, 0 for sharp corners. */
+  | { shape: 'rect'; pos: Vec2; width: number; height: number; rotation: number; corner_radius: number }
   | { shape: 'circle'; center: Vec2; radius: number }
 
 /** Colors and border shared by every shape. */
