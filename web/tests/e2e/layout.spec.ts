@@ -6,7 +6,7 @@ test.describe('workspace layout', () => {
 
   test('shows menu bar, tools, options, panels and status bar', async ({ page }) => {
     await expect(page).toHaveTitle('Transit Diagram Maker')
-    for (const menu of ['File', 'Edit', 'Document', 'Layer', 'Select', 'View', 'Window', 'Help']) {
+    for (const menu of ['File', 'Edit', 'Layer', 'Select', 'View', 'Window', 'Help']) {
       await expect(page.locator(`[data-menu=${menu}]`)).toBeVisible()
     }
     for (const id of ['tools-panel', 'options-bar', 'properties-panel', 'layers-panel', 'status-bar', 'canvas']) {

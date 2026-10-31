@@ -55,7 +55,7 @@ export const HELP = {
   'icon.panel':
     'Clicking a pictogram changes the selected pictograms to it, or adds it in the middle of the view when no pictogram is selected. Dragging a pictogram onto the canvas places it in the cell under the pointer (hold Alt to place it exactly under the pointer).',
   'icon.defaults': 'Colors and size given to pictograms you add from this panel.',
-  'icon.upload': 'SVG files you uploaded into this document. They are saved inside the file. Remove them in Document ▸ Fonts & Icons.',
+  'icon.upload': 'SVG files you uploaded into this document. They are saved inside the file. Remove them in File ▸ Fonts & Icons.',
   'icon.color': 'Color of the pictogram symbol.',
   'icon.background': 'Color of the rounded tile behind the symbol.',
   'icon.size': 'Edge length of the tile, in cells.',

@@ -15,7 +15,6 @@ test.describe('structure', () => {
       - button "Save (Ctrl+S)"
       - button "File"
       - button "Edit"
-      - button "Document"
       - button "Layer"
       - button "Select"
       - button "View"
@@ -63,6 +62,20 @@ test.describe('structure', () => {
     // The canvas takes most of the window.
     expect(canvas.width * canvas.height).toBeGreaterThan(0.4 * viewport.width * viewport.height)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  })
+
+  test('File menu holds the file commands and the document settings', async ({ page }) => {
+    await page.click('[data-menu=File]')
+    await expect(page.getByRole('menu')).toMatchAriaSnapshot(`
+      - menu:
+        - menuitem "New Ctrl+Alt+N"
+        - menuitem "Open… Ctrl+O"
+        - menuitem "Save Ctrl+S"
+        - menuitem "Save As… Ctrl+Shift+S"
+        - menuitem "Export as SVG… Ctrl+Shift+E"
+        - menuitem "Document Settings… Ctrl+Alt+D"
+        - menuitem "Fonts & Icons…"
+    `)
   })
 
   test('Layer menu lists its commands with their shortcuts', async ({ page }) => {

@@ -46,7 +46,7 @@ function reset(): void {
       </label>
       <ColorField v-if="draft.background !== ''" v-model="draft.background" label="Background" :help="HELP['export.background']" />
     </div>
-    <p class="dim note">Line widths, station sizes and the other drawing constants are document settings (Document ▸ Document Settings).</p>
+    <p class="dim note">Line widths, station sizes and the other drawing constants are document settings (File ▸ Document Settings).</p>
     <template #extra>
       <button class="ps-btn" @click="reset">Reset to defaults</button>
     </template>

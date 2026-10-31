@@ -130,8 +130,8 @@ test.describe('saving, opening and exporting', () => {
     expect(iconSvg).not.toContain('onclick')
     expect(iconSvg).not.toContain('script')
 
-    // Both are listed in Document > Fonts & Icons…
-    await page.click('[data-menu=Document]')
+    // Both are listed in File ▸ Fonts & Icons…
+    await page.click('[data-menu=File]')
     await page.click('.dropdown .item:has-text("Fonts & Icons")')
     await expect(page.getByTestId('asset-fonts')).toContainText('City Sans')
     await expect(page.getByTestId('asset-icons')).toContainText('star')

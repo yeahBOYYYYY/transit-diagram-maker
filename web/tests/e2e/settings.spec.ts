@@ -6,7 +6,7 @@ test.describe('settings and shortcuts', () => {
 
   test('document settings change rendering constants', async ({ page }) => {
     await drawLine(page, [[0, 0], [6, 0]])
-    await page.click('[data-menu=Document]')
+    await page.click('[data-menu=File]')
     await page.click('.dropdown .item:has-text("Document Settings")')
     const dialog = page.getByTestId('dialog')
     await expect(dialog).toBeVisible()
@@ -59,9 +59,12 @@ test.describe('settings and shortcuts', () => {
     expect(await state(page, (s) => s.fragments.length)).toBe(2)
   })
 
-  test('route mode toggles how the pen bends', async ({ page }) => {
-    await page.click('[data-menu=Document]')
-    await page.click('.dropdown .item:has-text("Diagonal then Straight")')
+  test('the pen routing is a document setting, not a menu item', async ({ page }) => {
+    await page.click('[data-menu=File]')
+    await expect(page.locator('.dropdown .item', { hasText: /diagonal/i })).toHaveCount(0)
+    await page.click('.dropdown .item:has-text("Document Settings")')
+    await page.getByTestId('dialog').getByRole('combobox', { name: /Pen routing/ }).selectOption('diagonal_first')
+    await page.getByTestId('dialog-ok').click()
     await drawLine(page, [[0, 0], [5, 2]])
     const pts = await state(page, (s) => (window as any).__transit.node(s.fragments[0].id).content.points)
     expect(pts).toEqual([{ x: 0, y: 0 }, { x: 2, y: 2 }, { x: 5, y: 2 }])

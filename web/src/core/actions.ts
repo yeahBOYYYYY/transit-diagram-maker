@@ -20,8 +20,8 @@ export const ACTIONS = {
   'edit.shortcuts': { label: 'Keyboard Shortcuts…', category: 'Edit', key: 'Ctrl+Alt+Shift+K' },
   'edit.restoreDefaults': { label: 'Restore All Defaults…', category: 'Edit', key: '' },
 
-  'document.settings': { label: 'Document Settings…', category: 'Document', key: 'Ctrl+Alt+D' },
-  'document.assets': { label: 'Fonts & Icons…', category: 'Document', key: '' },
+  'document.settings': { label: 'Document Settings…', category: 'File', key: 'Ctrl+Alt+D' },
+  'document.assets': { label: 'Fonts & Icons…', category: 'File', key: '' },
 
   'layer.newGroup': { label: 'New Group', category: 'Layer', key: 'Ctrl+Shift+N' },
   'layer.group': { label: 'Group Layers', category: 'Layer', key: 'Ctrl+G' },

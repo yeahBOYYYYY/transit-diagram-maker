@@ -24,7 +24,17 @@ const bar = ref<HTMLElement | null>(null)
 const menus = computed<{ name: string; items: Item[] }[]>(() => [
   {
     name: 'File',
-    items: [{ action: 'file.new' }, { action: 'file.open' }, { sep: true }, { action: 'file.save' }, { action: 'file.saveAs' }, { action: 'file.exportSvg' }],
+    items: [
+      { action: 'file.new' },
+      { action: 'file.open' },
+      { sep: true },
+      { action: 'file.save' },
+      { action: 'file.saveAs' },
+      { action: 'file.exportSvg' },
+      { sep: true },
+      { action: 'document.settings' },
+      { action: 'document.assets' },
+    ],
   },
   {
     name: 'Edit',
@@ -41,24 +51,6 @@ const menus = computed<{ name: string; items: Item[] }[]>(() => [
       { action: 'edit.shortcuts' },
       { action: 'edit.preferences' },
       { action: 'edit.restoreDefaults' },
-    ],
-  },
-  {
-    name: 'Document',
-    items: [
-      { action: 'document.settings' },
-      { action: 'document.assets' },
-      { sep: true },
-      {
-        label: 'Route: Straight then Diagonal',
-        toggle: () => store.state.settings.route_mode === 'straight_first',
-        set: () => store.run((e) => e.setSettings({ ...store.state.settings, route_mode: 'straight_first' })),
-      },
-      {
-        label: 'Route: Diagonal then Straight',
-        toggle: () => store.state.settings.route_mode === 'diagonal_first',
-        set: () => store.run((e) => e.setSettings({ ...store.state.settings, route_mode: 'diagonal_first' })),
-      },
     ],
   },
   {
