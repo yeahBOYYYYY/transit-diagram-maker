@@ -344,28 +344,79 @@ pub fn icon_svg(i: &Icon, settings: &DocSettings, assets: &Assets) -> String {
     )
 }
 
+/// A gradient definition for a box centered on `c` with half sizes `hw` ×
+/// `hh` in the user space of the element that paints with it, turned by
+/// `turn` degrees around `c` (for a straight line, whose box runs along it).
+/// A linear gradient crosses the box at `g.angle` from corner to corner, a
+/// radial one reaches `reach` from the center. User space units keep the
+/// angles true on boxes that aren't square, and work on a horizontal line,
+/// whose bounding box has no height.
+fn gradient_def(id: &str, g: &Gradient, c: Vec2, hw: f64, hh: f64, reach: f64, turn: f64) -> String {
+    let mut s = match g.kind {
+        GradientKind::Linear => {
+            let (sin, cos) = g.angle.to_radians().sin_cos();
+            let half = (hw * cos).abs() + (hh * sin).abs();
+            let d = Vec2::new(cos * half, sin * half);
+            let (a, z) = (c.sub(d), c.add(d));
+            format!(r#"<linearGradient id="{id}" gradientUnits="userSpaceOnUse" x1="{}" y1="{}" x2="{}" y2="{}""#, n(a.x), n(a.y), n(z.x), n(z.y))
+        }
+        GradientKind::Radial => format!(r#"<radialGradient id="{id}" gradientUnits="userSpaceOnUse" cx="{}" cy="{}" r="{}""#, n(c.x), n(c.y), n(reach.max(0.01))),
+    };
+    if turn != 0.0 {
+        let _ = write!(s, r#" gradientTransform="rotate({} {} {})""#, n(turn), n(c.x), n(c.y));
+    }
+    s.push('>');
+    for st in &g.stops {
+        let _ = write!(s, r#"<stop offset="{}" stop-color="{}"/>"#, n(st.position), esc(&st.color));
+    }
+    s.push_str(match g.kind {
+        GradientKind::Linear => "</linearGradient>",
+        GradientKind::Radial => "</radialGradient>",
+    });
+    s
+}
+
 /// A straight line, rectangle or circle. Borders of rectangles and circles
 /// are drawn inside their edge, so the shape covers exactly its cells; a
 /// line's border goes around it (a wider line of the border color below).
-pub fn shape_svg(sh: &Shape, settings: &DocSettings) -> String {
+/// Gradients are defined in front of the shape, with ids starting with
+/// `key` (unique in the page: the canvas and the export use the layer id).
+pub fn shape_svg(sh: &Shape, settings: &DocSettings, key: &str) -> String {
     let g = settings.cell_px;
     let b = sh.border_width.max(0.0) * g;
-    let fill = if sh.filled { esc(&sh.color) } else { "none".into() };
-    let border = esc(&sh.border_color);
-    match &sh.geometry {
+    let (fill_id, border_id) = (format!("{key}-fill"), format!("{key}-border"));
+    let paint = |gr: &Option<Gradient>, id: &str, flat: &str| if gr.is_some() { format!("url(#{id})") } else { esc(flat) };
+    let color = paint(&sh.gradient, &fill_id, &sh.color);
+    let fill = if sh.filled { color.clone() } else { "none".into() };
+    let border = paint(&sh.border_gradient, &border_id, &sh.border_color);
+    // Gradient definitions for the paints in use, each over its box: the
+    // center, the half sizes, the radial reach and the turn.
+    let mut defs = String::new();
+    let mut def = |gr: &Option<Gradient>, id: &str, used: bool, c: Vec2, hw: f64, hh: f64, reach: f64, turn: f64| {
+        if let (Some(gr), true) = (gr, used) {
+            defs.push_str(&gradient_def(id, gr, c, hw, hh, reach, turn));
+        }
+    };
+    let body = match &sh.geometry {
         ShapeGeometry::Line { from, to, thickness, cap, dashed, dash_length, dash_gap } => {
             let (a, z) = (from.scale(g), to.scale(g));
             let ends = format!(r#"x1="{}" y1="{}" x2="{}" y2="{}""#, n(a.x), n(a.y), n(z.x), n(z.y));
-            let cap = match cap {
-                Cap::Butt => "butt",
-                Cap::Round => "round",
-            };
+            let round = *cap == Cap::Round;
+            let cap = if round { "round" } else { "butt" };
             let w = thickness.max(0.0) * g;
+            // A line's gradients run in its own box, turned along it.
+            let (mid, half_len, turn) = (a.add(z).scale(0.5), z.sub(a).len() / 2.0, (z.y - a.y).atan2(z.x - a.x).to_degrees());
+            let mut boxed = |gr: &Option<Gradient>, id: &str, used: bool, hw: f64| {
+                let hl = half_len + if round { hw } else { 0.0 };
+                def(gr, id, used, mid, hl, hw, hl.hypot(hw), turn);
+            };
+            boxed(&sh.border_gradient, &border_id, b > 0.0, w / 2.0 + b);
+            boxed(&sh.gradient, &fill_id, true, w / 2.0);
             let mut s = String::new();
             if b > 0.0 {
                 let _ = write!(s, r#"<line {ends} stroke="{border}" stroke-width="{}" stroke-linecap="{cap}"/>"#, n(w + 2.0 * b));
             }
-            let _ = write!(s, r#"<line {ends} stroke="{}" stroke-width="{}" stroke-linecap="{cap}""#, esc(&sh.color), n(w));
+            let _ = write!(s, r#"<line {ends} stroke="{color}" stroke-width="{}" stroke-linecap="{cap}""#, n(w));
             if *dashed {
                 if let Some(v) = dash_array(z.sub(a).len(), 0.0, 0.0, (dash_length * g).max(0.5), (dash_gap * g).max(0.0)) {
                     let _ = write!(s, r#" stroke-dasharray="{}""#, v.iter().map(|x| n(*x)).collect::<Vec<_>>().join(" "));
@@ -378,6 +429,11 @@ pub fn shape_svg(sh: &Shape, settings: &DocSettings) -> String {
             let (w, h) = (width * g, height * g);
             let b = b.min(w.min(h) / 2.0);
             let p = pos.scale(g);
+            // The rectangle's own transform turns its gradients with it.
+            let c = p.add(Vec2::new(w / 2.0, h / 2.0));
+            let reach = (w / 2.0).hypot(h / 2.0);
+            def(&sh.gradient, &fill_id, sh.filled, c, w / 2.0, h / 2.0, reach, 0.0);
+            def(&sh.border_gradient, &border_id, b > 0.0, c, w / 2.0, h / 2.0, reach, 0.0);
             let mut s = format!(r#"<rect x="{}" y="{}" width="{}" height="{}" fill="{fill}""#, n(p.x + b / 2.0), n(p.y + b / 2.0), n(w - b), n(h - b));
             // The stroke runs half a border inside the edge, so its corners
             // are that much tighter than the outer ones.
@@ -389,7 +445,7 @@ pub fn shape_svg(sh: &Shape, settings: &DocSettings) -> String {
                 let _ = write!(s, r#" stroke="{border}" stroke-width="{}""#, n(b));
             }
             if *rotation != 0.0 {
-                let _ = write!(s, r#" transform="rotate({} {} {})""#, n(*rotation), n(p.x + w / 2.0), n(p.y + h / 2.0));
+                let _ = write!(s, r#" transform="rotate({} {} {})""#, n(*rotation), n(c.x), n(c.y));
             }
             s.push_str("/>");
             s
@@ -397,6 +453,8 @@ pub fn shape_svg(sh: &Shape, settings: &DocSettings) -> String {
         ShapeGeometry::Circle { center, radius } => {
             let (c, r) = (center.scale(g), radius * g);
             let b = b.min(r);
+            def(&sh.gradient, &fill_id, sh.filled, c, r, r, r, 0.0);
+            def(&sh.border_gradient, &border_id, b > 0.0, c, r, r, r, 0.0);
             let mut s = format!(r#"<circle cx="{}" cy="{}" r="{}" fill="{fill}""#, n(c.x), n(c.y), n(r - b / 2.0));
             if b > 0.0 {
                 let _ = write!(s, r#" stroke="{border}" stroke-width="{}""#, n(b));
@@ -404,6 +462,11 @@ pub fn shape_svg(sh: &Shape, settings: &DocSettings) -> String {
             s.push_str("/>");
             s
         }
+    };
+    if defs.is_empty() {
+        body
+    } else {
+        format!("<defs>{defs}</defs>{body}")
     }
 }
 
@@ -434,13 +497,15 @@ fn shape_bounds(sh: &Shape, settings: &DocSettings) -> Option<Rect> {
     }
 }
 
-pub fn content_svg(c: &Content, settings: &DocSettings, assets: &Assets) -> String {
+/// Markup of a layer's content. `id` (the layer's) keeps the ids of its
+/// gradients unique.
+pub fn content_svg(c: &Content, settings: &DocSettings, assets: &Assets, id: Id) -> String {
     match c {
         Content::Line(seg) => line_svg(&seg.points, &seg.style, settings),
         Content::Station(st) => station_svg(st, settings),
         Content::Text(t) => text_svg(t, settings),
         Content::Icon(i) => icon_svg(i, settings, assets),
-        Content::Shape(sh) => shape_svg(sh, settings),
+        Content::Shape(sh) => shape_svg(sh, settings, &format!("paint-{id}")),
     }
 }
 
@@ -499,7 +564,7 @@ pub fn render_fragments(doc: &Document) -> Vec<Fragment> {
             out.push(Fragment {
                 id: l.id,
                 kind: l.content.kind_name(),
-                svg: content_svg(&l.content, &doc.settings, &doc.assets),
+                svg: content_svg(&l.content, &doc.settings, &doc.assets, l.id),
                 locked,
                 bounds: content_bounds(&l.content, &doc.settings),
             });
@@ -539,7 +604,7 @@ fn export_nodes(nodes: &[Node], settings: &DocSettings, assets: &Assets, out: &m
                     r#"{pad}<g id="layer-{}" data-name="{}">{}</g>"#,
                     l.id,
                     esc(&l.name),
-                    content_svg(&l.content, settings, assets)
+                    content_svg(&l.content, settings, assets, l.id)
                 );
             }
         }
@@ -626,6 +691,112 @@ mod tests {
     fn parse(markup: &str) {
         let doc = format!(r#"<svg xmlns="http://www.w3.org/2000/svg">{markup}</svg>"#);
         roxmltree::Document::parse(&doc).unwrap_or_else(|e| panic!("bad svg {e}: {markup}"));
+    }
+
+    fn two_colors(kind: GradientKind, angle: f64) -> Option<Gradient> {
+        Some(Gradient::new(kind, angle, "#0098d4", "#9b0058"))
+    }
+
+    /// Attribute `key` of the first element named `tag` in the markup.
+    fn attr_of(markup: &str, tag: &str, key: &str) -> String {
+        let doc = format!(r#"<svg xmlns="http://www.w3.org/2000/svg">{markup}</svg>"#);
+        let xml = roxmltree::Document::parse(&doc).unwrap();
+        let node = xml.descendants().find(|n| n.tag_name().name() == tag).unwrap_or_else(|| panic!("no {tag}: {markup}"));
+        node.attribute(key).unwrap_or_else(|| panic!("no {key} on {tag}: {markup}")).to_string()
+    }
+
+    #[test]
+    fn flat_shapes_have_no_gradients() {
+        for sh in [Shape::rect(Vec2::new(0.0, 0.0), 2.0, 1.0), Shape::circle(Vec2::new(0.5, 0.5), 1.0), Shape::line(Vec2::new(0.0, 0.0), Vec2::new(2.0, 0.0))] {
+            let m = shape_svg(&sh, &settings(), "k");
+            assert!(!m.contains("defs") && !m.contains("url("), "{m}");
+        }
+    }
+
+    #[test]
+    fn linear_gradient_crosses_the_box_from_corner_to_corner() {
+        let s = settings();
+        // A 4 × 2 cell rectangle (96 × 48 pixels) centered on (48, 24).
+        let mut sh = Shape { gradient: two_colors(GradientKind::Linear, 0.0), ..Shape::rect(Vec2::new(0.0, 0.0), 4.0, 2.0) };
+        let m = shape_svg(&sh, &s, "paint-7");
+        parse(&m);
+        assert!(m.starts_with("<defs><linearGradient"), "{m}");
+        assert_eq!(attr_of(&m, "rect", "fill"), "url(#paint-7-fill)");
+        assert_eq!(attr_of(&m, "linearGradient", "id"), "paint-7-fill");
+        assert_eq!(attr_of(&m, "linearGradient", "gradientUnits"), "userSpaceOnUse");
+        let ends = |m: &str| ["x1", "y1", "x2", "y2"].map(|k| attr_of(m, "linearGradient", k).parse::<f64>().unwrap());
+        assert_eq!(ends(&m), [0.0, 24.0, 96.0, 24.0], "left to right");
+        sh.gradient = two_colors(GradientKind::Linear, 90.0);
+        assert_eq!(ends(&shape_svg(&sh, &s, "k")), [48.0, 0.0, 48.0, 48.0], "top to bottom");
+        // At 45° the gradient line is long enough for both far corners to
+        // land on the end stops: half of (96 + 48) / √2 on each side.
+        sh.gradient = two_colors(GradientKind::Linear, 45.0);
+        let [x1, y1, x2, y2] = ends(&shape_svg(&sh, &s, "k"));
+        let half = 72.0 / 2f64.sqrt();
+        for (got, want) in [(x1, 48.0 - half / 2f64.sqrt()), (y1, 24.0 - half / 2f64.sqrt()), (x2, 48.0 + half / 2f64.sqrt()), (y2, 24.0 + half / 2f64.sqrt())] {
+            assert!((got - want).abs() < 0.01, "{got} vs {want}");
+        }
+    }
+
+    #[test]
+    fn gradients_turn_with_the_shape() {
+        let s = settings();
+        // A turned rectangle's gradient lives in the rectangle's own (turned) user space.
+        let sh = Shape {
+            geometry: ShapeGeometry::Rect { pos: Vec2::new(0.0, 0.0), width: 2.0, height: 2.0, rotation: 30.0, corner_radius: 0.0 },
+            gradient: two_colors(GradientKind::Linear, 0.0),
+            ..Shape::rect(Vec2::new(0.0, 0.0), 1.0, 1.0)
+        };
+        let m = shape_svg(&sh, &s, "k");
+        assert_eq!(attr_of(&m, "rect", "transform"), "rotate(30 24 24)");
+        assert!(!m.contains("gradientTransform"), "{m}");
+        // A straight line's gradient runs along it: angle 0 goes from its start to its end.
+        let mut line = Shape { gradient: two_colors(GradientKind::Linear, 0.0), ..Shape::line(Vec2::new(0.0, 0.0), Vec2::new(0.0, 4.0)) };
+        let m = shape_svg(&line, &s, "k");
+        parse(&m);
+        assert_eq!(attr_of(&m, "line", "stroke"), "url(#k-fill)");
+        assert_eq!(attr_of(&m, "linearGradient", "gradientTransform"), "rotate(90 0 48)");
+        assert_eq!(["x1", "x2"].map(|k| attr_of(&m, "linearGradient", k)), ["-48", "48"]);
+        // Across a horizontal line (whose bounding box has no height) the
+        // gradient spans its thickness: two colors side by side.
+        line = Shape { gradient: two_colors(GradientKind::Linear, 90.0), ..Shape::line(Vec2::new(0.0, 0.0), Vec2::new(4.0, 0.0)) };
+        let m = shape_svg(&line, &s, "k");
+        assert!(!m.contains("gradientTransform"), "{m}");
+        assert_eq!(["y1", "y2"].map(|k| attr_of(&m, "linearGradient", k).parse::<f64>().unwrap()), [-1.2, 1.2]);
+    }
+
+    #[test]
+    fn radial_gradients_and_gradient_borders() {
+        let s = settings();
+        let c = Shape {
+            gradient: two_colors(GradientKind::Radial, 0.0),
+            border_gradient: two_colors(GradientKind::Linear, 90.0),
+            ..Shape::circle(Vec2::new(0.5, 0.5), 1.0)
+        };
+        let m = shape_svg(&c, &s, "k");
+        parse(&m);
+        assert_eq!(["cx", "cy", "r"].map(|k| attr_of(&m, "radialGradient", k)), ["12", "12", "24"], "out to the edge of the circle");
+        assert_eq!(attr_of(&m, "circle", "fill"), "url(#k-fill)");
+        assert_eq!(attr_of(&m, "circle", "stroke"), "url(#k-border)");
+        assert_eq!(attr_of(&m, "linearGradient", "id"), "k-border");
+        // An empty shape or one without a border defines no unused gradient.
+        let m = shape_svg(&Shape { filled: false, border_width: 0.0, ..c.clone() }, &s, "k");
+        assert!(!m.contains("Gradient") && m.contains(r#"fill="none""#), "{m}");
+    }
+
+    #[test]
+    fn equal_stops_give_a_hard_split() {
+        let stop = |color: &str, position: f64| GradientStop { color: color.into(), position };
+        let g = Gradient { kind: GradientKind::Linear, angle: 90.0, stops: vec![stop("#00f", 0.0), stop("#00f", 0.5), stop("#808", 0.5), stop("#808", 1.0)] };
+        let m = shape_svg(&Shape { gradient: Some(g), ..Shape::circle(Vec2::new(0.5, 0.5), 0.5) }, &settings(), "k");
+        assert!(m.contains(r##"<stop offset="0.5" stop-color="#00f"/><stop offset="0.5" stop-color="#808"/>"##), "{m}");
+    }
+
+    #[test]
+    fn layer_ids_keep_gradient_ids_unique() {
+        let sh = Shape { gradient: two_colors(GradientKind::Linear, 0.0), ..Shape::rect(Vec2::new(0.0, 0.0), 1.0, 1.0) };
+        let m = content_svg(&Content::Shape(sh), &settings(), &Assets::default(), 42);
+        assert!(m.contains(r#"id="paint-42-fill""#) && m.contains("url(#paint-42-fill)"), "{m}");
     }
 
     #[test]

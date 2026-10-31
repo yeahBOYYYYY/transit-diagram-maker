@@ -73,6 +73,14 @@ export const HELP = {
   'shape.dash_gap': 'Space between two dashes, in cells.',
   'shape.fill': 'Fill the inside of the rectangle or circle. Without a fill only the border shows.',
   'shape.border_color': 'Color of the border.',
+  'shape.border_paint': 'How the border is painted: one flat color, or a linear or radial gradient.',
+  'shape.paint':
+    'How it is painted: one flat color, a linear gradient (colors blending along an angle) or a radial gradient (colors blending out from the center). Gradients cover the shape and turn with it.',
+  'shape.gradient_angle':
+    'Direction of the linear gradient, in degrees: 0 runs from left to right, 90 from top to bottom (positive angles turn clockwise). On a straight line, 0 runs from its start to its end and 90 across it.',
+  'shape.gradient_stop': 'A color of the gradient. The gradient blends from one stop to the next; it needs at least two.',
+  'shape.gradient_position':
+    'Where this color sits along the gradient, from 0 percent (start) to 100 percent (end). Two stops at the same position give a hard split between their colors, like a station dot half one color and half another.',
   'shape.border_width':
     'Width of the border, in cells. 0 draws no border. A rectangle or circle keeps its size: the border is drawn inside its edge. A line gets the border on both sides.',
   'shape.ends': 'Where the line starts and ends, in cells. Grid intersections have whole numbers.',

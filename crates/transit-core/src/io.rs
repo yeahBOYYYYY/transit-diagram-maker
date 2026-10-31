@@ -226,7 +226,7 @@ fn layer_tag(l: &Layer) -> String {
                 .flag("filled", sh.filled, true)
                 .attr("border-color", &sh.border_color)
                 .attr("border-width", num(sh.border_width));
-            match &sh.geometry {
+            let t = match &sh.geometry {
                 ShapeGeometry::Line { from, to, thickness, cap, dashed, dash_length, dash_gap } => t
                     .attr("shape", "line")
                     .attr("from", vec2(*from))
@@ -244,8 +244,26 @@ fn layer_tag(l: &Layer) -> String {
                     .attr("rotation", num(*rotation))
                     .attr("corner-radius", num(*corner_radius)),
                 ShapeGeometry::Circle { center, radius } => t.attr("shape", "circle").attr("center", vec2(*center)).attr("radius", num(*radius)),
+            };
+            // Gradients are <transit:gradient paint="fill|border"> children
+            // holding their <transit:stop>s.
+            let mut inner = String::new();
+            for (paint, g) in [("fill", &sh.gradient), ("border", &sh.border_gradient)] {
+                if let Some(g) = g {
+                    let stops: String = g
+                        .stops
+                        .iter()
+                        .map(|st| Tag::new("stop").attr("color", &st.color).attr("position", num(st.position)).empty())
+                        .collect();
+                    let gt = Tag::new("gradient").attr("paint", paint).attr("kind", enum_name(&g.kind)).attr("angle", num(g.angle));
+                    inner.push_str(&gt.with_children("gradient", &stops));
+                }
             }
-            .empty()
+            if inner.is_empty() {
+                t.empty()
+            } else {
+                t.with_children("shape", &inner)
+            }
         }
     }
 }
@@ -278,7 +296,7 @@ fn write_nodes(nodes: &[Node], doc: &Document, out: &mut String, depth: usize) {
                     l.id,
                     esc(&l.name),
                     layer_tag(l),
-                    render::content_svg(&l.content, &doc.settings, &doc.assets)
+                    render::content_svg(&l.content, &doc.settings, &doc.assets, l.id)
                 );
             }
         }
@@ -538,12 +556,27 @@ fn read_shape(e: &El) -> Result<Shape> {
         "circle" => ShapeGeometry::Circle { center: e.vec2("center")?, radius: e.num("radius", 0.5)? },
         other => return Err(e.bad("shape", other)),
     };
+    let gradient = |paint: &str| -> Result<Option<Gradient>> {
+        let Some(g) = e.0.children().find(|n| is_transit(n, "gradient") && n.attribute("paint") == Some(paint)) else { return Ok(None) };
+        let ge = El(g);
+        let stops = g
+            .children()
+            .filter(|n| is_transit(n, "stop"))
+            .map(|st| {
+                let se = El(st);
+                Ok(GradientStop { color: se.string("color", "#000000"), position: se.num("position", 0.0)? })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok(Some(Gradient { kind: ge.enumeration("kind")?, angle: ge.num("angle", 0.0)?, stops }))
+    };
     Ok(Shape {
         geometry,
         color: e.string("color", "#1a1a1a"),
         filled: e.bool("filled", true)?,
         border_color: e.string("border-color", "#000000"),
         border_width: e.num("border-width", 0.0)?,
+        gradient: gradient("fill")?,
+        border_gradient: gradient("border")?,
     })
 }
 

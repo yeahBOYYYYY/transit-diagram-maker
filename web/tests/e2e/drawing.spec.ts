@@ -178,6 +178,52 @@ test.describe('drawing tools', () => {
     expect(await fragmentKinds(page)).toEqual(['shape', 'shape'])
   })
 
+  test('a circle split between two colors by a gradient in the Properties panel', async ({ page }) => {
+    await page.keyboard.press('u')
+    await page.getByTestId('shape-kind').getByRole('radio', { name: 'Circle' }).click()
+    await dragCells(page, [4, 4], [6, 4])
+    const id = await state(page, (s) => s.selection[0])
+    await page.getByTestId('prop-shape-paint').selectOption({ label: 'Linear gradient' })
+    const rows = page.getByTestId('prop-gradient-fill')
+    await expect(rows).toBeVisible()
+    // Both halves: stops 1 and 2 blue, stops 3 and 4 purple, 2 and 3 at 50 percent.
+    await rows.getByTestId('add-stop').click()
+    await rows.getByTestId('add-stop').click()
+    const colors = rows.locator('.color-field input[type=text]')
+    const positions = rows.locator('.num-field').filter({ hasText: 'Position' }).locator('input')
+    for (const [i, color] of ['#0098d4', '#0098d4', '#9b0058', '#9b0058'].entries()) {
+      await colors.nth(i).fill(color)
+      await colors.nth(i).press('Enter')
+    }
+    await positions.nth(1).fill('50')
+    await positions.nth(1).press('Enter')
+    await positions.nth(2).fill('50')
+    await positions.nth(2).press('Enter')
+    const gradient = await state(page, (s) => (window as any).__transit.node(s.selection[0]).content.gradient)
+    expect(gradient).toEqual({
+      kind: 'linear',
+      angle: 0,
+      stops: [
+        { color: '#0098d4', position: 0 },
+        { color: '#0098d4', position: 0.5 },
+        { color: '#9b0058', position: 0.5 },
+        { color: '#9b0058', position: 1 },
+      ],
+    })
+    // The canvas paints with a gradient element that resolves in the page,
+    // and the layer thumbnail doesn't reuse its id.
+    const painted = await page.evaluate((id) => {
+      const circle = document.querySelector(`[data-testid=doc-layer] g[data-id="${id}"] circle`)!
+      const ref = circle.getAttribute('fill')!.match(/url\(#(.+)\)/)![1]
+      const defs = document.querySelectorAll(`[id="${ref}"]`)
+      return { tag: defs[0]?.tagName, count: defs.length, ns: defs[0]?.namespaceURI, stops: defs[0]?.querySelectorAll('stop').length }
+    }, id)
+    expect(painted).toEqual({ tag: 'linearGradient', count: 1, ns: 'http://www.w3.org/2000/svg', stops: 4 })
+    // Undo takes back the last change: the second stop goes back to a quarter.
+    await page.keyboard.press('Control+z')
+    expect(await state(page, (s) => (window as any).__transit.node(s.selection[0]).content.gradient.stops[1].position)).toBe(0.25)
+  })
+
   test('selected shapes resize from their corner handles in move mode', async ({ page }) => {
     await page.keyboard.press('u')
     await page.getByTestId('shape-kind').getByRole('radio', { name: 'Rectangle' }).click()

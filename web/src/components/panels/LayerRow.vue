@@ -39,7 +39,9 @@ const thumb = computed(() => {
   const pad = Math.max(f.bounds.w, f.bounds.h) * 0.08 + 1
   return {
     viewBox: `${f.bounds.x - pad} ${f.bounds.y - pad} ${f.bounds.w + pad * 2} ${f.bounds.h + pad * 2}`,
-    svg: f.svg,
+    // The canvas already holds this markup: its gradient ids get a prefix
+    // so they stay unique in the page.
+    svg: f.svg.replace(/(id="|url\(#)paint-/g, '$1thumb-paint-'),
   }
 })
 

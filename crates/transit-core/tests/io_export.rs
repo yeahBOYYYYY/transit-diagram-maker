@@ -31,16 +31,58 @@ fn sample() -> Editor {
     ed.add_shape(dashed).unwrap();
     let mut rect = Shape::rect(Vec2::new(5.0, 7.0), 3.0, 2.0);
     rect.filled = false;
+    rect.border_gradient = Some(Gradient::new(GradientKind::Radial, 0.0, "#ff0000", "#0000ff"));
     if let ShapeGeometry::Rect { corner_radius, .. } = &mut rect.geometry {
         *corner_radius = 0.5;
     }
     ed.add_shape(rect).unwrap();
-    let circle = ed.add_shape(Shape::circle(Vec2::new(12.5, 0.5), 1.5)).unwrap();
+    let circle = ed.add_shape(Shape { gradient: Some(split_gradient()), ..Shape::circle(Vec2::new(12.5, 0.5), 1.5) }).unwrap();
     ed.rotate(&[circle], 30.0, Vec2::new(0.0, 0.0), true).unwrap();
     let g = ed.new_group(Some("Empty folder")).unwrap();
     ed.set_locked(g, true).unwrap();
     ed.set_visible(red.group_id, true).unwrap();
     ed
+}
+
+/// Half blue, half purple, split along a vertical line.
+fn split_gradient() -> Gradient {
+    let stop = |color: &str, position: f64| GradientStop { color: color.into(), position };
+    Gradient { kind: GradientKind::Linear, angle: 0.0, stops: vec![stop("#0098d4", 0.0), stop("#0098d4", 0.5), stop("#9b0058", 0.5), stop("#9b0058", 1.0)] }
+}
+
+#[test]
+fn shape_gradients_survive_saving_and_are_exported() {
+    let ed = sample();
+    let text = io::to_transit(ed.document());
+    let back = io::from_transit(&text).unwrap();
+    let mut shapes: Vec<Shape> = Vec::new();
+    tree::walk_layers(&back.root, &mut |l, _, _| {
+        if let Content::Shape(s) = &l.content {
+            shapes.push(s.clone());
+        }
+    });
+    let circle = shapes.iter().find(|s| matches!(s.geometry, ShapeGeometry::Circle { .. })).unwrap();
+    assert_eq!(circle.gradient, Some(split_gradient()));
+    assert_eq!(circle.border_gradient, None);
+    let rect = shapes.iter().find(|s| matches!(s.geometry, ShapeGeometry::Rect { .. })).unwrap();
+    assert_eq!(rect.gradient, None);
+    assert_eq!(rect.border_gradient.as_ref().map(|g| (g.kind, g.stops.len())), Some((GradientKind::Radial, 2)));
+    let xml = roxmltree::Document::parse(&text).unwrap();
+    let gradients: Vec<_> = xml.descendants().filter(|n| n.tag_name().namespace() == Some(io::NS) && n.tag_name().name() == "gradient").collect();
+    assert_eq!(gradients.iter().map(|g| g.attribute("paint").unwrap()).collect::<Vec<_>>(), ["border", "fill"]);
+    assert_eq!(gradients[1].children().filter(|n| n.is_element()).count(), 4, "one <transit:stop> per stop");
+    // The picture and the SVG export paint with the gradients, under ids that
+    // are unique in the file.
+    for svg in [text.clone(), render::export_svg(ed.document())] {
+        let doc = roxmltree::Document::parse(&svg).unwrap();
+        let defs: Vec<_> = doc.descendants().filter(|n| matches!(n.tag_name().name(), "linearGradient" | "radialGradient")).collect();
+        assert_eq!(defs.len(), 2, "{svg}");
+        for d in &defs {
+            let id = d.attribute("id").unwrap();
+            assert_eq!(doc.descendants().filter(|n| n.attribute("id") == Some(id)).count(), 1);
+            assert!(svg.contains(&format!("url(#{id})")), "{id} is used");
+        }
+    }
 }
 
 #[test]

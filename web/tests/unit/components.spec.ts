@@ -226,6 +226,80 @@ describe('PropertiesPanel', () => {
     expect(store.state.fragments.find((f) => f.id === t)!.svg).toContain('direction="rtl"')
   })
 
+  it('paints a shape with gradients, stop by stop', async () => {
+    vi.useFakeTimers()
+    const store = freshStore()
+    const c = store.run((e) => e.addShape(shapeFromDrag('circle', { cells: { x: 0, y: 0 }, cell: { x: 0, y: 0 } }, { cells: { x: 2, y: 2 }, cell: { x: 2, y: 2 } }, false, false)!))!
+    store.select([c])
+    const w = mountIt(PropertiesPanel)
+    const sh = () => {
+      const n = store.node(c)
+      if (n?.type !== 'layer' || n.content.kind !== 'shape') throw new Error('not a shape')
+      return n.content
+    }
+    const settle = async () => {
+      vi.advanceTimersByTime(1000)
+      await nextTick()
+    }
+    const flat = sh().color
+    expect(w.find('[data-testid=prop-gradient-fill]').exists()).toBe(false)
+
+    // A linear gradient starts from the flat color.
+    await w.find('[data-testid=prop-shape-paint]').setValue('linear')
+    await settle()
+    expect(sh().gradient?.kind).toBe('linear')
+    expect(sh().gradient?.stops.map((st) => st.position)).toEqual([0, 1])
+    expect(sh().gradient?.stops[0].color).toBe(flat)
+    const rows = () => w.find('[data-testid=prop-gradient-fill]')
+    expect(rows().text()).toContain('Angle')
+    expect(rows().text()).toContain('Stop 1')
+    expect(rows().text()).toContain('Stop 2')
+    expect(rows().findAll('[data-testid=remove-stop]').every((b) => b.attributes('disabled') !== undefined)).toBe(true)
+
+    // A third stop goes halfway; moved onto the second it makes a hard split.
+    await rows().find('[data-testid=add-stop]').trigger('click')
+    await settle()
+    expect(sh().gradient?.stops.map((st) => st.position)).toEqual([0, 0.5, 1])
+    const position = (i: number) => rows().findAll('.num-field').filter((f) => f.find('.scrub').text() === 'Position')[i].find('input')
+    await position(2).setValue('50')
+    await position(2).trigger('blur')
+    await settle()
+    expect(sh().gradient?.stops.map((st) => st.position)).toEqual([0, 0.5, 0.5])
+    const svg = () => store.state.fragments.find((f) => f.id === c)!.svg
+    expect(svg()).toContain(`fill="url(#paint-${c}-fill)"`)
+    expect(svg().match(/<stop offset="0.5"/g)).toHaveLength(2)
+    const angle = rows().findAll('.num-field').find((f) => f.find('.scrub').text() === 'Angle')!.find('input')
+    await angle.setValue('90')
+    await angle.trigger('blur')
+    await settle()
+    expect(sh().gradient?.angle).toBe(90)
+
+    // Stops can be removed down to two.
+    await rows().findAll('[data-testid=remove-stop]')[0].trigger('click')
+    await settle()
+    expect(sh().gradient?.stops.map((st) => st.position)).toEqual([0.5, 0.5])
+
+    // Radial gradients have no angle; the border has its own gradient.
+    await w.find('[data-testid=prop-shape-paint]').setValue('radial')
+    await settle()
+    expect(sh().gradient?.kind).toBe('radial')
+    expect(rows().text()).not.toContain('Angle')
+    await w.find('[data-testid=prop-shape-border-paint]').setValue('linear')
+    await settle()
+    expect(sh().border_gradient?.kind).toBe('linear')
+    expect(w.find('[data-testid=prop-gradient-border]').exists()).toBe(true)
+    expect(svg()).toContain(`stroke="url(#paint-${c}-border)"`)
+
+    // Back to a flat color, and every change is one undo step.
+    await w.find('[data-testid=prop-shape-paint]').setValue('flat')
+    await settle()
+    expect(sh().gradient).toBeNull()
+    expect(sh().color).toBe(flat)
+    store.undo()
+    expect(sh().gradient?.kind).toBe('radial')
+    vi.useRealTimers()
+  })
+
   async function setField(w: VueWrapper, label: string, value: string) {
     const input = w.find('[data-testid=prop-position]').findAll('.num-field').find((f) => f.find('.scrub').text() === label)!.find('input')
     await input.setValue(value)
@@ -298,6 +372,9 @@ describe('property help', () => {
       return store.run((e) => e.addShape(shapeFromDrag(kind, { cells: { x: 0, y: 0 }, cell: { x: 0, y: 0 } }, { cells: { x: 3, y: 2 }, cell: { x: 3, y: 2 } }, false, false)!))!
     })
     store.run((e) => e.updateContent(shapes[0], { dashed: true }))
+    const gradient = (kind: string) => ({ kind, angle: 0, stops: [{ color: '#000000', position: 0 }, { color: '#ffffff', position: 1 }] })
+    store.run((e) => e.updateContent(shapes[0], { gradient: gradient('linear'), border_gradient: gradient('radial') }))
+    store.run((e) => e.updateContent(shapes[1], { gradient: gradient('radial'), border_gradient: gradient('linear') }))
     const w = mountIt(PropertiesPanel)
     expectHelpEverywhere(w)
     for (const id of [l.layer_id, l.group_id, dot.station_id, tick.station_id, t, i, ...shapes]) {

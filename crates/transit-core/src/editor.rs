@@ -1372,6 +1372,11 @@ pub fn tidy_shape(sh: &mut Shape) {
     let size = |v: f64| geom::snap_tenth(v).clamp(0.1, 1000.0);
     let fine = |v: f64, lo: f64, hi: f64| if v.is_finite() { ((v * 100.0).round() / 100.0).clamp(lo, hi) } else { lo };
     sh.border_width = fine(sh.border_width, 0.0, 50.0);
+    for g in [&mut sh.gradient, &mut sh.border_gradient] {
+        if g.as_mut().is_some_and(|gr| !tidy_gradient(gr)) {
+            *g = None;
+        }
+    }
     match &mut sh.geometry {
         ShapeGeometry::Line { from, to, thickness, dash_length, dash_gap, .. } => {
             *from = from.snapped();
@@ -1405,6 +1410,29 @@ pub fn tidy_shape(sh: &mut Shape) {
             *radius = size(*radius);
         }
     }
+}
+
+/// Keep a gradient's angle in (-180, 180] (whole tenths) and its stops in
+/// 0..=1 (hundredths of a percent), sorted by position (stops at the same
+/// position keep their order, giving a hard split). A single stop is doubled
+/// so the gradient has two; false when it has none left (a flat color then).
+pub fn tidy_gradient(g: &mut Gradient) -> bool {
+    g.angle = free_rotation(g.angle);
+    for st in &mut g.stops {
+        st.position = if st.position.is_finite() { ((st.position * 10000.0).round() / 10000.0).clamp(0.0, 1.0) } else { 0.0 };
+    }
+    g.stops.sort_by(|a, b| a.position.total_cmp(&b.position));
+    match g.stops.len() {
+        0 => return false,
+        1 => {
+            let st = g.stops[0].clone();
+            let position = if st.position < 1.0 { 1.0 } else { 0.0 };
+            g.stops.push(GradientStop { position, ..st });
+            g.stops.sort_by(|a, b| a.position.total_cmp(&b.position));
+        }
+        _ => {}
+    }
+    true
 }
 
 /// Rotate a shape around `pivot`. A line between grid intersections turns

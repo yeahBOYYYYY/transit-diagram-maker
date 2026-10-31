@@ -1296,3 +1296,31 @@ fn rectangles_have_rounded_corners() {
     assert!((b.w - 2.0 * g).abs() < 1e-9 && (b.h - 2.0 * g).abs() < 1e-9, "{b:?}");
 }
 
+
+#[test]
+fn shape_gradients_are_tidied_and_undoable() {
+    let mut ed = Editor::new();
+    let c = ed.add_shape(Shape::circle(v(0.5, 0.5), 1.0)).unwrap();
+    let gradient = json!({"kind": "linear", "angle": 270.04, "stops": [
+        {"color": "#9b0058", "position": 1.5},
+        {"color": "#0098d4", "position": 0.5},
+        {"color": "#9b0058", "position": 0.5},
+        {"color": "#0098d4", "position": -2},
+    ]});
+    ed.update_content(c, &json!({"gradient": gradient})).unwrap();
+    let g = shape(&ed, c).gradient.clone().unwrap();
+    assert_eq!(g.angle, -90.0, "angles are kept in (-180, 180]");
+    let stops: Vec<(&str, f64)> = g.stops.iter().map(|s| (s.color.as_str(), s.position)).collect();
+    assert_eq!(stops, [("#0098d4", 0.0), ("#0098d4", 0.5), ("#9b0058", 0.5), ("#9b0058", 1.0)], "sorted and in range, equal positions keep their order");
+    // A single stop is doubled, no stops at all mean a flat color again.
+    ed.update_content(c, &json!({"border_gradient": {"kind": "radial", "stops": [{"color": "#000000", "position": 0.25}]}})).unwrap();
+    let b = shape(&ed, c).border_gradient.clone().unwrap();
+    assert_eq!((b.kind, b.stops.iter().map(|s| s.position).collect::<Vec<_>>()), (GradientKind::Radial, vec![0.25, 1.0]));
+    ed.update_content(c, &json!({"border_gradient": {"stops": []}})).unwrap();
+    assert_eq!(shape(&ed, c).border_gradient, None);
+    ed.update_content(c, &json!({"gradient": null})).unwrap();
+    assert_eq!(shape(&ed, c).gradient, None);
+    ed.undo();
+    ed.undo();
+    assert!(shape(&ed, c).gradient.is_some() && shape(&ed, c).border_gradient.is_some());
+}

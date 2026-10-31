@@ -139,7 +139,7 @@ impl TransitEditor {
     pub fn preview_shape(&self, shape_json: &str) -> Result<String, JsError> {
         let mut shape: Shape = parse(shape_json)?;
         transit_core::editor::tidy_shape(&mut shape);
-        Ok(render::shape_svg(&shape, self.inner.settings()))
+        Ok(render::shape_svg(&shape, self.inner.settings(), "paint-preview"))
     }
 
     /// Uploaded fonts (family names) and icons (with preview markup).

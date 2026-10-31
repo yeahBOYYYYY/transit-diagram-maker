@@ -661,6 +661,49 @@ pub enum ShapeGeometry {
     Circle { center: Vec2, radius: f64 },
 }
 
+/// Linear gradients run along an angle, radial ones out from the center.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GradientKind {
+    #[default]
+    Linear,
+    Radial,
+}
+
+/// A color at a place along a gradient, `position` from 0 (start) to 1 (end).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GradientStop {
+    pub color: String,
+    pub position: f64,
+}
+
+/// A gradient paint for a shape's fill or border. It spans the shape's own
+/// box and turns with it: a linear one runs at `angle` degrees (0 = left to
+/// right, positive turns clockwise like a rotation; on a straight line 0
+/// runs from its start to its end) so that the start and the end touch the
+/// box's corners, a radial one runs from the center to the farthest corner
+/// (to the edge of a circle). `stops` are sorted by position, at least two;
+/// two stops at the same position give a hard split between their colors.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Gradient {
+    #[serde(default)]
+    pub kind: GradientKind,
+    #[serde(default)]
+    pub angle: f64,
+    pub stops: Vec<GradientStop>,
+}
+
+impl Gradient {
+    /// A gradient from `a` to `b`.
+    pub fn new(kind: GradientKind, angle: f64, a: &str, b: &str) -> Self {
+        Gradient {
+            kind,
+            angle,
+            stops: vec![GradientStop { color: a.into(), position: 0.0 }, GradientStop { color: b.into(), position: 1.0 }],
+        }
+    }
+}
+
 /// A free-standing shape drawn with the shape tool: a straight line, a
 /// rectangle or a circle that belongs to no transit line.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -675,6 +718,12 @@ pub struct Shape {
     /// Border width in cells, 0 for none. A line gets it on both sides; a
     /// rectangle or circle inside its edge, so it keeps its size.
     pub border_width: f64,
+    /// Paints the line or the fill instead of `color` when set.
+    #[serde(default)]
+    pub gradient: Option<Gradient>,
+    /// Paints the border instead of `border_color` when set.
+    #[serde(default)]
+    pub border_gradient: Option<Gradient>,
 }
 
 impl Shape {
@@ -685,6 +734,8 @@ impl Shape {
             filled: true,
             border_color: "#ffffff".into(),
             border_width: 0.0,
+            gradient: None,
+            border_gradient: None,
         }
     }
 
@@ -695,6 +746,8 @@ impl Shape {
             filled: true,
             border_color: "#1a1a1a".into(),
             border_width: 0.1,
+            gradient: None,
+            border_gradient: None,
         }
     }
 
@@ -705,6 +758,8 @@ impl Shape {
             filled: true,
             border_color: "#000000".into(),
             border_width: 0.22,
+            gradient: None,
+            border_gradient: None,
         }
     }
 

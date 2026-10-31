@@ -138,6 +138,26 @@ export type ShapeGeometry =
   | { shape: 'rect'; pos: Vec2; width: number; height: number; rotation: number; corner_radius: number }
   | { shape: 'circle'; center: Vec2; radius: number }
 
+export type GradientKind = 'linear' | 'radial'
+
+/** A color at a place along a gradient, `position` from 0 (start) to 1 (end). */
+export interface GradientStop {
+  color: string
+  position: number
+}
+
+/**
+ * A gradient over the shape's own box, turning with it. `angle` in degrees
+ * (linear only): 0 runs left to right (along a straight line, from its start
+ * to its end), positive turns clockwise. `stops` are sorted by position, at
+ * least two; two at the same position give a hard split.
+ */
+export interface Gradient {
+  kind: GradientKind
+  angle: number
+  stops: GradientStop[]
+}
+
 /** Colors and border shared by every shape. */
 export interface ShapePaint {
   /** Color of a line, or the fill of a rectangle or circle. */
@@ -147,6 +167,10 @@ export interface ShapePaint {
   border_color: string
   /** In cells; 0 for no border. */
   border_width: number
+  /** Paints the line or the fill instead of `color` when set (null: the flat color). */
+  gradient?: Gradient | null
+  /** Paints the border instead of `border_color` when set. */
+  border_gradient?: Gradient | null
 }
 
 export type Shape = ShapeGeometry & ShapePaint

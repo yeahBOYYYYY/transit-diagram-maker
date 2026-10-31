@@ -8,7 +8,7 @@ import IconPicker from '../ui/IconPicker.vue'
 import UiIcon from '../ui/UiIcon.vue'
 import HelpTip from '../ui/HelpTip.vue'
 import { HELP } from '../../core/help'
-import type { DocNode, DocSettings, GroupNode, Id, LayerNode, LineSegment, LineStyle, StationKind, StrokeKind } from '../../core/types'
+import type { DocNode, DocSettings, Gradient, GradientKind, GradientStop, GroupNode, Id, LayerNode, LineSegment, LineStyle, StationKind, StrokeKind } from '../../core/types'
 import { STROKE_KINDS, hasChannel, hasDashes } from '../../core/lineStyles'
 import type { Engine } from '../../core/engine'
 import { findItem } from '../../core/tree'
@@ -155,6 +155,71 @@ function setPosition(axis: 'x' | 'y', value: number): void {
 
 /** The selected shape, if a shape is selected. */
 const shape = computed(() => (layer.value?.content.kind === 'shape' ? layer.value.content : null))
+
+/** The two paints of a shape: the line or fill, and the border. */
+type PaintKey = 'gradient' | 'border_gradient'
+type PaintMode = 'flat' | GradientKind
+const PAINT_MODES: { value: PaintMode; label: string }[] = [
+  { value: 'flat', label: 'Flat color' },
+  { value: 'linear', label: 'Linear gradient' },
+  { value: 'radial', label: 'Radial gradient' },
+]
+
+function gradientOf(key: PaintKey): Gradient | null {
+  return shape.value?.[key] ?? null
+}
+
+/** Switch a paint between its flat color and a gradient (which starts from the flat color and the second swatch). */
+function setPaintMode(key: PaintKey, mode: PaintMode): void {
+  const sh = shape.value
+  if (!sh) return
+  const g = gradientOf(key)
+  if (mode === 'flat') patch({ [key]: null })
+  else if (g) patch({ [key]: { ...g, kind: mode } })
+  else {
+    const flat = key === 'gradient' ? sh.color : sh.border_color
+    const other = [prefs.line.inner_color, prefs.line.color, '#000000', '#ffffff'].find((c) => c.toLowerCase() !== flat.toLowerCase())!
+    patch({ [key]: { kind: mode, angle: 0, stops: [{ color: flat, position: 0 }, { color: other, position: 1 }] } })
+  }
+  done()
+}
+
+function setGradient(key: PaintKey, change: Partial<Gradient>): void {
+  const g = gradientOf(key)
+  if (g) patch({ [key]: { ...g, ...change } })
+}
+
+function setStop(key: PaintKey, index: number, change: Partial<GradientStop>): void {
+  const g = gradientOf(key)
+  if (g) setGradient(key, { stops: g.stops.map((st, i) => (i === index ? { ...st, ...change } : st)) })
+}
+
+/** A new stop halfway along the widest gap between two stops, with the color of the stop before it. */
+function addStop(key: PaintKey): void {
+  const g = gradientOf(key)
+  if (!g) return
+  let at = 0
+  for (let i = 1; i < g.stops.length; i++) {
+    if (g.stops[i].position - g.stops[i - 1].position > g.stops[at + 1].position - g.stops[at].position) at = i - 1
+  }
+  const position = (g.stops[at].position + g.stops[at + 1].position) / 2
+  setGradient(key, { stops: [...g.stops.slice(0, at + 1), { color: g.stops[at].color, position }, ...g.stops.slice(at + 1)] })
+  done()
+}
+
+function removeStop(key: PaintKey, index: number): void {
+  const g = gradientOf(key)
+  if (g && g.stops.length > 2) setGradient(key, { stops: g.stops.filter((_, i) => i !== index) })
+  done()
+}
+
+/** The gradient rows to show under the fill (or line color) row and under the border row. */
+const gradientRows = computed(() => {
+  const sh = shape.value
+  if (!sh) return { fill: null, border: null }
+  const fill = sh.shape === 'line' || sh.filled ? (sh.gradient ?? null) : null
+  return { fill, border: sh.border_gradient ?? null }
+})
 
 const kindLabel = computed(() => {
   if (group.value) {
@@ -421,33 +486,90 @@ const childCount = computed(() => (group.value ? (findItem(s.tree, group.value.i
       <!-- shape -->
       <template v-if="shape">
         <div class="section-title">Appearance</div>
-        <template v-if="shape.shape === 'line'">
+        <!-- The line color or fill, then the border: a flat color or a gradient with its rows below. -->
+        <template v-for="paint in (['gradient', 'border_gradient'] as const)" :key="paint">
+          <template v-if="paint === 'border_gradient' && shape.shape === 'line'">
+            <NumberField :model-value="shape.thickness" label="Width" :min="0.01" :step="0.05" unit="cells" :help="HELP['shape.thickness']" data-testid="prop-shape-thickness" @update:model-value="(v) => patch({ thickness: v })" @commit="done" />
+            <div class="prop">
+              <span class="lbl">Caps<HelpTip :text="HELP['shape.cap']" /></span>
+              <div class="ctl">
+                <select :value="shape.cap" data-testid="prop-shape-cap" @change="patch({ cap: ($event.target as HTMLSelectElement).value }); done()">
+                  <option value="round">Round</option>
+                  <option value="butt">Butt</option>
+                </select>
+              </div>
+            </div>
+          </template>
           <div class="prop">
-            <span class="lbl">Color<HelpTip :text="HELP['shape.line_color']" /></span>
-            <div class="ctl"><ColorField :model-value="shape.color" @update:model-value="(v) => patch({ color: v })" /></div>
-          </div>
-          <NumberField :model-value="shape.thickness" label="Width" :min="0.01" :step="0.05" unit="cells" :help="HELP['shape.thickness']" data-testid="prop-shape-thickness" @update:model-value="(v) => patch({ thickness: v })" @commit="done" />
-          <div class="prop">
-            <span class="lbl">Caps<HelpTip :text="HELP['shape.cap']" /></span>
+            <span v-if="paint === 'border_gradient'" class="lbl">Border<HelpTip :text="HELP['shape.border_paint']" /></span>
+            <span v-else-if="shape.shape === 'line'" class="lbl">Color<HelpTip :text="HELP['shape.paint']" /></span>
+            <span v-else class="lbl">Fill<HelpTip :text="HELP['shape.fill']" /></span>
             <div class="ctl">
-              <select :value="shape.cap" data-testid="prop-shape-cap" @change="patch({ cap: ($event.target as HTMLSelectElement).value }); done()">
-                <option value="round">Round</option>
-                <option value="butt">Butt</option>
-              </select>
+              <input
+                v-if="paint === 'gradient' && shape.shape !== 'line'"
+                type="checkbox"
+                :checked="shape.filled"
+                title="Fill the inside"
+                data-testid="prop-shape-filled"
+                @change="patch({ filled: ($event.target as HTMLInputElement).checked }); done()"
+              />
+              <template v-if="paint === 'border_gradient' || shape.shape === 'line' || shape.filled">
+                <select
+                  :value="shape[paint]?.kind ?? 'flat'"
+                  :title="paint === 'border_gradient' ? 'How the border is painted' : 'How it is painted'"
+                  :data-testid="paint === 'gradient' ? 'prop-shape-paint' : 'prop-shape-border-paint'"
+                  @change="setPaintMode(paint, ($event.target as HTMLSelectElement).value as PaintMode)"
+                >
+                  <option v-for="m in PAINT_MODES" :key="m.value" :value="m.value">{{ m.label }}</option>
+                </select>
+                <ColorField
+                  v-if="!shape[paint]"
+                  :model-value="paint === 'gradient' ? shape.color : shape.border_color"
+                  @update:model-value="(v) => patch(paint === 'gradient' ? { color: v } : { border_color: v })"
+                />
+              </template>
             </div>
           </div>
-        </template>
-        <div v-else class="prop">
-          <span class="lbl">Fill<HelpTip :text="HELP['shape.fill']" /></span>
-          <div class="ctl">
-            <input type="checkbox" :checked="shape.filled" title="Fill the inside" data-testid="prop-shape-filled" @change="patch({ filled: ($event.target as HTMLInputElement).checked }); done()" />
-            <ColorField v-if="shape.filled" :model-value="shape.color" @update:model-value="(v) => patch({ color: v })" />
+          <div v-if="paint === 'gradient' ? gradientRows.fill : gradientRows.border" class="rows gradient" :data-testid="paint === 'gradient' ? 'prop-gradient-fill' : 'prop-gradient-border'">
+            <NumberField
+              v-if="shape[paint]!.kind === 'linear'"
+              :model-value="shape[paint]!.angle"
+              label="Angle"
+              :min="-180"
+              :max="180"
+              :step="45"
+              :precision="1"
+              unit="degrees"
+              :help="HELP['shape.gradient_angle']"
+              @update:model-value="(v) => setGradient(paint, { angle: v })"
+              @commit="done"
+            />
+            <template v-for="(st, i) in shape[paint]!.stops" :key="i">
+              <div class="prop">
+                <span class="lbl">Stop {{ i + 1 }}<HelpTip :text="HELP['shape.gradient_stop']" /></span>
+                <div class="ctl">
+                  <ColorField :model-value="st.color" @update:model-value="(v) => setStop(paint, i, { color: v })" />
+                  <button class="icon-btn" title="Remove this stop" :disabled="shape[paint]!.stops.length <= 2" data-testid="remove-stop" @click="removeStop(paint, i)">
+                    <UiIcon name="close" />
+                  </button>
+                </div>
+              </div>
+              <NumberField
+                :model-value="st.position * 100"
+                label="Position"
+                :min="0"
+                :max="100"
+                :step="5"
+                :precision="2"
+                unit="percent"
+                :help="HELP['shape.gradient_position']"
+                @update:model-value="(v) => setStop(paint, i, { position: v / 100 })"
+                @commit="done"
+              />
+            </template>
+            <button class="ps-btn wide start" data-testid="add-stop" @click="addStop(paint)">Add stop</button>
           </div>
-        </div>
-        <div class="prop">
-          <span class="lbl">Border<HelpTip :text="HELP['shape.border_color']" /></span>
-          <div class="ctl"><ColorField :model-value="shape.border_color" @update:model-value="(v) => patch({ border_color: v })" /></div>
-        </div>
+        </template>
         <NumberField :model-value="shape.border_width" label="Border width" :min="0" :step="0.05" unit="cells" :help="HELP['shape.border_width']" @update:model-value="(v) => patch({ border_width: v })" @commit="done" />
         <NumberField v-if="shape.shape === 'rect'" :model-value="shape.corner_radius" label="Corner radius" :min="0" :step="0.1" unit="cells" :help="HELP['shape.corner_radius']" data-testid="prop-shape-corner-radius" @update:model-value="(v) => patch({ corner_radius: v })" @commit="done" />
         <template v-if="shape.shape === 'line'">
@@ -602,6 +724,14 @@ const childCount = computed(() => (group.value ? (findItem(s.tree, group.value.i
 .apply-line {
   display: inline-flex;
   align-items: center;
+}
+/* A gradient's rows sit indented under the row that chose it. */
+.gradient > .prop > .lbl,
+.gradient > :deep(.num-field .lead) {
+  padding-left: 12px;
+}
+.gradient > .wide {
+  margin-left: 12px;
 }
 .tip {
   margin: 4px 0 0;
