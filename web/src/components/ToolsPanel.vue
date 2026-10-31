@@ -12,7 +12,7 @@ import type { ActionId } from '../core/actions'
 
 const store = useEditor()
 
-const TOOLS: ToolId[] = ['select', 'hand', 'pen', 'eraser', 'station', 'text']
+const TOOLS: ToolId[] = ['select', 'hand', 'pen', 'eraser', 'station', 'text', 'shape']
 
 function title(id: ActionId): string {
   const key = displayCombo(prefs.shortcuts[id] ?? '')

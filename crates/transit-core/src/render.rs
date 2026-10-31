@@ -344,12 +344,95 @@ pub fn icon_svg(i: &Icon, settings: &DocSettings, assets: &Assets) -> String {
     )
 }
 
+/// A straight line, rectangle or circle. Borders of rectangles and circles
+/// are drawn inside their edge, so the shape covers exactly its cells; a
+/// line's border goes around it (a wider line of the border color below).
+pub fn shape_svg(sh: &Shape, settings: &DocSettings) -> String {
+    let g = settings.cell_px;
+    let b = sh.border_width.max(0.0) * g;
+    let fill = if sh.filled { esc(&sh.color) } else { "none".into() };
+    let border = esc(&sh.border_color);
+    match &sh.geometry {
+        ShapeGeometry::Line { from, to, thickness, cap, dashed, dash_length, dash_gap } => {
+            let (a, z) = (from.scale(g), to.scale(g));
+            let ends = format!(r#"x1="{}" y1="{}" x2="{}" y2="{}""#, n(a.x), n(a.y), n(z.x), n(z.y));
+            let cap = match cap {
+                Cap::Butt => "butt",
+                Cap::Round => "round",
+            };
+            let w = thickness.max(0.0) * g;
+            let mut s = String::new();
+            if b > 0.0 {
+                let _ = write!(s, r#"<line {ends} stroke="{border}" stroke-width="{}" stroke-linecap="{cap}"/>"#, n(w + 2.0 * b));
+            }
+            let _ = write!(s, r#"<line {ends} stroke="{}" stroke-width="{}" stroke-linecap="{cap}""#, esc(&sh.color), n(w));
+            if *dashed {
+                if let Some(v) = dash_array(z.sub(a).len(), 0.0, 0.0, (dash_length * g).max(0.5), (dash_gap * g).max(0.0)) {
+                    let _ = write!(s, r#" stroke-dasharray="{}""#, v.iter().map(|x| n(*x)).collect::<Vec<_>>().join(" "));
+                }
+            }
+            s.push_str("/>");
+            s
+        }
+        ShapeGeometry::Rect { pos, width, height, rotation } => {
+            let (w, h) = (width * g, height * g);
+            let b = b.min(w.min(h) / 2.0);
+            let p = pos.scale(g);
+            let mut s = format!(r#"<rect x="{}" y="{}" width="{}" height="{}" fill="{fill}""#, n(p.x + b / 2.0), n(p.y + b / 2.0), n(w - b), n(h - b));
+            if b > 0.0 {
+                let _ = write!(s, r#" stroke="{border}" stroke-width="{}""#, n(b));
+            }
+            if *rotation != 0.0 {
+                let _ = write!(s, r#" transform="rotate({} {} {})""#, n(*rotation), n(p.x + w / 2.0), n(p.y + h / 2.0));
+            }
+            s.push_str("/>");
+            s
+        }
+        ShapeGeometry::Circle { center, radius } => {
+            let (c, r) = (center.scale(g), radius * g);
+            let b = b.min(r);
+            let mut s = format!(r#"<circle cx="{}" cy="{}" r="{}" fill="{fill}""#, n(c.x), n(c.y), n(r - b / 2.0));
+            if b > 0.0 {
+                let _ = write!(s, r#" stroke="{border}" stroke-width="{}""#, n(b));
+            }
+            s.push_str("/>");
+            s
+        }
+    }
+}
+
+/// Exact bounds of `shape_svg` in pixels.
+fn shape_bounds(sh: &Shape, settings: &DocSettings) -> Option<Rect> {
+    let g = settings.cell_px;
+    match &sh.geometry {
+        ShapeGeometry::Line { from, to, thickness, cap, .. } => {
+            let (a, z) = (from.scale(g), to.scale(g));
+            let h = (thickness.max(0.0) / 2.0 + sh.border_width.max(0.0)) * g;
+            let d = z.sub(a).normalized();
+            if *cap == Cap::Round || d.len() == 0.0 {
+                return Rect::from_points([a, z]).map(|r| r.inflate(h));
+            }
+            let nrm = d.perp().scale(h);
+            Rect::from_points([a.add(nrm), a.sub(nrm), z.add(nrm), z.sub(nrm)])
+        }
+        ShapeGeometry::Rect { pos, width, height, rotation } => {
+            let r = Rect { x: pos.x * g, y: pos.y * g, w: width * g, h: height * g };
+            Some(rotated_rect_bounds(r.center(), r, *rotation))
+        }
+        ShapeGeometry::Circle { center, radius } => {
+            let c = center.scale(g);
+            Some(Rect { x: c.x, y: c.y, w: 0.0, h: 0.0 }.inflate(radius * g))
+        }
+    }
+}
+
 pub fn content_svg(c: &Content, settings: &DocSettings, assets: &Assets) -> String {
     match c {
         Content::Line(seg) => line_svg(&seg.points, &seg.style, settings),
         Content::Station(st) => station_svg(st, settings),
         Content::Text(t) => text_svg(t, settings),
         Content::Icon(i) => icon_svg(i, settings, assets),
+        Content::Shape(sh) => shape_svg(sh, settings),
     }
 }
 
@@ -387,6 +470,7 @@ pub fn content_bounds(c: &Content, settings: &DocSettings) -> Option<Rect> {
             let s = i.size * g;
             Some(rotated_rect_bounds(p, Rect { x: p.x - s / 2.0, y: p.y - s / 2.0, w: s, h: s }, i.rotation))
         }
+        Content::Shape(sh) => shape_bounds(sh, settings),
     }
 }
 

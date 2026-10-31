@@ -627,6 +627,144 @@ impl Default for Icon {
     }
 }
 
+/// Outline of a drawn shape, in cell units.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "shape", rename_all = "snake_case")]
+pub enum ShapeGeometry {
+    /// A straight line between two points, normally grid intersections.
+    Line {
+        from: Vec2,
+        to: Vec2,
+        /// Width of the line in cells.
+        thickness: f64,
+        /// Round ends stick out by half the thickness; butt ends stop at the points.
+        cap: Cap,
+        dashed: bool,
+        /// Requested dash length in cells (fitted so the line starts and ends with a full dash).
+        dash_length: f64,
+        dash_gap: f64,
+    },
+    /// A rectangle whose top-left corner is `pos`, normally covering whole
+    /// cells. It is turned by `rotation` degrees around its center, kept in
+    /// (-45, 45] (a quarter turn swaps the width and the height instead).
+    Rect { pos: Vec2, width: f64, height: f64, rotation: f64 },
+    /// A circle, normally centered on a cell center.
+    Circle { center: Vec2, radius: f64 },
+}
+
+/// A free-standing shape drawn with the shape tool: a straight line, a
+/// rectangle or a circle that belongs to no transit line.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Shape {
+    #[serde(flatten)]
+    pub geometry: ShapeGeometry,
+    /// Color of a line, or the fill of a rectangle or circle.
+    pub color: String,
+    /// Rectangles and circles: false leaves them empty inside (only the border shows).
+    pub filled: bool,
+    pub border_color: String,
+    /// Border width in cells, 0 for none. A line gets it on both sides; a
+    /// rectangle or circle inside its edge, so it keeps its size.
+    pub border_width: f64,
+}
+
+impl Shape {
+    pub fn line(from: Vec2, to: Vec2) -> Self {
+        Shape {
+            geometry: ShapeGeometry::Line { from, to, thickness: 0.1, cap: Cap::Round, dashed: false, dash_length: 0.5, dash_gap: 0.3 },
+            color: "#1a1a1a".into(),
+            filled: true,
+            border_color: "#ffffff".into(),
+            border_width: 0.0,
+        }
+    }
+
+    pub fn rect(pos: Vec2, width: f64, height: f64) -> Self {
+        Shape {
+            geometry: ShapeGeometry::Rect { pos, width, height, rotation: 0.0 },
+            color: "#e6e6e6".into(),
+            filled: true,
+            border_color: "#1a1a1a".into(),
+            border_width: 0.1,
+        }
+    }
+
+    pub fn circle(center: Vec2, radius: f64) -> Self {
+        Shape {
+            geometry: ShapeGeometry::Circle { center, radius },
+            color: "#ffffff".into(),
+            filled: true,
+            border_color: "#000000".into(),
+            border_width: 0.22,
+        }
+    }
+
+    /// What the layers panel calls a new shape of this kind.
+    pub fn label(&self) -> &'static str {
+        match self.geometry {
+            ShapeGeometry::Line { .. } => "Straight line",
+            ShapeGeometry::Rect { .. } => "Rectangle",
+            ShapeGeometry::Circle { .. } => "Circle",
+        }
+    }
+
+    /// Position shown as X / Y: the top-left-most end of a line, the corner
+    /// of a rectangle, the center of a circle.
+    pub fn anchor(&self) -> Vec2 {
+        match &self.geometry {
+            ShapeGeometry::Line { from, to, .. } => Vec2::new(from.x.min(to.x), from.y.min(to.y)),
+            ShapeGeometry::Rect { pos, .. } => *pos,
+            ShapeGeometry::Circle { center, .. } => *center,
+        }
+    }
+
+    /// Points that land on the grid when the shape snaps: the ends of a line
+    /// and the corners of a rectangle (grid intersections), the center of a
+    /// circle (a cell center).
+    pub fn snap_points(&self) -> Vec<Vec2> {
+        match &self.geometry {
+            ShapeGeometry::Line { from, to, .. } => vec![*from, *to],
+            ShapeGeometry::Rect { pos, width, height, rotation } => {
+                let c = pos.add(Vec2::new(width / 2.0, height / 2.0));
+                [(0.0, 0.0), (*width, 0.0), (0.0, *height), (*width, *height)]
+                    .iter()
+                    .map(|&(x, y)| pos.add(Vec2::new(x, y)).rotate_around(c, *rotation))
+                    .collect()
+            }
+            ShapeGeometry::Circle { center, .. } => vec![*center],
+        }
+    }
+
+    pub fn translate(&mut self, d: Vec2) {
+        match &mut self.geometry {
+            ShapeGeometry::Line { from, to, .. } => {
+                *from = from.add(d);
+                *to = to.add(d);
+            }
+            ShapeGeometry::Rect { pos, .. } => *pos = pos.add(d),
+            ShapeGeometry::Circle { center, .. } => *center = center.add(d),
+        }
+    }
+
+    /// The delta that moves the shape by about `d` and puts it back on the
+    /// grid: whichever line end or rectangle corner is closest to a grid
+    /// intersection lands on it, and a circle centers on a cell.
+    pub fn snap_delta(&self, d: Vec2) -> Vec2 {
+        if let ShapeGeometry::Circle { center, .. } = &self.geometry {
+            let c = center.add(d);
+            return crate::geom::Cell::containing(c).center().sub(*center);
+        }
+        let best = self
+            .snap_points()
+            .into_iter()
+            .map(|p| p.add(d))
+            .map(|p| p.rounded(1.0).sub(p))
+            .min_by(|a, b| a.len().total_cmp(&b.len()))
+            .unwrap_or_default();
+        d.add(best)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Content {
@@ -634,6 +772,7 @@ pub enum Content {
     Station(Station),
     Text(TextBox),
     Icon(Icon),
+    Shape(Shape),
 }
 
 impl Content {
@@ -643,6 +782,7 @@ impl Content {
             Content::Station(_) => "station",
             Content::Text(_) => "text",
             Content::Icon(_) => "icon",
+            Content::Shape(_) => "shape",
         }
     }
 }

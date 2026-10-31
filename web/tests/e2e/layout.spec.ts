@@ -13,7 +13,7 @@ test.describe('workspace layout', () => {
       await expect(page.getByTestId(id)).toBeVisible()
     }
     const tools = page.locator('[data-testid=tools-panel] .tool')
-    await expect(tools).toHaveCount(6)
+    await expect(tools).toHaveCount(7)
     await expect(page.getByTestId('doc-title')).toHaveText(/^Untitled-1\.transit\.svg — /)
     // One document at a time: there is no document tab strip.
     await expect(page.locator('.doc-tabs')).toHaveCount(0)
@@ -44,7 +44,7 @@ test.describe('workspace layout', () => {
 
   test('the eraser has its own tool button and there is no icon tool', async ({ page }) => {
     const tools = page.locator('[data-testid=tools-panel] .tool')
-    await expect(tools).toHaveCount(6)
+    await expect(tools).toHaveCount(7)
     await expect(page.locator('[data-testid=tools-panel] .tool[data-tool=icon]')).toHaveCount(0)
     await page.locator('[data-testid=tools-panel] .tool[data-tool=eraser]').click()
     await expect(page.locator('[data-testid=tools-panel] .tool.on')).toHaveAttribute('data-tool', 'eraser')
@@ -75,6 +75,7 @@ test.describe('workspace layout', () => {
       ['h', 'hand'],
       ['s', 'station'],
       ['t', 'text'],
+      ['u', 'shape'],
       ['e', 'eraser'],
       ['v', 'select'],
     ]

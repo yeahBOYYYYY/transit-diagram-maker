@@ -53,6 +53,8 @@ const kindIcon = computed(() => {
       return 'station'
     case 'text':
       return 'text'
+    case 'shape':
+      return 'shape'
     default:
       return 'icon'
   }

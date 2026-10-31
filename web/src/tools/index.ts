@@ -1,5 +1,5 @@
 // Pointer and keyboard behavior of each canvas tool.
-import type { Cell, Id, Rect, Vec2 } from '../core/types'
+import type { Cell, Id, Rect, Shape, ShapeKind, Vec2 } from '../core/types'
 import { ancestorsOf, findItem, leafIds } from '../core/tree'
 import { CELL_PX, brush, cellsBetween, rectFromPoints, rectsIntersect } from '../core/viewport'
 import type { EditorStore, ToolId } from '../stores/editor'
@@ -504,6 +504,130 @@ function textTool(store: EditorStore): Tool {
   }
 }
 
+// ---------------------------------------------------------------- shape
+
+type DragPoint = Pick<PointerInfo, 'cells' | 'cell'>
+
+/**
+ * Turn `d` into the nearest of the 8 directions, keeping it on grid
+ * intersections: along an axis it keeps its length on that axis, on a
+ * diagonal both sides get the average of their lengths.
+ */
+function eightWay(d: Vec2): Vec2 {
+  const ax = Math.abs(d.x)
+  const ay = Math.abs(d.y)
+  if (ax > 2 * ay) return { x: d.x, y: 0 }
+  if (ay > 2 * ax) return { x: 0, y: d.y }
+  const n = Math.round((ax + ay) / 2)
+  return { x: Math.sign(d.x) * n, y: Math.sign(d.y) * n }
+}
+
+const tenth = (v: number) => Math.round(v * 10) / 10
+
+/**
+ * The shape a drag from `a` to `b` draws, or null when it is too small. A
+ * line goes between grid intersections in one of the 8 directions; a
+ * rectangle covers every cell from `a` to `b`; a circle is centered on the
+ * cell of `a` with a radius in half cells. With `free` (Alt) points and sizes
+ * follow the pointer in tenths of a cell; `square` (Shift) makes rectangles
+ * square and keeps free lines in the 8 directions.
+ */
+export function shapeFromDrag(kind: ShapeKind, a: DragPoint, b: DragPoint, free: boolean, square: boolean): Shape | null {
+  const st = prefs.shape
+  if (kind === 'line') {
+    const snap = (p: Vec2) => (free ? { x: tenth(p.x), y: tenth(p.y) } : { x: Math.round(p.x), y: Math.round(p.y) })
+    const from = snap(a.cells)
+    let d = { x: snap(b.cells).x - from.x, y: snap(b.cells).y - from.y }
+    if (!free) d = eightWay(d)
+    else if (square) {
+      const e = eightWay({ x: Math.round(d.x * 10), y: Math.round(d.y * 10) })
+      d = { x: e.x / 10, y: e.y / 10 }
+    }
+    if (d.x === 0 && d.y === 0) return null
+    const { color, filled, border_color, border_width, thickness, cap, dashed, dash_length, dash_gap } = st.line
+    const to = { x: tenth(from.x + d.x), y: tenth(from.y + d.y) }
+    return { shape: 'line', from, to, thickness, cap, dashed, dash_length, dash_gap, color, filled, border_color, border_width }
+  }
+  if (kind === 'rect') {
+    let x0: number, y0: number, x1: number, y1: number
+    if (free) {
+      [x0, y0, x1, y1] = [a.cells.x, a.cells.y, b.cells.x, b.cells.y].map(tenth)
+    } else {
+      // Every cell from the pressed one to the one under the pointer.
+      x0 = a.cell.x + (b.cell.x < a.cell.x ? 1 : 0)
+      y0 = a.cell.y + (b.cell.y < a.cell.y ? 1 : 0)
+      x1 = b.cell.x + (b.cell.x < a.cell.x ? 0 : 1)
+      y1 = b.cell.y + (b.cell.y < a.cell.y ? 0 : 1)
+    }
+    if (square) {
+      const side = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))
+      x1 = x0 + (x1 < x0 ? -side : side)
+      y1 = y0 + (y1 < y0 ? -side : side)
+    }
+    const width = tenth(Math.abs(x1 - x0))
+    const height = tenth(Math.abs(y1 - y0))
+    if (width < 0.1 || height < 0.1) return null
+    return { shape: 'rect', pos: { x: Math.min(x0, x1), y: Math.min(y0, y1) }, width, height, rotation: 0, ...st.rect }
+  }
+  const center = free ? { x: tenth(a.cells.x), y: tenth(a.cells.y) } : { x: a.cell.x + 0.5, y: a.cell.y + 0.5 }
+  const dist = Math.hypot(b.cells.x - center.x, b.cells.y - center.y)
+  const radius = free ? tenth(dist) : Math.max(0.5, Math.round(dist * 2) / 2)
+  if (radius < 0.1) return null
+  return { shape: 'circle', center, radius, ...st.circle }
+}
+
+function shapeTool(store: EditorStore): Tool {
+  let start: PointerInfo | null = null
+  const s = store.state
+  const hover = (p: PointerInfo) => {
+    // Rectangles and circles start from the cell under the pointer.
+    const cells = prefs.shape.kind === 'line' || p.alt ? [] : [p.cell]
+    s.overlay = { ...s.overlay, preview: '', cells, cellsColor: prefs.selectionColor }
+  }
+  const draw = (p: PointerInfo) => {
+    const shape = start && shapeFromDrag(prefs.shape.kind, start, p, p.alt, p.shift)
+    s.overlay = { ...s.overlay, preview: shape ? store.engine.value.previewShape(shape) : '', cells: [] }
+    return shape
+  }
+  return {
+    cursor: () => 'crosshair',
+    down(p) {
+      if (p.button !== 0) return
+      start = p
+      draw(p)
+    },
+    move(p, pressed) {
+      if (start && pressed) draw(p)
+      else hover(p)
+    },
+    up(p) {
+      if (!start) return
+      const shape = draw(p)
+      start = null
+      hover(p)
+      if (!shape) {
+        if (prefs.shape.kind === 'line') store.notify('Drag to draw a straight line')
+        return
+      }
+      const id = store.run((e) => e.addShape(shape))
+      if (id !== undefined) {
+        store.select([id])
+        store.notify(`${findItem(s.tree, id)?.name ?? 'Shape'} drawn`)
+      }
+    },
+    key(e) {
+      if (e.key !== 'Escape' || !start) return false
+      start = null
+      clearOverlay(store)
+      return true
+    },
+    reset() {
+      start = null
+      clearOverlay(store)
+    },
+  }
+}
+
 // ----------------------------------------------------------------- icon
 
 /** Where a pictogram placed at `p` is centered: its cell center, or exactly under the pointer with Alt. */
@@ -545,5 +669,6 @@ export function createTools(store: EditorStore, boundsOf: BoundsProvider): Recor
     eraser: eraserTool(store),
     station: stationTool(store),
     text: textTool(store),
+    shape: shapeTool(store),
   }
 }

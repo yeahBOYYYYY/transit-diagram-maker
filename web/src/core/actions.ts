@@ -46,6 +46,7 @@ export const ACTIONS = {
   'tool.eraser': { label: 'Erase Tool', category: 'Tools', key: 'E' },
   'tool.station': { label: 'Station Tool', category: 'Tools', key: 'S' },
   'tool.text': { label: 'Text Tool', category: 'Tools', key: 'T' },
+  'tool.shape': { label: 'Shape Tool', category: 'Tools', key: 'U' },
   'color.swap': { label: 'Swap Line and Inner Colors', category: 'Tools', key: 'X' },
   'color.reset': { label: 'Default Line and Inner Colors', category: 'Tools', key: 'D' },
 

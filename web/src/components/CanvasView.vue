@@ -150,13 +150,32 @@ function hitTest(clientX: number, clientY: number, world: { x: number; y: number
       if (!locked.has(id)) return id
     }
   }
-  // Text glyphs are thin; fall back to their boxes.
+  // Text glyphs are thin; fall back to their boxes. Thin straight lines
+  // (shapes) take a click a few screen pixels away.
   for (const f of [...s.fragments].reverse()) {
-    if (f.locked || (f.kind !== 'text' && f.kind !== 'icon')) continue
+    if (f.locked) continue
+    if (f.kind === 'shape') {
+      const n = store.node(f.id)
+      const sh = n?.type === 'layer' && n.content.kind === 'shape' ? n.content : null
+      if (sh?.shape !== 'line') continue
+      const reach = (sh.thickness / 2 + sh.border_width) * CELL_PX + 4 / s.view.zoom
+      if (distanceToSegment(world, sh.from, sh.to) <= reach) return f.id
+      continue
+    }
+    if (f.kind !== 'text' && f.kind !== 'icon') continue
     const b = boundsOf([f.id]).get(f.id)
     if (b && world.x >= b.x && world.x <= b.x + b.w && world.y >= b.y && world.y <= b.y + b.h) return f.id
   }
   return null
+}
+
+/** Distance in world pixels from `p` (world pixels) to the segment between two points in cells. */
+function distanceToSegment(p: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }): number {
+  const g = CELL_PX
+  const [ax, ay, bx, by] = [a.x * g, a.y * g, b.x * g, b.y * g]
+  const len2 = (bx - ax) ** 2 + (by - ay) ** 2
+  const t = len2 ? Math.max(0, Math.min(1, ((p.x - ax) * (bx - ax) + (p.y - ay) * (by - ay)) / len2)) : 0
+  return Math.hypot(p.x - (ax + t * (bx - ax)), p.y - (ay + t * (by - ay)))
 }
 
 function parseCell(v: string | null | undefined): { x: number; y: number } | null {

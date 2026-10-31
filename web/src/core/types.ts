@@ -128,11 +128,35 @@ export interface Icon {
   background: string
 }
 
+export type ShapeKind = 'line' | 'rect' | 'circle'
+
+/** Outline of a shape, in cells. */
+export type ShapeGeometry =
+  /** A straight line between two points (grid intersections unless drawn with Alt). */
+  | { shape: 'line'; from: Vec2; to: Vec2; thickness: number; cap: Cap; dashed: boolean; dash_length: number; dash_gap: number }
+  /** `pos` is the top-left corner; it turns around its center, `rotation` in (-45, 45]. */
+  | { shape: 'rect'; pos: Vec2; width: number; height: number; rotation: number }
+  | { shape: 'circle'; center: Vec2; radius: number }
+
+/** Colors and border shared by every shape. */
+export interface ShapePaint {
+  /** Color of a line, or the fill of a rectangle or circle. */
+  color: string
+  /** Rectangles and circles: false leaves them empty inside. */
+  filled: boolean
+  border_color: string
+  /** In cells; 0 for no border. */
+  border_width: number
+}
+
+export type Shape = ShapeGeometry & ShapePaint
+
 export type Content =
   | LineSegment
   | StationContent
   | ({ kind: 'text' } & TextBox)
   | ({ kind: 'icon' } & Icon)
+  | ({ kind: 'shape' } & Shape)
 
 export type ContentKind = Content['kind']
 

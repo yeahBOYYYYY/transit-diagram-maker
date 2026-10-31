@@ -1,6 +1,6 @@
 // Application preferences (not part of the document), persisted in localStorage.
 import { reactive, watch } from 'vue'
-import type { ExportOptions, Icon, LineStyle, StationKind, StationOptions, TextAlign, TextDirection } from '../core/types'
+import type { Cap, ExportOptions, Icon, LineStyle, ShapeKind, ShapePaint, StationKind, StationOptions, TextAlign, TextDirection } from '../core/types'
 import { DEFAULT_SHORTCUTS, type ActionId } from '../core/actions'
 import { FONT_FAMILIES } from '../core/fonts'
 import { STROKE_KINDS } from '../core/lineStyles'
@@ -51,7 +51,20 @@ export interface Prefs {
   station: StationOptions & { kind: StationKind }
   text: { size: number; color: string; font_family: string; bold: boolean; italic: boolean; align: TextAlign; direction: TextDirection }
   icon: Pick<Icon, 'icon' | 'color' | 'background'> & { size: number | null }
+  /** The shape tool's kind and the look of new shapes of each kind. */
+  shape: {
+    kind: ShapeKind
+    line: ShapePaint & { thickness: number; cap: Cap; dashed: boolean; dash_length: number; dash_gap: number }
+    rect: ShapePaint
+    circle: ShapePaint
+  }
 }
+
+export const SHAPE_KINDS: { value: ShapeKind; label: string }[] = [
+  { value: 'line', label: 'Line' },
+  { value: 'rect', label: 'Rectangle' },
+  { value: 'circle', label: 'Circle' },
+]
 
 
 export function defaultPrefs(): Prefs {
@@ -114,6 +127,12 @@ export function defaultPrefs(): Prefs {
     },
     text: { size: 0.75, color: '#1a1a1a', font_family: FONT_FAMILIES[0], bold: false, italic: false, align: 'middle', direction: 'ltr' },
     icon: { icon: 'wheelchair', color: '#ffffff', background: '#1d4f91', size: null },
+    shape: {
+      kind: 'rect',
+      line: { color: '#1a1a1a', filled: true, border_color: '#ffffff', border_width: 0, thickness: 0.1, cap: 'round', dashed: false, dash_length: 0.5, dash_gap: 0.3 },
+      rect: { color: '#e6e6e6', filled: true, border_color: '#1a1a1a', border_width: 0.1 },
+      circle: { color: '#ffffff', filled: true, border_color: '#000000', border_width: 0.22 },
+    },
   }
 }
 
@@ -139,6 +158,7 @@ export function loadPrefs(storage: Pick<Storage, 'getItem'> | null = safeStorage
     const p = deepMerge(defaultPrefs(), JSON.parse(raw))
     // A line style that no longer exists falls back to the default one.
     if (!STROKE_KINDS.some((k) => k.value === p.line.kind)) p.line.kind = defaultPrefs().line.kind
+    if (!SHAPE_KINDS.some((k) => k.value === p.shape.kind)) p.shape.kind = defaultPrefs().shape.kind
     return p
   } catch {
     return defaultPrefs()

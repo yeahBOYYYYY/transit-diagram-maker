@@ -1,12 +1,12 @@
 <script setup lang="ts">
 // Layers panel: top of the list is painted on top. Supports selection,
 // visibility, locking, renaming, grouping and drag & drop re-ordering.
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import PanelFrame from './PanelFrame.vue'
 import LayerRow from './LayerRow.vue'
 import UiIcon from '../ui/UiIcon.vue'
 import type { Fragment, Id, TreeItem } from '../../core/types'
-import { findItem, flatten, isEffectivelyLocked, stackIndex } from '../../core/tree'
+import { ancestorsOf, findItem, flatten, isEffectivelyLocked, stackIndex } from '../../core/tree'
 import { useEditor } from '../../stores/editor'
 import { prefs } from '../../stores/prefs'
 import { canUngroup, runAction, selectionDeletable } from '../../stores/commands'
@@ -16,6 +16,26 @@ const s = store.state
 
 const fragments = computed(() => new Map<Id, Fragment>(s.fragments.map((f) => [f.id, f])))
 let anchor: Id | null = null
+const list = ref<HTMLElement | null>(null)
+
+// Like Photoshop and GIMP: whatever gets selected (a click on the canvas,
+// a marquee, a new object) is shown in the list. The groups around it open
+// (pure view state, so neither an undo step nor an unsaved change) and the
+// list scrolls to its row.
+watch(
+  () => s.selection,
+  async (sel, old) => {
+    const added = sel.filter((id) => !old?.includes(id))
+    if (!added.length) return
+    const closed = new Set(added.flatMap((id) => ancestorsOf(s.tree, id)).filter((g) => findItem(s.tree, g)?.expanded === false))
+    if (closed.size) {
+      for (const g of closed) store.engine.value.setExpanded(g, true)
+      store.refresh()
+    }
+    await nextTick()
+    list.value?.querySelector(`[data-layer-id="${added[added.length - 1]}"]`)?.scrollIntoView?.({ block: 'nearest' })
+  },
+)
 
 function onSelect(id: Id, e: MouseEvent): void {
   if (e.shiftKey && anchor !== null) {
@@ -101,7 +121,7 @@ const selectionLocked = computed(
 
 <template>
   <PanelFrame title="Layers" grow>
-    <div class="layers" data-testid="layers-panel" @click.self="store.clearSelection()">
+    <div ref="list" class="layers" data-testid="layers-panel" @click.self="store.clearSelection()">
       <LayerRow
         v-for="item in s.tree"
         :key="item.id"

@@ -82,4 +82,21 @@ test.describe('layers panel', () => {
     const nested = await state(page, (s) => s.tree[0].children.map((c: any) => c.name))
     expect(nested).toEqual(['Line 1'])
   })
+
+  test('clicking an object on the canvas shows and highlights its layer', async ({ page }) => {
+    await drawLine(page, [[0, 0], [6, 0]])
+    await page.keyboard.press('s')
+    await clickCell(page, 3, 0)
+    await page.keyboard.press('v')
+    await clickCell(page, -4, -4)
+    // Close the line group: the station's row is hidden inside it.
+    await (await layerRow(page, 'Line 1')).locator('.caret').click()
+    await expect(page.locator('[data-testid=layers-panel] .row', { hasText: 'Station 1' })).toHaveCount(0)
+    await clickCell(page, 3, 0)
+    const id = await state(page, (s) => s.selection[0])
+    const row = page.locator(`[data-testid=layers-panel] .row[data-layer-id="${id}"]`)
+    await expect(row).toBeVisible()
+    await expect(row).toHaveClass(/selected/)
+    await expect(row).toBeInViewport()
+  })
 })

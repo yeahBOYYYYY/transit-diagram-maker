@@ -96,6 +96,7 @@ const TOOL_ACTIONS: Partial<Record<ActionId, ToolId>> = {
   'tool.eraser': 'eraser',
   'tool.station': 'station',
   'tool.text': 'text',
+  'tool.shape': 'shape',
 }
 
 /**

@@ -29,7 +29,7 @@
 //! ```
 
 use crate::assets::{font_face_css, FontAsset, IconAsset};
-use crate::editor::free_rotation;
+use crate::editor::{free_rotation, tidy_shape};
 use crate::error::{EditError, Result};
 use crate::geom::{self, Cell, Dir8, Vec2};
 use crate::model::*;
@@ -220,6 +220,32 @@ fn layer_tag(l: &Layer) -> String {
             .attr("color", &i.color)
             .attr("background", &i.background)
             .empty(),
+        Content::Shape(sh) => {
+            let t = base("shape")
+                .attr("color", &sh.color)
+                .flag("filled", sh.filled, true)
+                .attr("border-color", &sh.border_color)
+                .attr("border-width", num(sh.border_width));
+            match &sh.geometry {
+                ShapeGeometry::Line { from, to, thickness, cap, dashed, dash_length, dash_gap } => t
+                    .attr("shape", "line")
+                    .attr("from", vec2(*from))
+                    .attr("to", vec2(*to))
+                    .attr("thickness", num(*thickness))
+                    .attr("cap", enum_name(cap))
+                    .flag("dashed", *dashed, false)
+                    .attr("dash-length", num(*dash_length))
+                    .attr("dash-gap", num(*dash_gap)),
+                ShapeGeometry::Rect { pos, width, height, rotation } => t
+                    .attr("shape", "rect")
+                    .attr("pos", vec2(*pos))
+                    .attr("width", num(*width))
+                    .attr("height", num(*height))
+                    .attr("rotation", num(*rotation)),
+                ShapeGeometry::Circle { center, radius } => t.attr("shape", "circle").attr("center", vec2(*center)).attr("radius", num(*radius)),
+            }
+            .empty()
+        }
     }
 }
 
@@ -490,6 +516,30 @@ fn read_icon(e: &El) -> Result<Icon> {
     })
 }
 
+fn read_shape(e: &El) -> Result<Shape> {
+    let geometry = match e.req("shape")? {
+        "line" => ShapeGeometry::Line {
+            from: e.vec2("from")?,
+            to: e.vec2("to")?,
+            thickness: e.num("thickness", 0.1)?,
+            cap: e.enumeration("cap")?,
+            dashed: e.bool("dashed", false)?,
+            dash_length: e.num("dash-length", 0.5)?,
+            dash_gap: e.num("dash-gap", 0.3)?,
+        },
+        "rect" => ShapeGeometry::Rect { pos: e.vec2("pos")?, width: e.num("width", 1.0)?, height: e.num("height", 1.0)?, rotation: e.num("rotation", 0.0)? },
+        "circle" => ShapeGeometry::Circle { center: e.vec2("center")?, radius: e.num("radius", 0.5)? },
+        other => return Err(e.bad("shape", other)),
+    };
+    Ok(Shape {
+        geometry,
+        color: e.string("color", "#1a1a1a"),
+        filled: e.bool("filled", true)?,
+        border_color: e.string("border-color", "#000000"),
+        border_width: e.num("border-width", 0.0)?,
+    })
+}
+
 /// The layer tree under `parent`: every `<g>` whose first element is a
 /// `<transit:…>` description. Anything else (the rendered shapes, the
 /// background, foreign markup) is ignored.
@@ -518,6 +568,7 @@ fn read_nodes(parent: roxmltree::Node) -> Result<Vec<Node>> {
             "station" => Content::Station(read_station(&e)?),
             "text" => Content::Text(read_text(&e)?),
             "icon" => Content::Icon(read_icon(&e)?),
+            "shape" => Content::Shape(read_shape(&e)?),
             other => return Err(perr(format!("unknown element <transit:{other}>"))),
         };
         out.push(Node::Layer(Layer { id, name, visible, locked, content }));
@@ -609,6 +660,7 @@ pub fn validate(mut doc: Document) -> Result<Document> {
                 i.rotation = free_rotation(i.rotation);
                 i.pos = i.pos.snapped();
             }
+            Content::Shape(sh) => tidy_shape(sh),
             Content::Station(_) => {}
         }
     });

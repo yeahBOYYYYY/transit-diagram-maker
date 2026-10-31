@@ -2,7 +2,7 @@
 //! which keeps the binding surface small and the TypeScript side fully typed.
 
 use serde_json::Value;
-use transit_core::{io, render, Cell, Editor, Icon, LineStyle, StationKind, StationOptions, TextBox, Vec2};
+use transit_core::{io, render, Cell, Editor, Icon, LineStyle, Shape, StationKind, StationOptions, TextBox, Vec2};
 use wasm_bindgen::prelude::*;
 
 fn err(e: impl std::fmt::Display) -> JsError {
@@ -132,6 +132,14 @@ impl TransitEditor {
             transit_core::StationShape::Pill { cells, outer_color: outer.into(), inner_color: inner.into() },
         );
         Ok(render::station_svg(&st, self.inner.settings()))
+    }
+
+    /// Markup of a shape that is still being drawn with the shape tool.
+    #[wasm_bindgen(js_name = previewShape)]
+    pub fn preview_shape(&self, shape_json: &str) -> Result<String, JsError> {
+        let mut shape: Shape = parse(shape_json)?;
+        transit_core::editor::tidy_shape(&mut shape);
+        Ok(render::shape_svg(&shape, self.inner.settings()))
     }
 
     /// Uploaded fonts (family names) and icons (with preview markup).
@@ -302,6 +310,12 @@ impl TransitEditor {
     pub fn add_icon(&mut self, icon_json: &str) -> Result<f64, JsError> {
         let i: Icon = parse(icon_json)?;
         self.inner.add_icon(i).map(|v| v as f64).map_err(err)
+    }
+
+    #[wasm_bindgen(js_name = addShape)]
+    pub fn add_shape(&mut self, shape_json: &str) -> Result<f64, JsError> {
+        let shape: Shape = parse(shape_json)?;
+        self.inner.add_shape(shape).map(|v| v as f64).map_err(err)
     }
 
     #[wasm_bindgen(js_name = updateContent)]

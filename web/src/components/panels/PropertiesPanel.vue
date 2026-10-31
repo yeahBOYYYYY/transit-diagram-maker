@@ -153,12 +153,16 @@ function setPosition(axis: 'x' | 'y', value: number): void {
   live((e) => moveSelectionTo(e, store, axis, value))
 }
 
+/** The selected shape, if a shape is selected. */
+const shape = computed(() => (layer.value?.content.kind === 'shape' ? layer.value.content : null))
+
 const kindLabel = computed(() => {
   if (group.value) {
     return { generic: 'Group', line: 'Transit line', station: 'Station group' }[group.value.kind.role]
   }
+  if (shape.value) return { line: 'Straight line', rect: 'Rectangle', circle: 'Circle' }[shape.value.shape]
   const k = layer.value?.content.kind
-  return k ? { line: 'Line segment', station: 'Station', text: 'Text', icon: 'Pictogram' }[k] : ''
+  return k ? { line: 'Line segment', station: 'Station', text: 'Text', icon: 'Pictogram', shape: 'Shape' }[k] : ''
 })
 
 const coupledLines = computed(() => {
@@ -399,6 +403,68 @@ const childCount = computed(() => (group.value ? (findItem(s.tree, group.value.i
           </div>
         </template>
 
+        <!-- shape -->
+        <template v-if="shape">
+          <div class="section-title">Appearance</div>
+          <template v-if="shape.shape === 'line'">
+            <div class="field">
+              <span class="lbl">Color<HelpTip :text="HELP['shape.line_color']" /></span>
+              <ColorField :model-value="shape.color" @update:model-value="(v) => patch({ color: v })" />
+            </div>
+            <div class="field">
+              <span class="lbl">Caps<HelpTip :text="HELP['shape.cap']" /></span>
+              <select :value="shape.cap" data-testid="prop-shape-cap" @change="patch({ cap: ($event.target as HTMLSelectElement).value }); done()">
+                <option value="round">Round</option>
+                <option value="butt">Butt</option>
+              </select>
+            </div>
+            <div class="stack">
+              <NumberField :model-value="shape.thickness" label="Width" :min="0.01" :step="0.05" unit="cells" :help="HELP['shape.thickness']" data-testid="prop-shape-thickness" @update:model-value="(v) => patch({ thickness: v })" @commit="done" />
+            </div>
+          </template>
+          <div v-else class="field">
+            <label class="lbl check">
+              <input type="checkbox" :checked="shape.filled" data-testid="prop-shape-filled" @change="patch({ filled: ($event.target as HTMLInputElement).checked }); done()" />
+              Fill<HelpTip :text="HELP['shape.fill']" />
+            </label>
+            <ColorField v-if="shape.filled" :model-value="shape.color" :help="HELP['shape.fill_color']" @update:model-value="(v) => patch({ color: v })" />
+          </div>
+          <div class="field">
+            <span class="lbl">Border<HelpTip :text="HELP['shape.border_color']" /></span>
+            <ColorField :model-value="shape.border_color" @update:model-value="(v) => patch({ border_color: v })" />
+          </div>
+          <div class="stack">
+            <NumberField :model-value="shape.border_width" label="Border width" :min="0" :step="0.05" unit="cells" :help="HELP['shape.border_width']" @update:model-value="(v) => patch({ border_width: v })" @commit="done" />
+          </div>
+          <template v-if="shape.shape === 'line'">
+            <div class="field">
+              <label class="lbl check">
+                <input type="checkbox" :checked="shape.dashed" data-testid="prop-shape-dashed" @change="patch({ dashed: ($event.target as HTMLInputElement).checked }); done()" />
+                Dashed<HelpTip :text="HELP['shape.dashed']" />
+              </label>
+            </div>
+            <div v-if="shape.dashed" class="grid2">
+              <NumberField :model-value="shape.dash_length" label="Dash" :min="0.05" :step="0.1" unit="cells" :help="HELP['shape.dash_length']" @update:model-value="(v) => patch({ dash_length: v })" @commit="done" />
+              <NumberField :model-value="shape.dash_gap" label="Gap" :min="0" :step="0.1" unit="cells" :help="HELP['shape.dash_gap']" @update:model-value="(v) => patch({ dash_gap: v })" @commit="done" />
+            </div>
+            <div class="section-title">Ends</div>
+            <div class="grid2" data-testid="prop-shape-ends">
+              <NumberField :model-value="shape.from.x" label="Start X" :step="1" :precision="1" unit="cells" :help="HELP['shape.ends']" @update:model-value="(v) => patch({ from: { x: v } })" @commit="done" />
+              <NumberField :model-value="shape.from.y" label="Start Y" :step="1" :precision="1" unit="cells" :help="HELP['shape.ends']" @update:model-value="(v) => patch({ from: { y: v } })" @commit="done" />
+              <NumberField :model-value="shape.to.x" label="End X" :step="1" :precision="1" unit="cells" :help="HELP['shape.ends']" @update:model-value="(v) => patch({ to: { x: v } })" @commit="done" />
+              <NumberField :model-value="shape.to.y" label="End Y" :step="1" :precision="1" unit="cells" :help="HELP['shape.ends']" @update:model-value="(v) => patch({ to: { y: v } })" @commit="done" />
+            </div>
+          </template>
+          <div v-else-if="shape.shape === 'rect'" class="grid2" data-testid="prop-shape-size">
+            <NumberField :model-value="shape.width" label="Width" :min="0.1" :step="1" :precision="1" unit="cells" :help="HELP['shape.width']" @update:model-value="(v) => patch({ width: v })" @commit="done" />
+            <NumberField :model-value="shape.height" label="Height" :min="0.1" :step="1" :precision="1" unit="cells" :help="HELP['shape.height']" @update:model-value="(v) => patch({ height: v })" @commit="done" />
+            <NumberField :model-value="shape.rotation" label="Angle" :min="-180" :max="180" :step="45" :precision="1" unit="°" :help="HELP['shape.rotation']" @update:model-value="(v) => patch({ rotation: v })" @commit="done" />
+          </div>
+          <div v-else class="grid2" data-testid="prop-shape-size">
+            <NumberField :model-value="shape.radius" label="Radius" :min="0.1" :step="0.5" :precision="1" unit="cells" :help="HELP['shape.radius']" @update:model-value="(v) => patch({ radius: v })" @commit="done" />
+          </div>
+        </template>
+
         <!-- icon -->
         <template v-if="layer && layer.content.kind === 'icon'">
           <div class="section-title">Pictogram</div>
@@ -507,6 +573,10 @@ const childCount = computed(() => (group.value ? (findItem(s.tree, group.value.i
   width: 100%;
   resize: vertical;
   padding: 4px 6px;
+}
+.check {
+  gap: 4px;
+  width: auto;
 }
 .more,
 .apply-line {

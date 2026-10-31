@@ -1,5 +1,13 @@
 # Bugs & Teaks
 
+## 27/10/2026 - Commit 9f2d22a
+
+1. There should be a new tool, the "Shape Tool" that allows you to draw a shape, similar to InkScapes' and Illustrators', the options for shapes are the following,
+   1. A straight line - follows by default a grid line from and to grid intersections. Can have a color, a thickness, a border and more, very similar to transit line, but default is thin and along axis lines.
+   2. A rectangle - Can have a border, has a color for interior or border if one is set, always covers exact grid cells (it's assembled from 1x1 cell units). Snapping for size and rotation can be overwritten with Alt as always.
+   3. A circle - Like a dot station in terms of settings, but radius can be changed and doesn't have to be on a transit line.
+2. When clicking on an object on the canvas it should highlight the object's layer in the layer panel. Very similar to Photoshop and Gimp.
+
 ## 26/10/2026 - Commit a26fb2d
 
 1. Text should be able to snap with every corner of it's bounding box, not just a predefined one (like top left).

@@ -84,7 +84,7 @@ pub struct CreatedStation {
 pub struct TreeItem {
     pub id: Id,
     pub name: String,
-    /// "group", "line", "station", "text" or "icon".
+    /// "group", "line", "station", "text", "icon" or "shape".
     pub kind: String,
     /// For groups: "generic", "line" or "station".
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -684,6 +684,26 @@ impl Editor {
         })
     }
 
+    /// Add a straight line, rectangle or circle. Its positions are kept in
+    /// tenths of a cell; the shape tool has already snapped them to the grid
+    /// unless Alt was held.
+    pub fn add_shape(&mut self, mut shape: Shape) -> Result<Id> {
+        tidy_shape(&mut shape);
+        self.apply(|d| {
+            let id = d.alloc_id();
+            let label = shape.label();
+            let mut n = 0;
+            tree::walk_layers(&d.root, &mut |l, _, _| {
+                if matches!(&l.content, Content::Shape(s) if s.label() == label) {
+                    n += 1;
+                }
+            });
+            let name = format!("{label} {}", n + 1);
+            d.root.push(Node::Layer(Layer { id, name, visible: true, locked: false, content: Content::Shape(shape) }));
+            Ok(id)
+        })
+    }
+
     // --------------------------------------------------------------- assets
 
     pub fn assets(&self) -> &Assets {
@@ -821,6 +841,7 @@ impl Editor {
                     i.rotation = free_rotation(i.rotation);
                     i.pos = i.pos.snapped();
                 }
+                (_, Content::Shape(sh)) => tidy_shape(sh),
                 _ => {}
             }
             let rename = match (&layer.content, &content) {
@@ -1133,7 +1154,9 @@ impl Editor {
     /// intersection, except labels moved along with their station, which keep
     /// their place next to it. Pictograms move in whole cells along with grid
     /// content, and on their own the top-left corner of their centers lands on
-    /// a cell center. With `free` text and pictograms move in tenths.
+    /// a cell center. Shapes put the line end or rectangle corner closest to
+    /// a grid intersection on it, and circles their center on a cell center.
+    /// With `free` text, pictograms and shapes move in tenths.
     pub fn translate(&mut self, ids: &[Id], dx: f64, dy: f64, free: bool) -> Result<()> {
         self.apply(|d| {
             let leaves = editable_leaves(d, ids);
@@ -1143,11 +1166,12 @@ impl Editor {
     }
 
     /// Rotate nodes by `deg` around `pivot` (cell units). Everything rotates in
-    /// 45° steps; selections with grid-bound content (lines, stations) pivot
-    /// around a cell center so they land back on the grid, and text boxes put
-    /// their corner back on a grid intersection. With `free` (Alt), text and
-    /// pictograms rotate by any whole number of degrees; grid content keeps
-    /// its 45° steps. Returns the angle actually applied.
+    /// 45° steps; selections with grid-bound content (lines, stations) or
+    /// shapes pivot around a cell center so they land back on the grid, text
+    /// boxes put their corner back on a grid intersection and shapes snap like
+    /// they do when moved. With `free` (Alt), text, pictograms and shapes
+    /// rotate by any whole number of degrees; grid content keeps its 45°
+    /// steps. Returns the angle actually applied.
     pub fn rotate(&mut self, ids: &[Id], deg: f64, pivot: Vec2, free: bool) -> Result<f64> {
         self.apply(|d| {
             let leaves = editable_leaves(d, ids);
@@ -1157,7 +1181,8 @@ impl Editor {
             let free = free && !grid_bound;
             let steps = (deg / 45.0).round() as i32;
             let angle = if free { normalize_angle(deg.round()) } else { steps as f64 * 45.0 };
-            let pivot = if grid_bound { Cell::containing(pivot).center() } else { pivot };
+            let shapes = leaves.iter().any(|id| matches!(tree::find_layer(&d.root, *id).map(|l| &l.content), Some(Content::Shape(_))));
+            let pivot = if grid_bound || (shapes && !free) { Cell::containing(pivot).center() } else { pivot };
             if angle == 0.0 || !angle.is_finite() {
                 return Ok(0.0);
             }
@@ -1211,6 +1236,7 @@ impl Editor {
                         i.pos = i.pos.rotate_around(pivot, angle).snapped();
                         i.rotation = if free { free_rotation(i.rotation + angle) } else { snap_rotation(i.rotation + angle) };
                     }
+                    Content::Shape(sh) => rotate_shape(sh, pivot, angle, steps, free),
                 }
             }
             let new_anchors = station_anchors(d);
@@ -1334,6 +1360,81 @@ fn content_anchor(c: &Content) -> Option<Vec2> {
         Content::Station(st) => Some(st.anchor()),
         Content::Text(t) => Some(t.pos),
         Content::Icon(i) => Some(i.pos),
+        Content::Shape(sh) => Some(sh.anchor()),
+    }
+}
+
+/// Keep a shape's numbers in range: positions and sizes in tenths of a cell
+/// (sizes at least a tenth), widths in hundredths, and a rectangle's
+/// rotation in (-45°, 45°] (a quarter turn swaps its width and height
+/// around the same center instead).
+pub fn tidy_shape(sh: &mut Shape) {
+    let size = |v: f64| geom::snap_tenth(v).clamp(0.1, 1000.0);
+    let fine = |v: f64, lo: f64, hi: f64| if v.is_finite() { ((v * 100.0).round() / 100.0).clamp(lo, hi) } else { lo };
+    sh.border_width = fine(sh.border_width, 0.0, 50.0);
+    match &mut sh.geometry {
+        ShapeGeometry::Line { from, to, thickness, dash_length, dash_gap, .. } => {
+            *from = from.snapped();
+            *to = to.snapped();
+            *thickness = fine(*thickness, 0.01, 50.0);
+            *dash_length = fine(*dash_length, 0.05, 100.0);
+            *dash_gap = fine(*dash_gap, 0.0, 100.0);
+        }
+        ShapeGeometry::Rect { pos, width, height, rotation } => {
+            let (mut w, mut h) = (size(*width), size(*height));
+            let center = pos.add(Vec2::new(w / 2.0, h / 2.0));
+            let mut r = free_rotation(*rotation);
+            let mut quarter = false;
+            while r > 45.0 {
+                r -= 90.0;
+                quarter = !quarter;
+            }
+            while r <= -45.0 {
+                r += 90.0;
+                quarter = !quarter;
+            }
+            if quarter {
+                std::mem::swap(&mut w, &mut h);
+            }
+            *pos = center.sub(Vec2::new(w / 2.0, h / 2.0)).snapped();
+            (*width, *height, *rotation) = (w, h, free_rotation(r));
+        }
+        ShapeGeometry::Circle { center, radius } => {
+            *center = center.snapped();
+            *radius = size(*radius);
+        }
+    }
+}
+
+/// Rotate a shape around `pivot`. A line between grid intersections turns
+/// like a transit line (a run of n cells stays n cells long, so a straight
+/// line turned by 45° becomes a diagonal over the same number of cells);
+/// a rectangle turns around its center. Without `free` the result snaps back
+/// onto the grid the way a moved shape does.
+fn rotate_shape(sh: &mut Shape, pivot: Vec2, angle: f64, steps: i32, free: bool) {
+    match &mut sh.geometry {
+        ShapeGeometry::Line { from, to, .. } => {
+            let d = to.sub(*from);
+            let start = from.rotate_around(pivot, angle);
+            *to = if !free && d.x.fract() == 0.0 && d.y.fract() == 0.0 {
+                let (dx, dy) = rotate_offset(d.x as i32, d.y as i32, steps);
+                start.add(Vec2::new(dx as f64, dy as f64))
+            } else {
+                to.rotate_around(pivot, angle)
+            };
+            *from = start;
+        }
+        ShapeGeometry::Rect { pos, width, height, rotation } => {
+            let half = Vec2::new(*width / 2.0, *height / 2.0);
+            *pos = pos.add(half).rotate_around(pivot, angle).sub(half);
+            *rotation = if free { free_rotation(*rotation + angle) } else { snap_rotation(*rotation + angle) };
+        }
+        ShapeGeometry::Circle { center, .. } => *center = center.rotate_around(pivot, angle),
+    }
+    tidy_shape(sh);
+    if !free {
+        sh.translate(sh.snap_delta(Vec2::default()));
+        tidy_shape(sh);
     }
 }
 
@@ -1789,6 +1890,12 @@ fn translate_layers(d: &mut Document, leaves: &[Id], dx: f64, dy: f64, free: boo
                 }
             }
             Content::Icon(i) => i.pos = i.pos.add(icon_delta).snapped(),
+            Content::Shape(sh) => {
+                // Line ends and rectangle corners land on grid intersections,
+                // circles on cell centers.
+                sh.translate(if free { delta } else { sh.snap_delta(delta) });
+                tidy_shape(sh);
+            }
         }
     }
     snap_stations(d, &snap);

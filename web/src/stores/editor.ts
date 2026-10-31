@@ -24,7 +24,7 @@ import { fitRect, unionRects, zoomAt, type View } from '../core/viewport'
 import { prefs } from './prefs'
 import { docNameOf, type FileHandle } from '../core/files'
 
-export type ToolId = 'select' | 'hand' | 'pen' | 'eraser' | 'station' | 'text'
+export type ToolId = 'select' | 'hand' | 'pen' | 'eraser' | 'station' | 'text' | 'shape'
 
 export interface Overlay {
   /** Markup drawn in world space above the document (pen / pill previews). */

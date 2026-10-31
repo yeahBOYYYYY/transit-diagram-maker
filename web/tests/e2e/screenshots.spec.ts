@@ -69,6 +69,15 @@ async function sampleMap(page: Page) {
         e.updateContent(a.id, { pos: { x: 9.5 - a.t.width / 2, y: 3.3 } })
       })
       store.clearSelection()
+      // Every new station was selected, which opened its group in the layers
+      // panel; close them again so the panel shows the lines.
+      const close = (items: any[]) =>
+        items.forEach((it) => {
+          if (it.role === 'station' && it.expanded) store.engine.value.setExpanded(it.id, false)
+          close(it.children)
+        })
+      close(store.state.tree)
+      store.refresh()
       store.fitToScreen()
     },
     [STATIONS[3], STATIONS[2]],

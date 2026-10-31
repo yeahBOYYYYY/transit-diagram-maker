@@ -23,6 +23,17 @@ fn sample() -> Editor {
     ed.add_text(TextBox { rotation: 45.0, ..TextBox::with_text("Metro \"Map\" & <Co>") }).unwrap();
     ed.add_text(TextBox { direction: TextDirection::Rtl, ..TextBox::with_text("תחנה מרכזית") }).unwrap();
     ed.add_icon(Icon { icon: "ferry".into(), pos: Vec2::new(10.0, 5.0), ..Icon::default() }).unwrap();
+    let mut dashed = Shape::line(Vec2::new(-2.0, 8.0), Vec2::new(4.0, 8.0));
+    if let ShapeGeometry::Line { cap, dashed: d, .. } = &mut dashed.geometry {
+        *cap = Cap::Butt;
+        *d = true;
+    }
+    ed.add_shape(dashed).unwrap();
+    let mut rect = Shape::rect(Vec2::new(5.0, 7.0), 3.0, 2.0);
+    rect.filled = false;
+    ed.add_shape(rect).unwrap();
+    let circle = ed.add_shape(Shape::circle(Vec2::new(12.5, 0.5), 1.5)).unwrap();
+    ed.rotate(&[circle], 30.0, Vec2::new(0.0, 0.0), true).unwrap();
     let g = ed.new_group(Some("Empty folder")).unwrap();
     ed.set_locked(g, true).unwrap();
     ed.set_visible(red.group_id, true).unwrap();
@@ -52,6 +63,7 @@ fn saved_file_is_an_svg_picture_with_editor_data() {
     assert_eq!(data("settings"), 1);
     assert_eq!(data("segment"), 3, "the blue line was erased into two segments");
     assert_eq!(data("station"), 3);
+    assert_eq!(data("shape"), 3);
     // The picture is the regular export: same shapes as the SVG export.
     assert!(text.contains("stroke-dasharray"));
     assert!(text.contains(r##"fill="#ffffff""##), "background rect");

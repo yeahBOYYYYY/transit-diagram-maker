@@ -30,6 +30,7 @@ test.describe('structure', () => {
       - button "Erase Tool (E)"
       - button "Station Tool (S)"
       - button "Text Tool (T)"
+      - button "Shape Tool (U)"
       - textbox: "#e03c31"
       - textbox: "#ffffff"
       - button "Swap Line and Inner Colors (X)"

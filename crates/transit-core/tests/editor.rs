@@ -1175,3 +1175,107 @@ fn undo_inside_transaction_commits_first() {
     assert!(!ed.in_transaction());
     assert_eq!(segment(&ed, l.layer_id).points[0], c(0, 0));
 }
+
+// --------------------------------------------------------------- shapes
+
+fn shape(ed: &Editor, id: Id) -> &Shape {
+    match &ed.layer(id).unwrap().content {
+        Content::Shape(s) => s,
+        other => panic!("not a shape: {other:?}"),
+    }
+}
+
+fn v(x: f64, y: f64) -> Vec2 {
+    Vec2::new(x, y)
+}
+
+#[test]
+fn shapes_are_named_and_kept_in_tenths() {
+    let mut ed = Editor::new();
+    let a = ed.add_shape(Shape::rect(v(1.04, 2.0), 3.0, 0.0)).unwrap();
+    let b = ed.add_shape(Shape::rect(v(0.0, 0.0), 1.0, 1.0)).unwrap();
+    let l = ed.add_shape(Shape::line(v(0.0, 0.0), v(4.0, 0.0))).unwrap();
+    assert_eq!(ed.layer(a).unwrap().name, "Rectangle 1");
+    assert_eq!(ed.layer(b).unwrap().name, "Rectangle 2");
+    assert_eq!(ed.layer(l).unwrap().name, "Straight line 1");
+    assert_eq!(ed.tree()[0].kind, "shape");
+    let ShapeGeometry::Rect { pos, height, .. } = shape(&ed, a).geometry else { panic!() };
+    assert_eq!((pos, height), (v(1.0, 2.0), 0.1), "positions in tenths, sizes at least a tenth");
+    ed.undo();
+    assert!(ed.layer(l).is_none());
+}
+
+#[test]
+fn moved_shapes_snap_to_the_grid_unless_free() {
+    let mut ed = Editor::new();
+    let r = ed.add_shape(Shape::rect(v(1.0, 1.0), 2.0, 3.0)).unwrap();
+    let c = ed.add_shape(Shape::circle(v(0.5, 0.5), 1.5)).unwrap();
+    let l = ed.add_shape(Shape::line(v(0.0, 0.0), v(4.0, 0.0))).unwrap();
+    ed.translate(&[r, c, l], 1.4, -0.6, false).unwrap();
+    assert!(matches!(shape(&ed, r).geometry, ShapeGeometry::Rect { pos, .. } if pos == v(2.0, 0.0)), "corners on intersections");
+    assert!(matches!(shape(&ed, c).geometry, ShapeGeometry::Circle { center, .. } if center == v(1.5, -0.5)), "centered on a cell");
+    assert!(matches!(shape(&ed, l).geometry, ShapeGeometry::Line { from, to, .. } if from == v(1.0, -1.0) && to == v(5.0, -1.0)));
+    ed.translate(&[r], 0.3, 0.0, true).unwrap();
+    assert!(matches!(shape(&ed, r).geometry, ShapeGeometry::Rect { pos, .. } if pos == v(2.3, 0.0)), "Alt moves in tenths");
+    // Off the grid, a normal move puts the nearest corner back on an intersection.
+    ed.translate(&[r], 0.0, 0.0, false).unwrap();
+    assert!(matches!(shape(&ed, r).geometry, ShapeGeometry::Rect { pos, .. } if pos == v(2.0, 0.0)));
+}
+
+#[test]
+fn rotated_shapes_stay_on_the_grid() {
+    let mut ed = Editor::new();
+    // A quarter turn swaps the rectangle's sides instead of storing 90°.
+    let r = ed.add_shape(Shape::rect(v(0.0, 0.0), 2.0, 3.0)).unwrap();
+    assert_eq!(ed.rotate(&[r], 90.0, v(1.2, 1.4), false).unwrap(), 90.0);
+    let ShapeGeometry::Rect { pos, width, height, rotation } = shape(&ed, r).geometry else { panic!() };
+    assert_eq!((width, height, rotation), (3.0, 2.0, 0.0));
+    assert_eq!((pos.x.fract(), pos.y.fract()), (0.0, 0.0), "still covers whole cells: {pos:?}");
+    ed.rotate(&[r], 45.0, v(1.0, 1.0), false).unwrap();
+    assert!(matches!(shape(&ed, r).geometry, ShapeGeometry::Rect { rotation, .. } if rotation == 45.0));
+    ed.rotate(&[r], 20.0, v(1.0, 1.0), true).unwrap();
+    assert!(matches!(shape(&ed, r).geometry, ShapeGeometry::Rect { rotation, .. } if rotation == -25.0), "65° is -25° with the sides swapped");
+    // A straight line turned by 45° becomes a diagonal over the same cells.
+    let l = ed.add_shape(Shape::line(v(0.0, 0.0), v(4.0, 0.0))).unwrap();
+    ed.rotate(&[l], 45.0, v(2.0, 0.0), false).unwrap();
+    let ShapeGeometry::Line { from, to, .. } = shape(&ed, l).geometry else { panic!() };
+    assert_eq!(to.sub(from), v(4.0, 4.0));
+    assert_eq!((from.x.fract(), from.y.fract()), (0.0, 0.0));
+    // Alt turns it freely.
+    ed.rotate(&[l], 10.0, from, true).unwrap();
+    let ShapeGeometry::Line { from: f2, to: t2, .. } = shape(&ed, l).geometry else { panic!() };
+    assert_eq!(f2, from);
+    assert_ne!(t2.sub(f2).x, t2.sub(f2).y);
+}
+
+#[test]
+fn shape_patches_are_tidied_and_cannot_change_the_shape() {
+    let mut ed = Editor::new();
+    let c = ed.add_shape(Shape::circle(v(0.5, 0.5), 1.0)).unwrap();
+    ed.update_content(c, &json!({"radius": -3, "border_width": 0.123, "color": "#00ff00"})).unwrap();
+    let s = shape(&ed, c);
+    assert!(matches!(s.geometry, ShapeGeometry::Circle { radius, .. } if radius == 0.1));
+    assert_eq!((s.border_width, s.color.as_str()), (0.12, "#00ff00"));
+    assert!(ed.update_content(c, &json!({"shape": "rect"})).is_err());
+    assert_eq!(ed.position(&[c]), Some(v(0.5, 0.5)));
+    let dup = ed.duplicate(&[c]).unwrap()[0];
+    assert!(matches!(shape(&ed, dup).geometry, ShapeGeometry::Circle { center, .. } if center == v(1.5, 1.5)));
+}
+
+#[test]
+fn shape_bounds_cover_the_whole_shape() {
+    let mut ed = Editor::new();
+    let g = CELL_PX;
+    let r = ed.add_shape(Shape::rect(v(1.0, 2.0), 3.0, 2.0)).unwrap();
+    let b = ed.bounds(&[r]).unwrap();
+    assert_eq!((b.x, b.y, b.w, b.h), (g, 2.0 * g, 3.0 * g, 2.0 * g), "the border stays inside");
+    let mut thick = Shape::line(v(0.0, 0.0), v(4.0, 0.0));
+    thick.border_width = 0.2;
+    if let ShapeGeometry::Line { cap, thickness, .. } = &mut thick.geometry {
+        *cap = Cap::Butt;
+        *thickness = 0.6;
+    }
+    let l = ed.add_shape(thick).unwrap();
+    let b = ed.bounds(&[l]).unwrap();
+    assert!((b.x - 0.0).abs() < 1e-9 && (b.w - 4.0 * g).abs() < 1e-9 && (b.h - 1.0 * g).abs() < 1e-9, "{b:?}");
+}

@@ -6,7 +6,7 @@
 export const HELP = {
   // Selection
   position:
-    'Position in grid cells. Text uses the top-left corner of its box, pictograms their center, stations their center, lines the top-left cell center they pass through, and several objects the top-left-most of those. Dragged objects snap: text puts its corner on a grid intersection, everything else snaps to the cells (hold Alt to move in steps of 0.1 cell). Typed values can use 0.1 steps, except for lines, which move in whole cells; moving a station by a fraction of a cell takes it off its line.',
+    'Position in grid cells. Text uses the top-left corner of its box, pictograms their center, stations their center, lines the top-left cell center they pass through, rectangles their top-left corner, circles their center, straight lines their top-left-most end, and several objects the top-left-most of those. Dragged objects snap: text, rectangles and straight lines put a corner or end on a grid intersection, everything else snaps to the cells (hold Alt to move in steps of 0.1 cell). Typed values can use 0.1 steps, except for lines, which move in whole cells; moving a station by a fraction of a cell takes it off its line.',
 
   // Lines
   'line.target': 'Draw a new line, or add a disconnected segment to an existing line. New segments take that line\'s style.',
@@ -61,6 +61,26 @@ export const HELP = {
   'icon.size': 'Edge length of the tile, in cells.',
   'icon.size_default': 'New pictograms match the dot station diameter unless a size is set.',
   'icon.rotation': 'Rotation in degrees. The rotate handles turn in steps of 45°; hold Alt to turn freely.',
+
+  // Shapes
+  'shape.kind':
+    'Line: a straight line from one grid intersection to another, in one of 8 directions. Rectangle: covers whole cells. Circle: centered on a cell, its radius in half cells. Hold Alt while drawing to use any point, size and angle.',
+  'shape.line_color': 'Color of the line.',
+  'shape.thickness': 'Width of the line, in cells.',
+  'shape.cap': 'Shape of the line ends. Round ends stick out by half the line width; butt ends stop exactly at the end points.',
+  'shape.dashed': 'Draw the line as dashes. Dashes and gaps are stretched slightly so the line starts and ends with a full dash.',
+  'shape.dash_length': 'Length of each dash, in cells.',
+  'shape.dash_gap': 'Space between two dashes, in cells.',
+  'shape.fill': 'Fill the inside of the rectangle or circle. Without a fill only the border shows.',
+  'shape.fill_color': 'Color inside the rectangle or circle.',
+  'shape.border_color': 'Color of the border.',
+  'shape.border_width':
+    'Width of the border, in cells. 0 draws no border. A rectangle or circle keeps its size: the border is drawn inside its edge. A line gets the border on both sides.',
+  'shape.ends': 'Where the line starts and ends, in cells. Grid intersections have whole numbers.',
+  'shape.width': 'Width of the rectangle, in cells.',
+  'shape.height': 'Height of the rectangle, in cells.',
+  'shape.radius': 'Radius of the circle, in cells. 0.5 fills exactly one cell.',
+  'shape.rotation': 'Rotation in degrees around the center of the rectangle. The rotate handles turn in steps of 45°; hold Alt to turn freely. A quarter turn swaps the width and the height.',
 
   // Eraser
   'eraser.size': 'Width of the eraser brush, in cells.',

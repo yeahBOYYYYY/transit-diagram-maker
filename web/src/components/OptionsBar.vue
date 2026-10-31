@@ -9,7 +9,7 @@ import NumberField from './ui/NumberField.vue'
 import ColorField from './ui/ColorField.vue'
 import Segmented from './ui/Segmented.vue'
 import { useEditor } from '../stores/editor'
-import { prefs } from '../stores/prefs'
+import { SHAPE_KINDS, prefs } from '../stores/prefs'
 import FontSelect from './ui/FontSelect.vue'
 import { rotateSelection } from '../stores/commands'
 import { selectedPill } from '../tools'
@@ -33,6 +33,16 @@ function setText(key: TextKey, value: unknown): void {
   if (s.textEdit) store.formatText({ [key]: value })
   else (prefs.text as Record<TextKey, unknown>)[key] = value
 }
+/** Colors and border of the shape kind the shape tool draws. */
+const shapePaint = computed(() => prefs.shape[prefs.shape.kind])
+const shapeHint = computed(
+  () =>
+    ({
+      line: 'Drag between grid intersections to draw a line in one of 8 directions · Alt: any point and angle',
+      rect: 'Drag across cells to draw a rectangle covering them · Shift: square · Alt: off the grid',
+      circle: 'Drag out from a cell to draw a circle centered on it · Alt: off the grid, any radius',
+    })[prefs.shape.kind],
+)
 const pillSelected = computed(() => {
   void s.revision
   return selectedPill(store) !== null
@@ -205,6 +215,43 @@ const pillSelected = computed(() => {
         <span class="dim">Name label<HelpTip :text="HELP['station.label']" /></span>
       </label>
       <span class="hint dim">{{ prefs.station.kind === 'pill' ? 'Drag across lines to paint a pill station' : 'Click on a line to place a station' }}</span>
+    </template>
+
+    <template v-else-if="tool === 'shape'">
+      <span class="dim opt">Shape<HelpTip :text="HELP['shape.kind']" /></span>
+      <Segmented v-model="prefs.shape.kind" data-testid="shape-kind" :options="SHAPE_KINDS" />
+      <div class="sep-v" />
+      <template v-if="prefs.shape.kind === 'line'">
+        <ColorField v-model="prefs.shape.line.color" label="Color" :help="HELP['shape.line_color']" />
+        <NumberField v-model="prefs.shape.line.thickness" label="Width" :min="0.01" :step="0.05" unit="cells" :width="40" :help="HELP['shape.thickness']" data-testid="shape-thickness" />
+        <label class="opt">
+          <span class="dim">Caps<HelpTip :text="HELP['shape.cap']" /></span>
+          <select v-model="prefs.shape.line.cap">
+            <option value="round">Round</option>
+            <option value="butt">Butt</option>
+          </select>
+        </label>
+      </template>
+      <template v-else>
+        <label class="opt">
+          <input v-model="shapePaint.filled" type="checkbox" data-testid="shape-filled" />
+          <span class="dim">Fill<HelpTip :text="HELP['shape.fill']" /></span>
+        </label>
+        <ColorField v-if="shapePaint.filled" v-model="shapePaint.color" :help="HELP['shape.fill_color']" />
+      </template>
+      <ColorField v-model="shapePaint.border_color" label="Border" :help="HELP['shape.border_color']" />
+      <NumberField v-model="shapePaint.border_width" label="Border width" :min="0" :step="0.05" unit="cells" :width="40" :help="HELP['shape.border_width']" />
+      <template v-if="prefs.shape.kind === 'line'">
+        <label class="opt">
+          <input v-model="prefs.shape.line.dashed" type="checkbox" data-testid="shape-dashed" />
+          <span class="dim">Dashed<HelpTip :text="HELP['shape.dashed']" /></span>
+        </label>
+        <template v-if="prefs.shape.line.dashed">
+          <NumberField v-model="prefs.shape.line.dash_length" label="Dash" :min="0.05" :step="0.1" unit="cells" :width="36" :help="HELP['shape.dash_length']" />
+          <NumberField v-model="prefs.shape.line.dash_gap" label="Gap" :min="0" :step="0.1" unit="cells" :width="36" :help="HELP['shape.dash_gap']" />
+        </template>
+      </template>
+      <span class="hint dim">{{ shapeHint }}</span>
     </template>
 
 

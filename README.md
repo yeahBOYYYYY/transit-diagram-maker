@@ -46,7 +46,12 @@ own SVG icons, all in the Icons panel: click one to add it, or drag it onto the 
   <img src="docs/images/icons-panel.png" alt="The Icons panel next to the map" width="900">
 </p>
 
-**A real editor.** Layers and groups with visibility, locking and drag-and-drop ordering;
+**Shapes.** The shape tool draws straight lines between grid intersections, rectangles that
+cover whole cells and circles centered on a cell, each with its own color, fill and border, for
+legends, water, parks or frames around an inset.
+
+**A real editor.** Layers and groups with visibility, locking and drag-and-drop ordering (a
+click on the map shows that object's layer, opening its groups);
 unlimited undo where a whole drag is one step; snapping that Alt turns off for free moves and
 free rotation; an eyedropper on every color; rebindable keyboard shortcuts; and preferences for
 just about every number in the program, each with a way back to the defaults.
@@ -98,9 +103,11 @@ On WSL with the repository on a Windows drive, start the dev server with
 | Erase | `E` | Drag across a line to cut it into separate segments. |
 | Station | `S` | Click a line for a dot or tick station; drag across lines for a pill. |
 | Text | `T` | Click to place a text box, type, Shift+Enter for a new line, Enter to finish. |
+| Shape | `U` | Drag to draw a straight line, a rectangle (Shift: square) or a circle; pick which in the options bar. |
 
-- **Snapping:** everything snaps to the grid while you drag. Hold **Alt** to move in tenths of a
-  cell and to rotate text and pictograms by any angle (stations then leave their line).
+- **Snapping:** everything snaps to the grid while you drag or draw. Hold **Alt** to move and
+  draw in tenths of a cell and to rotate text, pictograms and shapes by any angle (stations then
+  leave their line).
 - **Line colors:** the two swatches under the tools are the line color and the inner color of
   hollow and dashed lines, like the foreground and background colors of Photoshop. Click one to
   choose a color, press `X` to swap them and `D` to go back to the defaults. Tick stations take

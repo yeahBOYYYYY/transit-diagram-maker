@@ -13,6 +13,9 @@ const PATHS: Record<string, string> = {
   station:
     '<path d="M1.5 10h17" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/><circle cx="10" cy="10" r="4.4" fill="#383838" stroke="currentColor" stroke-width="1.8"/>',
   text: '<path d="M4 4.5h12v2.4M10 4.5v11M7.4 15.5h5.2M4 4.5v2.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="square"/>',
+  // A square and a circle, like the shape tools of Illustrator and Inkscape.
+  shape:
+    '<rect x="2.5" y="7.5" width="9.5" height="9.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="12.5" cy="7.5" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/>',
   // A pictogram tile (the airport sign) like the ones the tool places.
   icon:
     '<rect x="2.5" y="2.5" width="15" height="15" rx="3.2" fill="none" stroke="currentColor" stroke-width="1.4"/><path transform="translate(4.24 4.24) scale(0.48)" d="M12 2.8c.9 0 1.4.8 1.4 1.7v5.2l7.3 4.4v2l-7.3-2.2v4.6l2.1 1.6v1.6L12 20.8l-3.5.9v-1.6l2.1-1.6v-4.6l-7.3 2.2v-2l7.3-4.4V4.5c0-.9.5-1.7 1.4-1.7z" fill="currentColor"/>',

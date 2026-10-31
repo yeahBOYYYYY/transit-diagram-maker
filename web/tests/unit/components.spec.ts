@@ -21,6 +21,7 @@ import * as files from '../../src/core/files'
 import { prefs } from '../../src/stores/prefs'
 import { runAction } from '../../src/stores/commands'
 import { picking, toHex } from '../../src/core/eyedropper'
+import { shapeFromDrag } from '../../src/tools'
 
 let wrappers: VueWrapper[] = []
 function mountIt<T>(c: T, opts: Record<string, unknown> = {}) {
@@ -49,6 +50,26 @@ describe('LayersPanel', () => {
     expect(names.filter((n) => n === 'Station 1')).toHaveLength(1)
     await w.find(`[data-layer-id="${l.group_id}"]`).trigger('click')
     expect(store.state.selection).toEqual([l.group_id])
+  })
+
+  it('shows the layer of an object selected on the canvas, opening its groups', async () => {
+    const store = freshStore()
+    store.run((e) => e.createLine([{ x: 0, y: 0 }, { x: 5, y: 0 }], {}))
+    const st = store.run((e) => e.addStation('dot', { x: 2, y: 0 }, {}))!
+    store.run((e) => e.setExpanded(st.group_id, false))
+    store.state.dirty = false
+    const undo = store.state.canUndo
+    const w = mountIt(LayersPanel)
+    expect(w.find(`[data-layer-id="${st.station_id}"]`).exists()).toBe(false)
+    // What a click on the station on the canvas does.
+    store.select([st.station_id])
+    await nextTick()
+    await nextTick()
+    const row = w.find(`[data-layer-id="${st.station_id}"]`)
+    expect(row.exists()).toBe(true)
+    expect(row.classes()).toContain('selected')
+    expect(store.state.dirty).toBe(false)
+    expect(store.state.canUndo).toBe(undo)
   })
 
   it('toggles visibility and lock from the row buttons', async () => {
@@ -272,9 +293,14 @@ describe('property help', () => {
     const tick = store.run((e) => e.addStation('tick', { x: 5, y: 0 }, { label: false }))!
     const t = store.run((e) => e.addText({}))!
     const i = store.run((e) => e.addIcon({}))!
+    const shapes = (['line', 'rect', 'circle'] as const).map((kind) => {
+      store.state.selection = []
+      return store.run((e) => e.addShape(shapeFromDrag(kind, { cells: { x: 0, y: 0 }, cell: { x: 0, y: 0 } }, { cells: { x: 3, y: 2 }, cell: { x: 3, y: 2 } }, false, false)!))!
+    })
+    store.run((e) => e.updateContent(shapes[0], { dashed: true }))
     const w = mountIt(PropertiesPanel)
     expectHelpEverywhere(w)
-    for (const id of [l.layer_id, l.group_id, dot.station_id, tick.station_id, t, i]) {
+    for (const id of [l.layer_id, l.group_id, dot.station_id, tick.station_id, t, i, ...shapes]) {
       store.select([id])
       await nextTick()
       expectHelpEverywhere(w)
@@ -300,6 +326,14 @@ describe('property help', () => {
       expectHelpEverywhere(w)
       w.unmount()
     }
+    store.setTool('shape')
+    for (const kind of ['line', 'rect', 'circle'] as const) {
+      prefs.shape.kind = kind
+      prefs.shape.line.dashed = true
+      const w = mount(OptionsBar as never, { attachTo: document.body })
+      expectHelpEverywhere(w)
+      w.unmount()
+    }
   })
 
   it('shows the help text while hovering the info icon', async () => {
@@ -318,7 +352,7 @@ describe('ToolsPanel', () => {
   it('has one button per tool, including the eraser, and none for pictograms', async () => {
     const store = freshStore()
     const w = mountIt(ToolsPanel)
-    expect(w.findAll('.tool').map((b) => b.attributes('data-tool'))).toEqual(['select', 'hand', 'pen', 'eraser', 'station', 'text'])
+    expect(w.findAll('.tool').map((b) => b.attributes('data-tool'))).toEqual(['select', 'hand', 'pen', 'eraser', 'station', 'text', 'shape'])
     await w.find('[data-tool=eraser]').trigger('click')
     expect(store.state.tool).toBe('eraser')
     expect(w.find('[data-tool=eraser]').classes()).toContain('on')

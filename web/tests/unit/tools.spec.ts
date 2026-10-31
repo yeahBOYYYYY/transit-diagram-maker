@@ -382,6 +382,68 @@ describe('selection tool', () => {
   })
 })
 
+describe('shape tool', () => {
+  function drag(store: EditorStore, tool: ReturnType<typeof setup>['tools']['shape'], from: [number, number], to: [number, number], extra = {}) {
+    tool.down?.(at(store, from[0], from[1], extra))
+    tool.move?.(at(store, to[0], to[1], extra), true)
+    const preview = store.state.overlay.preview
+    tool.up?.(at(store, to[0], to[1], extra))
+    return preview
+  }
+  function shapeOf(store: EditorStore) {
+    const n = store.node(store.state.selection[0])
+    if (n?.type !== 'layer' || n.content.kind !== 'shape') throw new Error('no shape selected')
+    return n.content
+  }
+
+  it('draws a rectangle over every cell it was dragged across, as one undo step', () => {
+    const { store, tools } = setup()
+    prefs.shape.kind = 'rect'
+    const depth = store.engine.value.canUndo()
+    expect(depth).toBe(false)
+    expect(drag(store, tools.shape, [4.2, 3.7], [1.6, 1.2])).toContain('<rect')
+    expect(shapeOf(store)).toMatchObject({ shape: 'rect', pos: { x: 1, y: 1 }, width: 4, height: 3, rotation: 0, color: prefs.shape.rect.color })
+    expect(store.state.tree[0].name).toBe('Rectangle 1')
+    store.undo()
+    expect(store.state.tree).toHaveLength(0)
+    // A click is one cell; Shift makes a square; Alt follows the pointer in tenths.
+    click(store, tools.shape, 2.5, 2.5)
+    expect(shapeOf(store)).toMatchObject({ pos: { x: 2, y: 2 }, width: 1, height: 1 })
+    drag(store, tools.shape, [0.5, 0.5], [2.5, 5.5], { shift: true })
+    expect(shapeOf(store)).toMatchObject({ width: 6, height: 6 })
+    drag(store, tools.shape, [0.33, 0.5], [2.04, 1.26], { alt: true })
+    expect(shapeOf(store)).toMatchObject({ pos: { x: 0.3, y: 0.5 }, width: 1.7, height: 0.8 })
+  })
+
+  it('draws lines between grid intersections in 8 directions, or anywhere with Alt', () => {
+    const { store, tools } = setup()
+    prefs.shape.kind = 'line'
+    expect(drag(store, tools.shape, [0.8, 1.1], [5.2, 1.9])).toContain('<line')
+    expect(shapeOf(store)).toMatchObject({ shape: 'line', from: { x: 1, y: 1 }, to: { x: 5, y: 1 }, thickness: 0.1 })
+    drag(store, tools.shape, [0, 0], [3.2, 2.6])
+    expect(shapeOf(store)).toMatchObject({ from: { x: 0, y: 0 }, to: { x: 3, y: 3 } })
+    drag(store, tools.shape, [0, 0], [3.2, 1.06], { alt: true })
+    expect(shapeOf(store)).toMatchObject({ from: { x: 0, y: 0 }, to: { x: 3.2, y: 1.1 } })
+    // A click draws nothing.
+    const count = store.state.tree.length
+    click(store, tools.shape, 4, 4)
+    expect(store.state.tree).toHaveLength(count)
+  })
+
+  it('draws circles centered on a cell with a radius in half cells; Escape cancels', () => {
+    const { store, tools } = setup()
+    prefs.shape.kind = 'circle'
+    expect(drag(store, tools.shape, [2.3, 2.8], [4.1, 2.6])).toContain('<circle')
+    expect(shapeOf(store)).toMatchObject({ shape: 'circle', center: { x: 2.5, y: 2.5 }, radius: 1.5 })
+    tools.shape.down?.(at(store, 8, 8))
+    tools.shape.move?.(at(store, 10, 8), true)
+    expect(tools.shape.key?.(key('Escape'))).toBe(true)
+    expect(store.state.overlay.preview).toBe('')
+    tools.shape.up?.(at(store, 10, 8))
+    expect(store.state.tree).toHaveLength(1)
+  })
+})
+
 describe('hand tool', () => {
   it('pans the view while dragging', () => {
     const { store, tools } = setup()

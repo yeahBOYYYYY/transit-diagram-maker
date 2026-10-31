@@ -17,6 +17,7 @@ import type {
   LineStyle,
   Rect,
   RouteMode,
+  Shape,
   StationKind,
   StationOptions,
   TextBox,
@@ -84,6 +85,10 @@ export class Engine {
   }
   previewPill(cells: Cell[], outer: string, inner: string): string {
     return this.ed.previewPill(j(cells), outer, inner)
+  }
+  /** Markup of a shape being drawn. */
+  previewShape(shape: Shape): string {
+    return this.ed.previewShape(j(shape))
   }
   route(a: Cell, b: Cell, mode: RouteMode): Cell[] {
     return JSON.parse(this.ed.route(a.x, a.y, b.x, b.y, mode))
@@ -186,6 +191,10 @@ export class Engine {
   }
   addIcon(i: Partial<Icon>): Id {
     return this.ed.addIcon(j(i))
+  }
+  /** Add a straight line, rectangle or circle (positions kept in tenths of a cell). */
+  addShape(shape: Shape): Id {
+    return this.ed.addShape(j(shape))
   }
   /** Merge a patch into a layer. A segment's style changes that segment only, except its color, which the whole line shares. */
   updateContent(id: Id, patch: Record<string, unknown>): void {
